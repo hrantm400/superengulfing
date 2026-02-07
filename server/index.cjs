@@ -31,6 +31,18 @@ app.use('/download', express.static(path.join(__dirname, 'public')));
 // Test: GET /api/ping returns 200 if this server is running (use to verify port 3001 is this app)
 app.get('/api/ping', (req, res) => res.json({ ok: true, message: 'Dashboard API' }));
 
+// GET /api/site-media - Public: PDF and welcome video URLs per locale (for thank-you page)
+const DEFAULT_WELCOME_VIDEO = 'https://fast.wistia.net/embed/iframe/bb9a8qt24g?videoFoam=true';
+app.get('/api/site-media', (req, res) => {
+    const locale = (req.query.locale === 'am' ? 'am' : 'en');
+    const pdfEnv = locale === 'am' ? (process.env.PDF_LINK_AM || process.env.PDF_LINK) : (process.env.PDF_LINK_EN || process.env.PDF_LINK);
+    const videoEnv = locale === 'am' ? process.env.WELCOME_VIDEO_AM : process.env.WELCOME_VIDEO_EN;
+    res.json({
+        welcomePdfUrl: pdfEnv || 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing',
+        welcomeVideoUrl: videoEnv || DEFAULT_WELCOME_VIDEO
+    });
+});
+
 // ==================== PROFILE & AUTH (register first so /api/me is always available) ====================
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
     console.error('FATAL: JWT_SECRET must be set in production');
@@ -60,9 +72,10 @@ const requireAuth = (req, res, next) => {
     }
 };
 
-// Admin two-step auth: allowed emails and JWT secret (separate from user JWT)
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'hayk7eg@gmail.com,0hrmelk@gmail.com')
-    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+// Admin two-step auth: allowed emails (union of ADMIN_EMAILS_EN + ADMIN_EMAILS_AM, fallback: ADMIN_EMAILS)
+const adminEmailsEn = (process.env.ADMIN_EMAILS_EN || process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+const adminEmailsAm = (process.env.ADMIN_EMAILS_AM || process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+const ADMIN_EMAILS = [...new Set([...adminEmailsEn, ...adminEmailsAm])];
 const adminJwtSecret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'superengulfing-admin-secret';
 const requireAdminAuth = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -353,12 +366,13 @@ app.post('/api/me/indicator-access-request', requireAuth, async (req, res) => {
             [tradingview_username, 'pending', req.user.id]
         );
         const userRow = await pool.query(
-            'SELECT email, COALESCE(first_name, \'\') AS first_name, indicator_requested_at FROM dashboard_users WHERE id = $1',
+            'SELECT email, COALESCE(first_name, \'\') AS first_name, indicator_requested_at, COALESCE(locale, \'en\') AS locale FROM dashboard_users WHERE id = $1',
             [req.user.id]
         );
         if (userRow.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-        const { email, first_name: firstName, indicator_requested_at: requestedAt } = userRow.rows[0];
-        await sendAdminIndicatorAccessRequestNotification(firstName || 'User', email, tradingview_username, requestedAt);
+        const { email, first_name: firstName, indicator_requested_at: requestedAt, locale: userLocale } = userRow.rows[0];
+        const locale = userLocale === 'am' ? 'am' : 'en';
+        await sendAdminIndicatorAccessRequestNotification(firstName || 'User', email, tradingview_username, requestedAt, locale);
 
         const profileRow = await pool.query(
             'SELECT id, email, COALESCE(first_name, \'\') AS first_name, COALESCE(onboarding_completed, false) AS onboarding_completed, COALESCE(certificate_section_collapsed, false) AS certificate_section_collapsed, COALESCE(tradingview_username, \'\') AS tradingview_username, COALESCE(indicator_access_status, \'none\') AS indicator_access_status, indicator_requested_at, indicator_rejected_reason, indicator_rejected_at FROM dashboard_users WHERE id = $1',
@@ -1076,7 +1090,7 @@ app.post('/api/access-requests', async (req, res) => {
             [email.toLowerCase().trim(), String(uid).trim(), 'pending', locale]
         );
         await sendRequestReceivedEmail(email, locale);
-        await sendAdminNewAccessRequestNotification(email.toLowerCase().trim(), String(uid).trim());
+        await sendAdminNewAccessRequestNotification(email.toLowerCase().trim(), String(uid).trim(), locale);
         res.status(201).json({ success: true, message: 'Request received. We will process it within 24 hours.' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -2758,7 +2772,8 @@ async function sendAdminPinEmail(email, code) {
 
 // Send welcome email WITH PDF link (sent after confirmation)
 async function sendWelcomeEmail(email, locale = 'en') {
-    const pdfLink = process.env.PDF_LINK || 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing';
+    const pdfLinkEnv = locale === 'am' ? (process.env.PDF_LINK_AM || process.env.PDF_LINK) : (process.env.PDF_LINK_EN || process.env.PDF_LINK);
+    const pdfLink = pdfLinkEnv || 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing';
     const apiUrl = process.env.API_URL || 'http://localhost:3001';
     const unsubscribeUrl = `${apiUrl}/api/unsubscribe?email=${encodeURIComponent(email)}`;
     const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
@@ -2820,10 +2835,10 @@ async function sendWelcomeEmail(email, locale = 'en') {
 }
 
 // Send admin notification when a new access request is submitted (email + UID)
-// ADMIN_EMAIL in .env: one or more addresses, comma-separated (e.g. admin1@x.com,admin2@x.com)
-async function sendAdminNewAccessRequestNotification(applicantEmail, uid) {
-    const adminEmailsRaw = process.env.ADMIN_EMAIL || '';
-    const adminEmails = adminEmailsRaw.split(',').map(s => s.trim()).filter(s => s && s.includes('@'));
+// ADMIN_EMAIL_EN, ADMIN_EMAIL_AM per locale (fallback: ADMIN_EMAIL)
+async function sendAdminNewAccessRequestNotification(applicantEmail, uid, locale = 'en') {
+    const adminEmailsRaw = locale === 'am' ? (process.env.ADMIN_EMAIL_AM || process.env.ADMIN_EMAIL) : (process.env.ADMIN_EMAIL_EN || process.env.ADMIN_EMAIL);
+    const adminEmails = (adminEmailsRaw || '').split(',').map(s => s.trim()).filter(s => s && s.includes('@'));
     if (adminEmails.length === 0) return false;
     const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
     const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
@@ -2858,9 +2873,10 @@ async function sendAdminNewAccessRequestNotification(applicantEmail, uid) {
 const TRADINGVIEW_INDICATOR_URL = 'https://www.tradingview.com/v/B2iqoM5q/';
 
 // Send admin email when a logged-in user requests TradingView indicator access
-async function sendAdminIndicatorAccessRequestNotification(firstName, email, tradingview_username, requestedAt) {
-    const adminEmailsRaw = process.env.ADMIN_EMAIL || '';
-    const adminEmails = adminEmailsRaw.split(',').map(s => s.trim()).filter(s => s && s.includes('@'));
+// ADMIN_EMAIL_EN, ADMIN_EMAIL_AM per locale (fallback: ADMIN_EMAIL)
+async function sendAdminIndicatorAccessRequestNotification(firstName, email, tradingview_username, requestedAt, locale = 'en') {
+    const adminEmailsRaw = locale === 'am' ? (process.env.ADMIN_EMAIL_AM || process.env.ADMIN_EMAIL) : (process.env.ADMIN_EMAIL_EN || process.env.ADMIN_EMAIL);
+    const adminEmails = (adminEmailsRaw || '').split(',').map(s => s.trim()).filter(s => s && s.includes('@'));
     if (adminEmails.length === 0) return false;
     const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
     const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
@@ -3274,31 +3290,41 @@ app.get('/api/analytics', requireAdminAuth, async (req, res) => {
     }
 });
 
-// GET /api/settings - Public: get site settings (affiliate link for Access page)
-app.get('/api/settings', requireAdminAuth, async (req, res) => {
+// GET /api/settings - Public: get site settings (affiliate link for Access page), ?locale=en|am
+app.get('/api/settings', async (req, res) => {
+    const locale = (req.query.locale === 'am' ? 'am' : 'en');
+    const suffix = locale === 'am' ? '_am' : '_en';
+    const keys = [`affiliate_label${suffix}`, `affiliate_url${suffix}`, 'affiliate_label', 'affiliate_url'];
     try {
         const result = await pool.query(
-            "SELECT key, value FROM site_settings WHERE key IN ('affiliate_label', 'affiliate_url')"
+            "SELECT key, value FROM site_settings WHERE key = ANY($1)",
+            [keys]
         );
         const map = {};
         result.rows.forEach(r => { map[r.key] = r.value || ''; });
+        const labelKey = `affiliate_label${suffix}`;
+        const urlKey = `affiliate_url${suffix}`;
         res.json({
-            affiliate_label: map.affiliate_label || 'Affiliate Link',
-            affiliate_url: map.affiliate_url || '#'
+            affiliate_label: map[labelKey] || map.affiliate_label || 'Affiliate Link',
+            affiliate_url: map[urlKey] || map.affiliate_url || '#'
         });
     } catch (error) {
         res.json({ affiliate_label: 'Affiliate Link', affiliate_url: '#' });
     }
 });
 
-// PUT and POST /api/settings - Admin: update site settings (affiliate label & url)
+// PUT and POST /api/settings - Admin: update site settings (affiliate label & url), body: { locale?, affiliate_label, affiliate_url }
 async function updateSettingsHandler(req, res) {
-    const { affiliate_label, affiliate_url } = req.body || {};
+    const { locale: bodyLocale, affiliate_label, affiliate_url } = req.body || {};
+    const locale = (bodyLocale === 'am' ? 'am' : 'en');
+    const suffix = locale === 'am' ? '_am' : '_en';
+    const labelKey = `affiliate_label${suffix}`;
+    const urlKey = `affiliate_url${suffix}`;
     try {
         if (affiliate_label !== undefined) {
             await pool.query(
                 'INSERT INTO site_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-                ['affiliate_label', String(affiliate_label)]
+                [labelKey, String(affiliate_label)]
             );
         }
         if (affiliate_url !== undefined) {
@@ -3308,18 +3334,19 @@ async function updateSettingsHandler(req, res) {
             }
             await pool.query(
                 'INSERT INTO site_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-                ['affiliate_url', url]
+                [urlKey, url]
             );
         }
         const result = await pool.query(
-            "SELECT key, value FROM site_settings WHERE key IN ('affiliate_label', 'affiliate_url')"
+            "SELECT key, value FROM site_settings WHERE key IN ($1, $2)",
+            [labelKey, urlKey]
         );
         const map = {};
         result.rows.forEach(r => { map[r.key] = r.value || ''; });
         res.json({
             success: true,
-            affiliate_label: map.affiliate_label || '',
-            affiliate_url: map.affiliate_url || ''
+            affiliate_label: map[labelKey] || '',
+            affiliate_url: map[urlKey] || ''
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

@@ -1,14 +1,32 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from '@remix-run/react';
 import { useLocale } from '../contexts/LocaleContext';
 import { getContentMedia } from '../contentMedia';
+import { getApiUrl } from '../lib/api';
 import { useTranslation } from '../locales';
 
 const ThankYou: React.FC = () => {
     const { locale, localizePath } = useLocale();
     const { t } = useTranslation();
-    const media = getContentMedia(locale);
+    const [media, setMedia] = useState(() => getContentMedia(locale));
     const pdfLink = media.welcomePdfUrl;
+
+    useEffect(() => {
+        const apiUrl = getApiUrl();
+        if (apiUrl) {
+            fetch(`${apiUrl}/api/site-media?locale=${locale}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    if (data?.welcomePdfUrl || data?.welcomeVideoUrl) {
+                        setMedia(prev => ({
+                            welcomePdfUrl: data.welcomePdfUrl || prev.welcomePdfUrl,
+                            welcomeVideoUrl: data.welcomeVideoUrl || prev.welcomeVideoUrl
+                        }));
+                    }
+                })
+                .catch(() => {});
+        }
+    }, [locale]);
 
     // Auto-open PDF in new tab after 2 seconds
     useEffect(() => {
@@ -16,7 +34,7 @@ const ThankYou: React.FC = () => {
             window.open(pdfLink, '_blank');
         }, 2000);
         return () => clearTimeout(timer);
-    }, []);
+    }, [pdfLink]);
 
     return (
         <div className="min-h-screen bg-background text-foreground font-display relative overflow-x-hidden">

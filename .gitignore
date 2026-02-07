@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+build
+.env
+server/.env
 *.local
 TUNNEL_URL.txt
 

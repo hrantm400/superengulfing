@@ -233,7 +233,7 @@ const Admin: React.FC = () => {
 
     useEffect(() => {
         if (activeTab === 'settings') {
-            fetchWithAdminAuth(`${API_URL}/api/settings`)
+            fetch(`${API_URL}/api/settings?locale=${adminAudienceLocale}`)
                 .then(res => res.json())
                 .then(data => {
                     setAffiliateLabel(data.affiliate_label || '');
@@ -241,7 +241,7 @@ const Admin: React.FC = () => {
                 })
                 .catch(() => {});
         }
-    }, [activeTab]);
+    }, [activeTab, adminAudienceLocale]);
 
     useEffect(() => {
         if (selectedSequenceId) {
@@ -1663,8 +1663,8 @@ const Admin: React.FC = () => {
 
                         <div className="space-y-6">
                             <div className="bg-surface rounded-xl p-6 border border-border">
-                                <h3 className="font-semibold mb-4">Affiliate Link (Access page)</h3>
-                                <p className="text-muted text-sm mb-4">This text and link appear at the top of the Access page and below the Register Now button. Use your Wix affiliate link.</p>
+                                <h3 className="font-semibold mb-4">Affiliate Link ({adminAudienceLocale === 'am' ? 'Armenian' : 'English'} Access page)</h3>
+                                <p className="text-muted text-sm mb-4">This text and link appear at the top of the {adminAudienceLocale === 'am' ? 'Armenian' : 'English'} Access page and below the Register Now button. Switch EN/AM above to edit the other locale.</p>
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-muted text-sm mb-2">Label (visible text)</label>
@@ -1692,7 +1692,7 @@ const Admin: React.FC = () => {
                                                 const res = await fetchWithAdminAuth(`${API_URL}/api/settings`, {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ affiliate_label: affiliateLabel, affiliate_url: affiliateUrl })
+                                                    body: JSON.stringify({ locale: adminAudienceLocale, affiliate_label: affiliateLabel, affiliate_url: affiliateUrl })
                                                 });
                                                 if (res.ok) {
                                                     const data = await res.json();

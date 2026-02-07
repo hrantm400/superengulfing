@@ -17,7 +17,8 @@
     "migrate:onboarding": "node server/run_onboarding_migration.cjs",
     "migrate:certificate-section": "node server/run_certificate_section_migration.cjs",
     "migrate:indicator-access": "node server/run_indicator_access_migration.cjs",
-    "migrate:lesson-resources": "node server/run_lesson_resources_migration.cjs"
+    "migrate:lesson-resources": "node server/run_lesson_resources_migration.cjs",
+    "migrate:site-settings-locale": "node server/run_site_settings_locale_migration.cjs"
   },
   "dependencies": {
     "@remix-run/node": "^2.17.4",

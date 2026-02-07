@@ -3,6 +3,7 @@ import AccessBackground from '../components/AccessBackground';
 import AccessHero from '../components/AccessHero';
 import ProcessCard from '../components/ProcessCard';
 import VerificationCard from '../components/VerificationCard';
+import { useLocale } from '../contexts/LocaleContext';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -14,14 +15,15 @@ function ensureAbsoluteUrl(url: string): string {
 }
 
 const Access: React.FC = () => {
+    const { locale } = useLocale();
     const [affiliate, setAffiliate] = useState<{ affiliate_label: string; affiliate_url: string }>({ affiliate_label: 'Test Affiliate Link', affiliate_url: '#' });
 
     const loadSettings = React.useCallback(() => {
-        fetch(`${API_URL}/api/settings`)
+        fetch(`${API_URL}/api/settings?locale=${locale}`)
             .then(res => res.json())
             .then(data => setAffiliate({ affiliate_label: data.affiliate_label || 'Affiliate Link', affiliate_url: data.affiliate_url || '#' }))
             .catch(() => {});
-    }, []);
+    }, [locale]);
 
     useEffect(() => {
         loadSettings();
