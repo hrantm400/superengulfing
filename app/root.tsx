@@ -38,7 +38,11 @@ export const links: LinksFunction = () => [
 ];
 
 export async function loader(_args: LoaderFunctionArgs) {
-  const apiUrl = process.env.VITE_API_URL || process.env.API_URL || "";
+  let apiUrl = process.env.VITE_API_URL || process.env.API_URL || "";
+  // Avoid double /api: code appends /api/... to base URL, so base must not end with /api
+  if (apiUrl.endsWith("/api")) {
+    apiUrl = apiUrl.slice(0, -4);
+  }
   return {
     env: {
       API_URL: apiUrl,
@@ -101,6 +105,7 @@ export default function App() {
     <html
       lang="en"
       className="text-foreground font-display min-h-screen flex flex-col overflow-x-hidden selection:bg-primary selection:text-black"
+      suppressHydrationWarning
     >
       <head>
         <ThemeScript />

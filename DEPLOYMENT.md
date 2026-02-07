@@ -180,7 +180,7 @@ nano server/.env
 
 | Переменная | Описание | Пример |
 |------------|----------|--------|
-| API_URL | Публичный URL API | `https://superengulfing.io/api` |
+| API_URL | Базовый URL сайта (без /api — код сам добавляет /api/...) | `https://superengulfing.com` |
 | THANK_YOU_URL | Страница Thank You | `https://superengulfing.io/thank-you` |
 | FRONTEND_URL | Домен сайта | `https://superengulfing.io` |
 | PDF_LINK | Ссылка на PDF (fallback если per-locale не задан) | `https://drive.google.com/file/d/...` |
@@ -239,10 +239,12 @@ nano .env
 Содержимое:
 
 ```
-VITE_API_URL=https://твой-домен.com/api
+VITE_API_URL=https://твой-домен.com
 VITE_SITE_URL=https://твой-домен.com
-API_URL=https://твой-домен.com/api
+API_URL=https://твой-домен.com
 ```
+
+Важно: не добавляй `/api` — код сам добавляет `/api/subscribe`, `/api/confirm` и т.д.
 
 Сохранить: `Ctrl+O`, `Enter`, `Ctrl+X`.
 

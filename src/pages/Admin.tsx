@@ -113,7 +113,7 @@ const Admin: React.FC = () => {
     const { fetchWithAdminAuth } = useAdminAuth();
     const urlAudienceAm = location.pathname.startsWith('/am') || new URLSearchParams(location.search).get('audience') === 'am';
     const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'settings' | 'courses'>('dashboard');
-    const [adminAudienceLocale, setAdminAudienceLocale] = useState<'en' | 'am'>(() => (typeof window !== 'undefined' && (window.location.pathname.startsWith('/am') || new URLSearchParams(window.location.search).get('audience') === 'am') ? 'am' : 'en'));
+    const [adminAudienceLocale, setAdminAudienceLocale] = useState<'en' | 'am'>(() => (urlAudienceAm ? 'am' : 'en'));
     const [stats, setStats] = useState<Stats>({ total: 0, today: 0, thisWeek: 0, emailsSent: 0 });
     const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
     const [tags, setTags] = useState<Tag[]>([]);
