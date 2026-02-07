@@ -1,0 +1,1 @@
+import{j as o}from"./jsx-runtime-0DLF9kdB.js";import{B as t}from"./Book-Da0Masr_.js";import{g as r}from"./seo-CGSarzVR.js";const s=()=>r("book");function f(){return o.jsx(t,{})}export{f as default,s as meta};

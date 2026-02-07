@@ -1,0 +1,1 @@
+import{j as t}from"./jsx-runtime-0DLF9kdB.js";import{T as r}from"./Terms-D8U74IJg.js";import{g as m}from"./seo-CGSarzVR.js";import"./LocaleContext-83TzI_2y.js";import"./index-QScjhSTK.js";import"./api-c0T8i5BA.js";import"./components-CDq68o1-.js";import"./index-CbJBlSim.js";const u=()=>m("terms");function x(){return t.jsx(r,{})}export{x as default,u as meta};

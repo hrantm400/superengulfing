@@ -1,0 +1,1 @@
+import{j as o}from"./jsx-runtime-0DLF9kdB.js";import{L as r}from"./Login-CtK-_Xst.js";import"./index-QScjhSTK.js";import"./LocaleContext-83TzI_2y.js";import"./api-c0T8i5BA.js";import"./components-CDq68o1-.js";import"./index-CbJBlSim.js";function e(){return o.jsx(r,{})}export{e as default};
