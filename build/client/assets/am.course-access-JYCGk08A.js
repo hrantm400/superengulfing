@@ -1,1 +1,0 @@
-import{j as t}from"./jsx-runtime-0DLF9kdB.js";import{A as o}from"./Access-DGOTIVZq.js";import{g as r}from"./seo-CGSarzVR.js";import"./index-QScjhSTK.js";import"./index-CbJBlSim.js";import"./LocaleContext-83TzI_2y.js";import"./api-c0T8i5BA.js";import"./components-CDq68o1-.js";const n=()=>r("access");function u(){return t.jsx(o,{})}export{u as default,n as meta};

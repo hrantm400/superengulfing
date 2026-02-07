@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from '@remix-run/react';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { AdminCourses } from '../components/admin/AdminCourses';
+import { getApiUrl } from '../lib/api';
 
 interface Subscriber {
     id: number;
@@ -98,7 +99,7 @@ interface IndicatorAccessRequest {
     indicator_requested_at: string | null;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { getApiUrl } from '../lib/api';
 
 const REJECT_REASON_TEMPLATES: { id: string; label: string; text: string }[] = [
     { id: 'verify', label: 'Could not verify (WEEX/account)', text: 'We could not verify your account / UID.' },
@@ -202,7 +203,7 @@ const Admin: React.FC = () => {
 
     useEffect(() => {
         if (activeTab === 'accessRequests') {
-            fetchWithAdminAuth(`${API_URL}/api/access-requests?locale=${adminAudienceLocale}`)
+            fetchWithAdminAuth(`${getApiUrl()}/api/access-requests?locale=${adminAudienceLocale}`)
                 .then(res => res.json())
                 .then(data => setAccessRequests(Array.isArray(data) ? data : []))
                 .catch(() => setAccessRequests([]));
@@ -211,7 +212,7 @@ const Admin: React.FC = () => {
 
     useEffect(() => {
         if (activeTab === 'indicatorRequests') {
-            fetchWithAdminAuth(`${API_URL}/api/indicator-access-requests`)
+            fetchWithAdminAuth(`${getApiUrl()}/api/indicator-access-requests`)
                 .then(res => res.json())
                 .then(data => setIndicatorRequests(Array.isArray(data) ? data : []))
                 .catch(() => setIndicatorRequests([]));
@@ -219,13 +220,13 @@ const Admin: React.FC = () => {
     }, [activeTab]);
 
     const fetchBroadcastAnalytics = (id: number) => {
-        fetchWithAdminAuth(`${API_URL}/api/broadcasts/${id}/analytics`)
+        fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${id}/analytics`)
             .then(res => res.json())
             .then(data => setBroadcastAnalytics(prev => ({ ...prev, [id]: data })))
             .catch(() => {});
     };
     const fetchSequenceAnalytics = (id: number) => {
-        fetchWithAdminAuth(`${API_URL}/api/sequences/${id}/analytics`)
+        fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${id}/analytics`)
             .then(res => res.json())
             .then(data => setSequenceAnalytics(prev => ({ ...prev, [id]: data })))
             .catch(() => {});
@@ -233,7 +234,7 @@ const Admin: React.FC = () => {
 
     useEffect(() => {
         if (activeTab === 'settings') {
-            fetch(`${API_URL}/api/settings?locale=${adminAudienceLocale}`)
+            fetch(`${getApiUrl()}/api/settings?locale=${adminAudienceLocale}`)
                 .then(res => res.json())
                 .then(data => {
                     setAffiliateLabel(data.affiliate_label || '');
@@ -256,7 +257,7 @@ const Admin: React.FC = () => {
 
     useEffect(() => {
         if (activeTab === 'sequences') {
-            fetchWithAdminAuth(`${API_URL}/api/sequence-triggers`)
+            fetchWithAdminAuth(`${getApiUrl()}/api/sequence-triggers`)
                 .then(res => res.json())
                 .then(data => setSequenceTriggers(Array.isArray(data) ? data : []))
                 .catch(() => setSequenceTriggers([]));
@@ -265,7 +266,7 @@ const Admin: React.FC = () => {
 
     const fetchAnalytics = async () => {
         try {
-            const res = await fetchWithAdminAuth(`${API_URL}/api/analytics`);
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/analytics`);
             const data = await res.json();
             if (res.ok && data && data.summary) {
                 setAnalyticsData(data);
@@ -288,7 +289,7 @@ const Admin: React.FC = () => {
 
     const fetchSequenceEmails = async (seqId: number) => {
         try {
-            const res = await fetchWithAdminAuth(`${API_URL}/api/sequences/${seqId}/emails`);
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${seqId}/emails`);
             const data = await res.json();
             setSequenceEmails(data);
         } catch (e) {
@@ -299,7 +300,7 @@ const Admin: React.FC = () => {
     const scheduleBroadcast = async () => {
         if (!scheduleBroadcastId || !scheduleDatetime) return;
         try {
-            await fetchWithAdminAuth(`${API_URL}/api/broadcasts/${scheduleBroadcastId}/schedule`, {
+            await fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${scheduleBroadcastId}/schedule`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -320,7 +321,7 @@ const Admin: React.FC = () => {
     const addSequenceEmail = async () => {
         if (!selectedSequenceId || !sequenceEmailForm.subject || !sequenceEmailForm.body) return;
         try {
-            await fetchWithAdminAuth(`${API_URL}/api/sequences/${selectedSequenceId}/emails`, {
+            await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${selectedSequenceId}/emails`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -341,7 +342,7 @@ const Admin: React.FC = () => {
 
     const activateSequence = async (seqId: number) => {
         try {
-            await fetchWithAdminAuth(`${API_URL}/api/sequences/${seqId}/activate`, { method: 'POST' });
+            await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${seqId}/activate`, { method: 'POST' });
             setMessage('Sequence activated');
             fetchAll();
         } catch (e) {
@@ -351,7 +352,7 @@ const Admin: React.FC = () => {
 
     const pauseSequence = async (seqId: number) => {
         try {
-            await fetchWithAdminAuth(`${API_URL}/api/sequences/${seqId}/pause`, { method: 'POST' });
+            await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${seqId}/pause`, { method: 'POST' });
             setMessage('Sequence paused');
             fetchAll();
         } catch (e) {
@@ -362,7 +363,7 @@ const Admin: React.FC = () => {
     const updateSequenceName = async () => {
         if (!selectedSequenceId || sequenceNameEdit === null || !sequenceNameEdit.trim()) return;
         try {
-            await fetchWithAdminAuth(`${API_URL}/api/sequences/${selectedSequenceId}`, {
+            await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${selectedSequenceId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: sequenceNameEdit.trim() })
@@ -378,7 +379,7 @@ const Admin: React.FC = () => {
     const updateSequenceEmail = async () => {
         if (!selectedSequenceId || !editingSequenceEmailId) return;
         try {
-            await fetchWithAdminAuth(`${API_URL}/api/sequences/${selectedSequenceId}/emails/${editingSequenceEmailId}`, {
+            await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${selectedSequenceId}/emails/${editingSequenceEmailId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -401,7 +402,7 @@ const Admin: React.FC = () => {
     const deleteSequenceEmail = async (seqId: number, emailId: number) => {
         if (!confirm('Remove this step from the sequence?')) return;
         try {
-            await fetchWithAdminAuth(`${API_URL}/api/sequences/${seqId}/emails/${emailId}`, { method: 'DELETE' });
+            await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${seqId}/emails/${emailId}`, { method: 'DELETE' });
             if (editingSequenceEmailId === emailId) {
                 setEditingSequenceEmailId(null);
                 setSequenceEmailForm({ subject: '', body: '', delay_days: 0, delay_hours: 0 });
@@ -416,7 +417,7 @@ const Admin: React.FC = () => {
 
     const addSubscriberToSequence = async (subscriberId: number, seqId: number) => {
         try {
-            await fetchWithAdminAuth(`${API_URL}/api/subscribers/${subscriberId}/sequences/${seqId}`, { method: 'POST' });
+            await fetchWithAdminAuth(`${getApiUrl()}/api/subscribers/${subscriberId}/sequences/${seqId}`, { method: 'POST' });
             setMessage('Subscriber added to sequence');
             setAddSubscriberSequenceId(null);
             fetchAll();
@@ -458,7 +459,7 @@ const Admin: React.FC = () => {
             return;
         }
         try {
-            const res = await fetchWithAdminAuth(`${API_URL}/api/import`, {
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/import`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ subscribers: subscribersList })
@@ -478,12 +479,12 @@ const Admin: React.FC = () => {
         setLoading(true);
         try {
             const [statsRes, subsRes, tagsRes, templatesRes, broadcastsRes, seqRes] = await Promise.all([
-                fetchWithAdminAuth(`${API_URL}/api/stats?locale=${locale}`),
-                fetchWithAdminAuth(`${API_URL}/api/subscribers?locale=${locale}`),
-                fetchWithAdminAuth(`${API_URL}/api/tags`),
-                fetchWithAdminAuth(`${API_URL}/api/templates`),
-                fetchWithAdminAuth(`${API_URL}/api/broadcasts`),
-                fetchWithAdminAuth(`${API_URL}/api/sequences`)
+                fetchWithAdminAuth(`${getApiUrl()}/api/stats?locale=${locale}`),
+                fetchWithAdminAuth(`${getApiUrl()}/api/subscribers?locale=${locale}`),
+                fetchWithAdminAuth(`${getApiUrl()}/api/tags`),
+                fetchWithAdminAuth(`${getApiUrl()}/api/templates`),
+                fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts`),
+                fetchWithAdminAuth(`${getApiUrl()}/api/sequences`)
             ]);
 
             setStats(await statsRes.json());
@@ -502,7 +503,7 @@ const Admin: React.FC = () => {
 
     const createTag = async () => {
         if (!newTagName) return;
-        await fetchWithAdminAuth(`${API_URL}/api/tags`, {
+        await fetchWithAdminAuth(`${getApiUrl()}/api/tags`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: newTagName, color: newTagColor })
@@ -512,13 +513,13 @@ const Admin: React.FC = () => {
     };
 
     const deleteTag = async (id: number) => {
-        await fetchWithAdminAuth(`${API_URL}/api/tags/${id}`, { method: 'DELETE' });
+        await fetchWithAdminAuth(`${getApiUrl()}/api/tags/${id}`, { method: 'DELETE' });
         fetchAll();
     };
 
     const createBroadcast = async () => {
         if (!broadcastForm.subject || !broadcastForm.body) return;
-        await fetchWithAdminAuth(`${API_URL}/api/broadcasts`, {
+        await fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -537,7 +538,7 @@ const Admin: React.FC = () => {
     const sendBroadcast = async (id: number) => {
         if (!confirm('Send this broadcast to all subscribers?')) return;
         setMessage('Sending...');
-        const res = await fetchWithAdminAuth(`${API_URL}/api/broadcasts/${id}/send`, { method: 'POST' });
+        const res = await fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${id}/send`, { method: 'POST' });
         const data = await res.json();
         setMessage(`Sent to ${data.sentCount} subscribers`);
         fetchAll();
@@ -545,7 +546,7 @@ const Admin: React.FC = () => {
 
     const createTemplate = async () => {
         if (!templateForm.name) return;
-        await fetchWithAdminAuth(`${API_URL}/api/templates`, {
+        await fetchWithAdminAuth(`${getApiUrl()}/api/templates`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(templateForm)
@@ -556,7 +557,7 @@ const Admin: React.FC = () => {
 
     const updateTemplate = async () => {
         if (editingTemplateId == null || !templateForm.name) return;
-        await fetchWithAdminAuth(`${API_URL}/api/templates/${editingTemplateId}`, {
+        await fetchWithAdminAuth(`${getApiUrl()}/api/templates/${editingTemplateId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(templateForm)
@@ -569,7 +570,7 @@ const Admin: React.FC = () => {
 
     const deleteTemplate = async (id: number) => {
         if (!confirm('Delete this template?')) return;
-        await fetchWithAdminAuth(`${API_URL}/api/templates/${id}`, { method: 'DELETE' });
+        await fetchWithAdminAuth(`${getApiUrl()}/api/templates/${id}`, { method: 'DELETE' });
         if (editingTemplateId === id) setEditingTemplateId(null);
         setTemplateForm({ name: '', subject: '', body: '' });
         fetchAll();
@@ -578,7 +579,7 @@ const Admin: React.FC = () => {
 
     const createSequence = async () => {
         if (!sequenceForm.name) return;
-        await fetchWithAdminAuth(`${API_URL}/api/sequences`, {
+        await fetchWithAdminAuth(`${getApiUrl()}/api/sequences`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(sequenceForm)
@@ -589,7 +590,7 @@ const Admin: React.FC = () => {
 
     const deleteSubscriber = async (id: number) => {
         if (!confirm('Delete this subscriber?')) return;
-        await fetchWithAdminAuth(`${API_URL}/api/subscribers/${id}`, { method: 'DELETE' });
+        await fetchWithAdminAuth(`${getApiUrl()}/api/subscribers/${id}`, { method: 'DELETE' });
         fetchAll();
     };
 
@@ -603,7 +604,7 @@ const Admin: React.FC = () => {
             return;
         }
         try {
-            await fetchWithAdminAuth(`${API_URL}/api/subscribers/${editSubscriberId}`, {
+            await fetchWithAdminAuth(`${getApiUrl()}/api/subscribers/${editSubscriberId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ first_name: editSubscriberForm.first_name, status: editSubscriberForm.status, custom_fields })
@@ -677,7 +678,7 @@ const Admin: React.FC = () => {
                                 navigate('/admin', { replace: true });
                                 fetchAll('en');
                                 if (activeTab === 'accessRequests') {
-                                    fetchWithAdminAuth(`${API_URL}/api/access-requests?locale=en`).then(r => r.json()).then(d => setAccessRequests(Array.isArray(d) ? d : [])).catch(() => setAccessRequests([]));
+                                    fetchWithAdminAuth(`${getApiUrl()}/api/access-requests?locale=en`).then(r => r.json()).then(d => setAccessRequests(Array.isArray(d) ? d : [])).catch(() => setAccessRequests([]));
                                 }
                             }}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${adminAudienceLocale === 'en' ? 'bg-primary text-black' : 'text-muted hover:text-foreground'}`}
@@ -690,7 +691,7 @@ const Admin: React.FC = () => {
                                 navigate('/am/admin', { replace: true });
                                 fetchAll('am');
                                 if (activeTab === 'accessRequests') {
-                                    fetchWithAdminAuth(`${API_URL}/api/access-requests?locale=am`).then(r => r.json()).then(d => setAccessRequests(Array.isArray(d) ? d : [])).catch(() => setAccessRequests([]));
+                                    fetchWithAdminAuth(`${getApiUrl()}/api/access-requests?locale=am`).then(r => r.json()).then(d => setAccessRequests(Array.isArray(d) ? d : [])).catch(() => setAccessRequests([]));
                                 }
                             }}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${adminAudienceLocale === 'am' ? 'bg-primary text-black' : 'text-muted hover:text-foreground'}`}
@@ -767,7 +768,7 @@ const Admin: React.FC = () => {
                                     Import CSV
                                 </label>
                                 <button onClick={fetchAll} className="px-4 py-2 bg-surfaceElevated hover:bg-surface/80 rounded-lg">Refresh</button>
-                                <a href={`${API_URL}/api/export`} className="px-4 py-2 bg-primary/20 text-primary rounded-lg">Export CSV</a>
+                                <a href={`${getApiUrl()}/api/export`} className="px-4 py-2 bg-primary/20 text-primary rounded-lg">Export CSV</a>
                             </div>
                         </div>
 
@@ -780,7 +781,7 @@ const Admin: React.FC = () => {
                                 </select>
                                 {bulkTagId && (
                                     <button onClick={async () => {
-                                        await fetchWithAdminAuth(`${API_URL}/api/subscribers/bulk-tag`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_ids: selectedSubscriberIds, tag_id: bulkTagId }) });
+                                        await fetchWithAdminAuth(`${getApiUrl()}/api/subscribers/bulk-tag`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_ids: selectedSubscriberIds, tag_id: bulkTagId }) });
                                         setMessage('Tag added'); setSelectedSubscriberIds([]); setBulkTagId(null); fetchAll();
                                     }} className="px-3 py-1 bg-primary text-black text-sm font-bold rounded shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">Apply</button>
                                 )}
@@ -790,7 +791,7 @@ const Admin: React.FC = () => {
                                 </select>
                                 {bulkRemoveTagId && (
                                     <button onClick={async () => {
-                                        await fetchWithAdminAuth(`${API_URL}/api/subscribers/bulk-remove-tag`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_ids: selectedSubscriberIds, tag_id: bulkRemoveTagId }) });
+                                        await fetchWithAdminAuth(`${getApiUrl()}/api/subscribers/bulk-remove-tag`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_ids: selectedSubscriberIds, tag_id: bulkRemoveTagId }) });
                                         setMessage('Tag removed'); setSelectedSubscriberIds([]); setBulkRemoveTagId(null); fetchAll();
                                     }} className="px-3 py-1 bg-amber-500/20 text-amber-400 text-sm rounded">Apply</button>
                                 )}
@@ -800,13 +801,13 @@ const Admin: React.FC = () => {
                                 </select>
                                 {bulkSequenceId && (
                                     <button onClick={async () => {
-                                        await fetchWithAdminAuth(`${API_URL}/api/subscribers/bulk-sequence`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_ids: selectedSubscriberIds, sequence_id: bulkSequenceId }) });
+                                        await fetchWithAdminAuth(`${getApiUrl()}/api/subscribers/bulk-sequence`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_ids: selectedSubscriberIds, sequence_id: bulkSequenceId }) });
                                         setMessage('Added to sequence'); setSelectedSubscriberIds([]); setBulkSequenceId(null); fetchAll();
                                     }} className="px-3 py-1 bg-blue-500/20 text-blue-400 text-sm rounded">Apply</button>
                                 )}
                                 <button onClick={async () => {
                                     if (!confirm(`Unsubscribe ${selectedSubscriberIds.length} subscriber(s)?`)) return;
-                                    await fetchWithAdminAuth(`${API_URL}/api/subscribers/bulk-unsubscribe`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_ids: selectedSubscriberIds }) });
+                                    await fetchWithAdminAuth(`${getApiUrl()}/api/subscribers/bulk-unsubscribe`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_ids: selectedSubscriberIds }) });
                                     setMessage('Unsubscribed'); setSelectedSubscriberIds([]); fetchAll();
                                 }} className="px-3 py-1 bg-red-500/20 text-red-400 text-sm rounded">Unsubscribe</button>
                                 <button onClick={() => { setSelectedSubscriberIds([]); setBulkTagId(null); setBulkRemoveTagId(null); setBulkSequenceId(null); }} className="text-muted text-sm">Clear</button>
@@ -1130,7 +1131,7 @@ const Admin: React.FC = () => {
                                                     <button onClick={() => sendBroadcast(b.id)} className="px-4 py-2 bg-primary text-black font-bold rounded-lg text-sm shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">
                                                         Send Now
                                                     </button>
-                                                    <button onClick={() => { const subjectB = prompt('Subject B (for A/B test):'); if (subjectB != null && subjectB.trim()) { fetchWithAdminAuth(`${API_URL}/api/broadcasts/${b.id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ab_test: true, subject_b: subjectB.trim() }) }).then(r => r.json()).then(d => { setMessage(d.abTest || d.error || 'Sent'); fetchAll(); }); } }} className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm">
+                                                    <button onClick={() => { const subjectB = prompt('Subject B (for A/B test):'); if (subjectB != null && subjectB.trim()) { fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${b.id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ab_test: true, subject_b: subjectB.trim() }) }).then(r => r.json()).then(d => { setMessage(d.abTest || d.error || 'Sent'); fetchAll(); }); } }} className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm">
                                                         A/B test
                                                     </button>
                                                     <button onClick={() => { setScheduleBroadcastId(b.id); setScheduleDatetime(''); }} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm">
@@ -1139,7 +1140,7 @@ const Admin: React.FC = () => {
                                                     <button
                                                         onClick={async () => {
                                                             try {
-                                                                const res = await fetchWithAdminAuth(`${API_URL}/api/broadcasts/${b.id}/test-send`, {
+                                                                const res = await fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${b.id}/test-send`, {
                                                                     method: 'POST',
                                                                     headers: { 'Content-Type': 'application/json' },
                                                                     body: JSON.stringify({})
@@ -1198,17 +1199,17 @@ const Admin: React.FC = () => {
                                     </select>
                                     <button onClick={async () => {
                                         if (!triggerForm.tag_id || !triggerForm.sequence_id) return;
-                                        await fetchWithAdminAuth(`${API_URL}/api/sequence-triggers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(triggerForm) });
+                                        await fetchWithAdminAuth(`${getApiUrl()}/api/sequence-triggers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(triggerForm) });
                                         setMessage('Trigger added');
                                         setTriggerForm({ tag_id: 0, sequence_id: 0 });
-                                        fetchWithAdminAuth(`${API_URL}/api/sequence-triggers`).then(r => r.json()).then(d => setSequenceTriggers(Array.isArray(d) ? d : []));
+                                        fetchWithAdminAuth(`${getApiUrl()}/api/sequence-triggers`).then(r => r.json()).then(d => setSequenceTriggers(Array.isArray(d) ? d : []));
                                     }} className="px-4 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">Add trigger</button>
                                 </div>
                                 <div className="space-y-2">
                                     {sequenceTriggers.map(tr => (
                                         <div key={tr.id} className="flex items-center justify-between py-2 border-b border-border">
                                             <span>When tag <strong style={{ color: (tags.find(t => t.id === tr.tag_id)?.color) || '#fff' }}>{tr.tag_name}</strong> is added → add to sequence <strong>{tr.sequence_name}</strong></span>
-                                            <button onClick={async () => { await fetchWithAdminAuth(`${API_URL}/api/sequence-triggers/${tr.id}`, { method: 'DELETE' }); setSequenceTriggers(prev => prev.filter(x => x.id !== tr.id)); setMessage('Trigger removed'); }} className="text-red-400 hover:underline text-sm">Remove</button>
+                                            <button onClick={async () => { await fetchWithAdminAuth(`${getApiUrl()}/api/sequence-triggers/${tr.id}`, { method: 'DELETE' }); setSequenceTriggers(prev => prev.filter(x => x.id !== tr.id)); setMessage('Trigger removed'); }} className="text-red-400 hover:underline text-sm">Remove</button>
                                         </div>
                                     ))}
                                     {sequenceTriggers.length === 0 && <p className="text-muted text-sm">No triggers. Add one above.</p>}
@@ -1543,9 +1544,9 @@ const Admin: React.FC = () => {
                                                         <button
                                                             onClick={async () => {
                                                                 try {
-                                                                    await fetchWithAdminAuth(`${API_URL}/api/access-requests/${req.id}/accept`, { method: 'POST' });
+                                                                    await fetchWithAdminAuth(`${getApiUrl()}/api/access-requests/${req.id}/accept`, { method: 'POST' });
                                                                     setMessage('Request accepted. User will receive set-password email.');
-                                                                    fetchWithAdminAuth(`${API_URL}/api/access-requests?locale=${adminAudienceLocale}`).then(r => r.json()).then(d => setAccessRequests(Array.isArray(d) ? d : []));
+                                                                    fetchWithAdminAuth(`${getApiUrl()}/api/access-requests?locale=${adminAudienceLocale}`).then(r => r.json()).then(d => setAccessRequests(Array.isArray(d) ? d : []));
                                                                 } catch (e) {
                                                                     setMessage('Failed to accept');
                                                                 }
@@ -1612,14 +1613,14 @@ const Admin: React.FC = () => {
                                                         <button
                                                             onClick={async () => {
                                                                 try {
-                                                                    const res = await fetchWithAdminAuth(`${API_URL}/api/indicator-access-requests/${req.id}/approve`, { method: 'POST' });
+                                                                    const res = await fetchWithAdminAuth(`${getApiUrl()}/api/indicator-access-requests/${req.id}/approve`, { method: 'POST' });
                                                                     if (!res.ok) {
                                                                         const err = await res.json().catch(() => ({}));
                                                                         setMessage(err.error || 'Failed to approve');
                                                                         return;
                                                                     }
                                                                     setMessage('Access approved. User will receive an email.');
-                                                                    const listRes = await fetchWithAdminAuth(`${API_URL}/api/indicator-access-requests`);
+                                                                    const listRes = await fetchWithAdminAuth(`${getApiUrl()}/api/indicator-access-requests`);
                                                                     const list = await listRes.json();
                                                                     setIndicatorRequests(Array.isArray(list) ? list : []);
                                                                 } catch (e) {
@@ -1689,7 +1690,7 @@ const Admin: React.FC = () => {
                                     <button
                                         onClick={async () => {
                                             try {
-                                                const res = await fetchWithAdminAuth(`${API_URL}/api/settings`, {
+                                                const res = await fetchWithAdminAuth(`${getApiUrl()}/api/settings`, {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
                                                     body: JSON.stringify({ locale: adminAudienceLocale, affiliate_label: affiliateLabel, affiliate_url: affiliateUrl })
@@ -1735,7 +1736,7 @@ const Admin: React.FC = () => {
                                 <h3 className="font-semibold mb-4">Test Email</h3>
                                 <button
                                     onClick={async () => {
-                                        const res = await fetchWithAdminAuth(`${API_URL}/api/test-email`);
+                                        const res = await fetchWithAdminAuth(`${getApiUrl()}/api/test-email`);
                                         const data = await res.json();
                                         setMessage(data.success ? '✅ Test email sent!' : '❌ Failed');
                                     }}
@@ -1797,7 +1798,7 @@ const Admin: React.FC = () => {
                                     setRejectSubmitting(true);
                                     try {
                                         if (rejectModal.type === 'access') {
-                                            const res = await fetchWithAdminAuth(`${API_URL}/api/access-requests/${rejectModal.id}/reject`, {
+                                            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/access-requests/${rejectModal.id}/reject`, {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({ reason }),
@@ -1808,11 +1809,11 @@ const Admin: React.FC = () => {
                                                 return;
                                             }
                                             setMessage('Request rejected. User will receive an email with the reason.');
-                                            const listRes = await fetchWithAdminAuth(`${API_URL}/api/access-requests?locale=${adminAudienceLocale}`);
+                                            const listRes = await fetchWithAdminAuth(`${getApiUrl()}/api/access-requests?locale=${adminAudienceLocale}`);
                                             const list = await listRes.json();
                                             setAccessRequests(Array.isArray(list) ? list : []);
                                         } else {
-                                            const res = await fetchWithAdminAuth(`${API_URL}/api/indicator-access-requests/${rejectModal.userId}/reject`, {
+                                            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/indicator-access-requests/${rejectModal.userId}/reject`, {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({ reason }),
@@ -1823,7 +1824,7 @@ const Admin: React.FC = () => {
                                                 return;
                                             }
                                             setMessage('Request rejected. User will receive an email with the reason.');
-                                            const listRes = await fetchWithAdminAuth(`${API_URL}/api/indicator-access-requests`);
+                                            const listRes = await fetchWithAdminAuth(`${getApiUrl()}/api/indicator-access-requests`);
                                             const list = await listRes.json();
                                             setIndicatorRequests(Array.isArray(list) ? list : []);
                                         }

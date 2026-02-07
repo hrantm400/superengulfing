@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from '@remix-run/react';
 import { useLocale } from '../contexts/LocaleContext';
 import { useTranslation } from '../locales';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { getApiUrl } from '../lib/api';
 
 const SetPassword: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -33,7 +32,7 @@ const SetPassword: React.FC = () => {
         }
         setIsSubmitting(true);
         try {
-            const res = await fetch(`${API_BASE}/api/set-password`, {
+            const res = await fetch(`${getApiUrl()}/api/set-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token, password }),

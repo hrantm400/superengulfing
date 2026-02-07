@@ -1,1 +1,0 @@
-import{j as t}from"./jsx-runtime-0DLF9kdB.js";import{T as o}from"./ThankYou-DSAE9Znc.js";import{g as r}from"./seo-CGSarzVR.js";import"./index-QScjhSTK.js";import"./LocaleContext-83TzI_2y.js";import"./api-c0T8i5BA.js";import"./components-CDq68o1-.js";import"./index-CbJBlSim.js";const f=()=>r("thankYou");function x(){return t.jsx(o,{})}export{x as default,f as meta};

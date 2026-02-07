@@ -1,1 +1,0 @@
-import{j as o}from"./jsx-runtime-0DLF9kdB.js";import{T as r}from"./ThankYou-DSAE9Znc.js";import"./index-QScjhSTK.js";import"./LocaleContext-83TzI_2y.js";import"./api-c0T8i5BA.js";import"./components-CDq68o1-.js";import"./index-CbJBlSim.js";function u(){return o.jsx(r,{})}export{u as default};

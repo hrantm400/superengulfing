@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useLocale } from '../contexts/LocaleContext';
 import { useTranslation } from '../locales';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { getApiUrl } from '../lib/api';
 
 const VerificationCard: React.FC = () => {
   const { locale } = useLocale();
@@ -22,7 +21,7 @@ const VerificationCard: React.FC = () => {
     setError(null);
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/access-requests`, {
+      const res = await fetch(`${getApiUrl()}/api/access-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), uid: String(uid).trim(), locale }),

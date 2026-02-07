@@ -1,1 +1,0 @@
-import{j as r}from"./jsx-runtime-0DLF9kdB.js";import{A as t,a as i}from"./AdminGate-CIYoDyYQ.js";import"./index-QScjhSTK.js";import"./api-c0T8i5BA.js";import"./plus-DXKeQuKl.js";import"./createLucideIcon-CnELezcF.js";import"./book-open-DpnmxrYp.js";import"./x-fvj0jzvG.js";function A(){return r.jsx(t,{children:r.jsx(i,{})})}export{A as default};

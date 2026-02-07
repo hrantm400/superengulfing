@@ -1,1 +1,0 @@
-import{j as t}from"./jsx-runtime-0DLF9kdB.js";import{S as o}from"./SetPassword-CGSF5gwH.js";import{g as r}from"./seo-CGSarzVR.js";import"./index-QScjhSTK.js";import"./LocaleContext-83TzI_2y.js";import"./api-c0T8i5BA.js";import"./components-CDq68o1-.js";import"./index-CbJBlSim.js";const d=()=>r("setPassword");function u(){return t.jsx(o,{})}export{u as default,d as meta};

@@ -1,10 +1,16 @@
-const API_URL =
-  (typeof window !== "undefined" && (window as { ENV?: { API_URL?: string } }).ENV?.API_URL) ||
-  import.meta.env?.VITE_API_URL ||
-  "";
+function getApiUrlRaw(): string {
+  return (
+    (typeof window !== "undefined" && (window as { ENV?: { API_URL?: string } }).ENV?.API_URL) ||
+    import.meta.env?.VITE_API_URL ||
+    ""
+  );
+}
 
+/** Returns base API URL without trailing /api (code appends /api/...). */
 export function getApiUrl(): string {
-  return API_URL;
+  const url = getApiUrlRaw();
+  if (url.endsWith("/api")) return url.slice(0, -4);
+  return url;
 }
 
 export function getAuthToken(): string | null {
@@ -33,7 +39,7 @@ export async function authFetch(
   options: RequestInit = {}
 ): Promise<Response> {
   const token = getAuthToken();
-  const url = path.startsWith('http') ? path : `${API_URL}${path}`;
+  const url = path.startsWith('http') ? path : `${getApiUrl()}${path}`;
   const headers: HeadersInit = {
     ...(typeof options.headers === 'object' && !(options.headers instanceof Headers)
       ? options.headers

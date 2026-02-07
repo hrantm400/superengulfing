@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import PdfSuccessPopup from './PdfSuccessPopup';
 import { useTranslation } from '../locales';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { getApiUrl } from '../lib/api';
 
 type PatternType = 'bull' | 'bear';
 type SetupType = 'RUN' | 'REV';
@@ -255,7 +254,7 @@ const PatternShowcase: React.FC = () => {
     setStatus('loading');
 
     try {
-      const res = await fetch(`${API_BASE}/api/subscribe`, {
+      const res = await fetch(`${getApiUrl()}/api/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, source: 'pattern-showcase' })

@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL || '';
+import { getApiUrl } from '../lib/api';
 const STORAGE_KEY = 'adminSession';
 
 interface AdminSession {
@@ -54,7 +53,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const requestCode = useCallback(async (password: string): Promise<{ success: boolean; emailMasked?: string; setupRequired?: boolean; otpauthUrl?: string; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/admin-auth/request-code`, {
+      const res = await fetch(`${getApiUrl()}/api/admin-auth/request-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: password.trim() })
@@ -81,7 +80,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     rememberDuration?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/admin-auth/verify`, {
+      const res = await fetch(`${getApiUrl()}/api/admin-auth/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

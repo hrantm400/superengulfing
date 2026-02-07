@@ -1,1 +1,0 @@
-import{j as t}from"./jsx-runtime-0DLF9kdB.js";import{P as o}from"./ProtectedRoute-kUFs4gIZ.js";import"./index-QScjhSTK.js";import"./LocaleContext-83TzI_2y.js";import"./api-c0T8i5BA.js";import"./components-CDq68o1-.js";function s(){return t.jsx(o,{})}export{s as default};

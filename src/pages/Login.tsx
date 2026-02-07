@@ -3,8 +3,7 @@ import { Link, useNavigate, useLocation } from '@remix-run/react';
 import { useLocale } from '../contexts/LocaleContext';
 import { useTranslation } from '../locales';
 import { useUser } from '../contexts/UserContext';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { getApiUrl } from '../lib/api';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -34,7 +33,7 @@ const Login: React.FC = () => {
         setMessage('');
         setIsSubmitting(true);
         try {
-            const res = await fetch(`${API_BASE}/api/login`, {
+            const res = await fetch(`${getApiUrl()}/api/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: email.trim(), password }),
@@ -63,7 +62,7 @@ const Login: React.FC = () => {
         setMessage('');
         setIsSubmitting(true);
         try {
-            const res = await fetch(`${API_BASE}/api/dev-login`, {
+            const res = await fetch(`${getApiUrl()}/api/dev-login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
