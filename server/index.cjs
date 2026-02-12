@@ -1014,7 +1014,9 @@ app.get('/api/confirm/:token', async (req, res) => {
 
         // Determine subscriber locale once
         const subLocale = subscriber.locale === 'am' ? 'am' : 'en';
-        const thankYouBase = (process.env.THANK_YOU_URL || 'http://localhost:5173/thank-you').replace(/\/thank-you\/?$/i, '') || (process.env.THANK_YOU_URL || 'http://localhost:5173');
+        // Use THANK_YOU_URL if available, otherwise fall back to API_URL (without /api suffix)
+        const thankYouBaseRaw = process.env.THANK_YOU_URL || (process.env.API_URL || 'http://localhost:3001').replace(/\/api$/, '');
+        const thankYouBase = thankYouBaseRaw.replace(/\/thank-you\/?$/i, '') || thankYouBaseRaw;
         const thankYouUrl = subLocale === 'am' ? `${thankYouBase}/am/thank-you?confirmed=1` : `${thankYouBase}/thank-you?confirmed=1`;
 
         if (subscriber.confirmed_at) {
@@ -3544,9 +3546,10 @@ async function sendRequestReceivedEmail(email, locale = 'en') {
 
 // Send "set your password" email (after admin accept)
 async function sendSetPasswordEmail(email, token, locale = 'en') {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    // Use FRONTEND_URL if available, otherwise fall back to API_URL (without /api suffix)
+    const baseUrl = process.env.FRONTEND_URL || (process.env.API_URL || 'http://localhost:3001').replace(/\/api$/, '');
     const pathPrefix = locale === 'am' ? '/am' : '';
-    const setPasswordUrl = `${frontendUrl}${pathPrefix}/set-password?token=${encodeURIComponent(token)}`;
+    const setPasswordUrl = `${baseUrl}${pathPrefix}/set-password?token=${encodeURIComponent(token)}`;
     const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
     const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
     const isAm = locale === 'am';
