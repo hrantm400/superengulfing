@@ -1,12 +1,11 @@
 import { RemixBrowser } from "@remix-run/react";
-import { startTransition, StrictMode } from "react";
-import { hydrateRoot } from "react-dom/client";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
 
-startTransition(() => {
-  hydrateRoot(
-    document,
-    <StrictMode>
-      <RemixBrowser />
-    </StrictMode>
-  );
-});
+// Use createRoot instead of hydrateRoot to avoid hydration mismatch (#418)
+// caused by ThemeScript modifying DOM before React hydrates
+createRoot(document).render(
+  <StrictMode>
+    <RemixBrowser />
+  </StrictMode>
+);

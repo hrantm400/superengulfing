@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 
-const SITE_URL = process.env.VITE_SITE_URL || process.env.SITE_URL || "https://superengulfing.io";
+const SITE_URL = process.env.VITE_SITE_URL || process.env.SITE_URL || "https://superengulfing.com";
 
 const PUBLIC_PATHS = [
   "",

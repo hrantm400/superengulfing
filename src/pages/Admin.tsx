@@ -691,8 +691,18 @@ const Admin: React.FC = () => {
 
     const deleteTag = async (id: number) => {
         if (!confirm('Delete this tag?')) return;
-        await fetchWithAdminAuth(`${getApiUrl()}/api/tags/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
-        fetchAll();
+        try {
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/tags/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setMessage(data.error || `Failed to delete tag (${res.status})`);
+                return;
+            }
+            fetchAll();
+            setMessage('Tag deleted');
+        } catch (e) {
+            setMessage('Failed to delete tag');
+        }
     };
 
     const startEditTag = (tag: Tag) => {
@@ -775,7 +785,12 @@ const Admin: React.FC = () => {
     const deleteBroadcast = async (id: number) => {
         if (!confirm('Delete this broadcast? This cannot be undone.')) return;
         try {
-            await fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setMessage(data.error || `Failed to delete broadcast (${res.status})`);
+                return;
+            }
             setMessage('Broadcast deleted');
             fetchAll();
         } catch (e) {
@@ -860,11 +875,20 @@ const Admin: React.FC = () => {
 
     const deleteTemplate = async (id: number) => {
         if (!confirm('Delete this template?')) return;
-        await fetchWithAdminAuth(`${getApiUrl()}/api/templates/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
-        if (editingTemplateId === id) setEditingTemplateId(null);
-        setTemplateForm({ name: '', subject: '', body: '' });
-        fetchAll();
-        setMessage('Template deleted');
+        try {
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/templates/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setMessage(data.error || `Failed to delete template (${res.status})`);
+                return;
+            }
+            if (editingTemplateId === id) setEditingTemplateId(null);
+            setTemplateForm({ name: '', subject: '', body: '' });
+            fetchAll();
+            setMessage('Template deleted');
+        } catch (e) {
+            setMessage('Failed to delete template');
+        }
     };
 
     const createSequence = async () => {
@@ -881,7 +905,12 @@ const Admin: React.FC = () => {
     const deleteSequence = async (id: number) => {
         if (!confirm('Delete this sequence? All steps and subscriber progress will be removed. This cannot be undone.')) return;
         try {
-            await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setMessage(data.error || `Failed to delete sequence (${res.status})`);
+                return;
+            }
             if (selectedSequenceId === id) setSelectedSequenceId(null);
             setMessage('Sequence deleted');
             fetchAll();

@@ -54,7 +54,7 @@ export function meta() {
   return [
     { charset: "utf-8" },
     { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5" },
-    { title: "SuperEngulfing.io - Master the Liquidity Sweep" },
+    { title: "SuperEngulfing.com - Master the Liquidity Sweep" },
   ];
 }
 
@@ -64,14 +64,14 @@ const JSON_LD = {
     {
       "@type": "Organization",
       name: "SuperEngulfing",
-      url: "https://superengulfing.io",
-      logo: "https://superengulfing.io/logo/superengulfing-logo-black.png",
+      url: "https://superengulfing.com",
+      logo: "https://superengulfing.com/logo/superengulfing-logo-black.png",
       description: "Advanced educational tools and proprietary algorithms for financial market analysis. Master the liquidity sweep.",
     },
     {
       "@type": "WebSite",
       name: "SuperEngulfing",
-      url: "https://superengulfing.io",
+      url: "https://superengulfing.com",
       description: "Master the Liquidity Sweep. Institutional algos hunt stops—SuperEngulfing identifies the wick grab before the reversal.",
     },
   ],
@@ -108,6 +108,7 @@ export default function App() {
       suppressHydrationWarning
     >
       <head>
+        <meta name="google-site-verification" content="phObeDb8UJ29dMEbXPRhHqtRVnRRDh15trtvFXZ_hEc" />
         <ThemeScript />
         <Meta />
         <Links />

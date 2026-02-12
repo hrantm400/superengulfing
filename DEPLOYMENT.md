@@ -181,8 +181,8 @@ nano server/.env
 | Переменная | Описание | Пример |
 |------------|----------|--------|
 | API_URL | Базовый URL сайта (без /api — код сам добавляет /api/...) | `https://superengulfing.com` |
-| THANK_YOU_URL | Страница Thank You | `https://superengulfing.io/thank-you` |
-| FRONTEND_URL | Домен сайта | `https://superengulfing.io` |
+| THANK_YOU_URL | Страница Thank You | `https://superengulfing.com/thank-you` |
+| FRONTEND_URL | Домен сайта | `https://superengulfing.com` |
 | PDF_LINK | Ссылка на PDF (fallback если per-locale не задан) | `https://drive.google.com/file/d/...` |
 
 ### PDF и видео по локали (EN / AM)
@@ -198,7 +198,7 @@ nano server/.env
 
 | Переменная | Описание | Как получить |
 |------------|----------|--------------|
-| CORS_ORIGIN | Разрешённый origin для API | Тот же домен: `https://superengulfing.io` |
+| CORS_ORIGIN | Разрешённый origin для API | Тот же домен: `https://superengulfing.com` |
 | JWT_SECRET | Секрет для JWT | Сгенерировать: `openssl rand -hex 32` |
 
 ### Admin
@@ -336,12 +336,12 @@ pm2 logs
 nano /etc/nginx/sites-available/superengulfing
 ```
 
-Вставь (замени `superengulfing.io` на свой домен):
+Вставь (замени `superengulfing.com` на свой домен):
 
 ```nginx
 server {
     listen 80;
-    server_name superengulfing.io www.superengulfing.io;
+    server_name superengulfing.com www.superengulfing.com;
 
     # API — проксируем на Express
     location /api {
@@ -390,7 +390,7 @@ systemctl reload nginx
 
 ```bash
 apt install -y certbot python3-certbot-nginx
-certbot --nginx -d superengulfing.io -d www.superengulfing.io
+certbot --nginx -d superengulfing.com -d www.superengulfing.com
 ```
 
 Дальше следуй подсказкам certbot.
@@ -509,6 +509,30 @@ curl http://127.0.0.1:3000
 ### GitHub Actions падает
 
 Проверь Secrets. Убедись, что `SSH_PRIVATE_KEY` содержит весь ключ, включая `-----BEGIN ... KEY-----` и `-----END ... KEY-----`.
+
+---
+
+## Деплой через WinSCP (без Git)
+
+Если Git не работает, можно вручную скопировать файлы:
+
+1. **Локально:** выполни `npm run build` в папке проекта.
+2. **WinSCP:** подключись к серверу (SFTP, твой IP и логин root).
+3. **Скопируй файлы:**
+   - Папку `build/client/` (всё содержимое) → `/var/www/superengulfing/build/client/`
+   - Папку `build/server/` (всё содержимое) → `/var/www/superengulfing/build/server/`
+   - При изменении API: `server/index.cjs` → `/var/www/superengulfing/server/`
+   - При новых миграциях: файлы из `server/migrations/` → `/var/www/superengulfing/server/migrations/`
+4. **На сервере по SSH:**
+   ```bash
+   pm2 restart remix
+   pm2 restart api    # если менял server/index.cjs
+   ```
+5. **Миграция БД** (если добавлена новая — например 020):
+   ```bash
+   cd /var/www/superengulfing
+   sudo -u postgres psql -d superengulfing_email -f server/migrations/020_subscribers_double_optin.sql
+   ```
 
 ---
 

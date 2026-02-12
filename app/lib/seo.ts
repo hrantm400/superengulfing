@@ -1,6 +1,6 @@
 import type { MetaDescriptor } from "@remix-run/node";
 
-const SITE_NAME = "SuperEngulfing.io";
+const SITE_NAME = "SuperEngulfing.com";
 const DEFAULT_TITLE = `${SITE_NAME} - Master the Liquidity Sweep`;
 const DEFAULT_DESC = "Institutional algos hunt stops below the lows. SuperEngulfing identifies the wick grab before the reversal happens.";
 

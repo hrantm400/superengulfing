@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 
-const SITE_URL = process.env.VITE_SITE_URL || process.env.SITE_URL || "https://superengulfing.io";
+const SITE_URL = process.env.VITE_SITE_URL || process.env.SITE_URL || "https://superengulfing.com";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const txt = `User-agent: *

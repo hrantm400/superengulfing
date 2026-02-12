@@ -263,9 +263,17 @@ const PatternShowcase: React.FC = () => {
       const data = await res.json();
 
       if (data.success) {
-        setStatus('success');
-        setMessage(data.message);
-        setEmail('');
+        if (data.subscriptionStatus === 'already_subscribed') {
+          setStatus('error');
+          setMessage(t('home.patternShowcase.emailAlreadyUsed'));
+        } else if (data.subscriptionStatus === 'pending_confirmation') {
+          setStatus('error');
+          setMessage(t('home.patternShowcase.pendingConfirm'));
+        } else {
+          setStatus('success');
+          setMessage(data.message);
+          setEmail('');
+        }
       } else {
         setStatus('error');
         setMessage(data.message);
