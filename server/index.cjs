@@ -82,9 +82,15 @@ const requireAuth = (req, res, next) => {
     }
 };
 
-// Admin two-step auth: allowed emails (union of ADMIN_EMAILS_EN + ADMIN_EMAILS_AM, fallback: ADMIN_EMAILS)
-const adminEmailsEn = (process.env.ADMIN_EMAILS_EN || process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-const adminEmailsAm = (process.env.ADMIN_EMAILS_AM || process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+// Admin two-step auth: allowed emails (union of ADMIN_EMAILS_EN + ADMIN_EMAILS_AM, fallback: ADMIN_EMAILS or legacy ADMIN_EMAIL)
+const adminEmailsEn = (process.env.ADMIN_EMAILS_EN || process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+const adminEmailsAm = (process.env.ADMIN_EMAILS_AM || process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
 const ADMIN_EMAILS = [...new Set([...adminEmailsEn, ...adminEmailsAm])];
 const adminJwtSecret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'superengulfing-admin-secret';
 const requireAdminAuth = (req, res, next) => {
@@ -1629,14 +1635,55 @@ app.put('/api/courses/:id', requireAdminAuth, async (req, res) => {
     }
 });
 
-// DELETE /api/courses/:id - Delete course (admin)
+// DELETE /api/courses/:id - Delete course (admin, locale-scoped, with lessons/resources/enrollments cleanup)
 app.delete('/api/courses/:id', requireAdminAuth, async (req, res) => {
+    const { locale } = req.query;
+    const loc = (locale === 'am' || locale === 'en') ? locale : null;
+    if (!loc) return res.status(400).json({ error: 'locale query param (am|en) is required' });
+
+    const courseId = req.params.id;
+    const client = await pool.connect();
     try {
-        const result = await pool.query('DELETE FROM courses WHERE id = $1 RETURNING id', [req.params.id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
+        await client.query('BEGIN');
+
+        // Ensure course exists for this locale
+        const courseResult = await client.query(
+            "SELECT id FROM courses WHERE id = $1 AND COALESCE(locale, 'en') = $2",
+            [courseId, loc]
+        );
+        if (courseResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Course not found for this locale' });
+        }
+
+        // Delete lesson resources tied to this course
+        await client.query(`
+            DELETE FROM lesson_resources
+            WHERE lesson_id IN (SELECT id FROM lessons WHERE course_id = $1)
+        `, [courseId]);
+
+        // Delete video progress tied to this course
+        await client.query(`
+            DELETE FROM video_progress
+            WHERE lesson_id IN (SELECT id FROM lessons WHERE course_id = $1)
+        `, [courseId]);
+
+        // Delete enrollments for this course
+        await client.query('DELETE FROM enrollments WHERE course_id = $1', [courseId]);
+
+        // Delete lessons themselves
+        await client.query('DELETE FROM lessons WHERE course_id = $1', [courseId]);
+
+        // Finally delete course row
+        await client.query("DELETE FROM courses WHERE id = $1 AND COALESCE(locale, 'en') = $2", [courseId, loc]);
+
+        await client.query('COMMIT');
         res.json({ success: true });
     } catch (error) {
+        await client.query('ROLLBACK');
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 });
 
@@ -2051,10 +2098,23 @@ app.put('/api/tags/:id', requireAdminAuth, async (req, res) => {
     }
 });
 
-// DELETE /api/tags/:id - Delete tag
+// DELETE /api/tags/:id - Delete tag (locale-scoped)
 app.delete('/api/tags/:id', requireAdminAuth, async (req, res) => {
+    const { locale } = req.query;
+    const loc = (locale === 'am' || locale === 'en') ? locale : null;
+    if (!loc) return res.status(400).json({ error: 'locale query param (am|en) is required' });
+
     try {
-        await pool.query('DELETE FROM tags WHERE id = $1', [req.params.id]);
+        // Remove any subscriber/tag links first (defensive; tables may or may not exist)
+        try {
+            await pool.query('DELETE FROM subscriber_tags WHERE tag_id = $1', [req.params.id]);
+        } catch (_) { /* table may not exist yet */ }
+
+        const result = await pool.query(
+            "DELETE FROM tags WHERE id = $1 AND COALESCE(locale, 'en') = $2 RETURNING id",
+            [req.params.id, loc]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Tag not found for this locale' });
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -2117,10 +2177,18 @@ app.put('/api/templates/:id', requireAdminAuth, async (req, res) => {
     }
 });
 
-// DELETE /api/templates/:id - Delete template
+// DELETE /api/templates/:id - Delete template (locale-scoped)
 app.delete('/api/templates/:id', requireAdminAuth, async (req, res) => {
+    const { locale } = req.query;
+    const loc = (locale === 'am' || locale === 'en') ? locale : null;
+    if (!loc) return res.status(400).json({ error: 'locale query param (am|en) is required' });
+
     try {
-        await pool.query('DELETE FROM templates WHERE id = $1', [req.params.id]);
+        const result = await pool.query(
+            "DELETE FROM templates WHERE id = $1 AND COALESCE(locale, 'en') = $2 RETURNING id",
+            [req.params.id, loc]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Template not found for this locale' });
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -2423,10 +2491,23 @@ app.get('/api/broadcasts/:id/analytics', requireAdminAuth, async (req, res) => {
     }
 });
 
-// DELETE /api/broadcasts/:id - Delete broadcast
+// DELETE /api/broadcasts/:id - Delete broadcast (locale-scoped)
 app.delete('/api/broadcasts/:id', requireAdminAuth, async (req, res) => {
+    const { locale } = req.query;
+    const loc = (locale === 'am' || locale === 'en') ? locale : null;
+    if (!loc) return res.status(400).json({ error: 'locale query param (am|en) is required' });
+
     try {
-        await pool.query('DELETE FROM broadcasts WHERE id = $1', [req.params.id]);
+        // Clean up any outstanding send jobs that reference this broadcast
+        try {
+            await pool.query('DELETE FROM email_send_jobs WHERE broadcast_id = $1', [req.params.id]);
+        } catch (_) { /* table may not exist yet */ }
+
+        const result = await pool.query(
+            "DELETE FROM broadcasts WHERE id = $1 AND COALESCE(locale, 'en') = $2 RETURNING id",
+            [req.params.id, loc]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Broadcast not found for this locale' });
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -2740,13 +2821,44 @@ app.post('/api/sequences/:id/pause', requireAdminAuth, async (req, res) => {
     }
 });
 
-// DELETE /api/sequences/:id - Delete sequence
+// DELETE /api/sequences/:id - Delete sequence (locale-scoped, with steps and subscriber progress)
 app.delete('/api/sequences/:id', requireAdminAuth, async (req, res) => {
+    const { locale } = req.query;
+    const loc = (locale === 'am' || locale === 'en') ? locale : null;
+    if (!loc) return res.status(400).json({ error: 'locale query param (am|en) is required' });
+
+    const seqId = req.params.id;
+    const client = await pool.connect();
     try {
-        await pool.query('DELETE FROM sequences WHERE id = $1', [req.params.id]);
+        await client.query('BEGIN');
+
+        // Ensure sequence exists for this locale
+        const seqResult = await client.query(
+            "SELECT id FROM sequences WHERE id = $1 AND COALESCE(locale, 'en') = $2",
+            [seqId, loc]
+        );
+        if (seqResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Sequence not found for this locale' });
+        }
+
+        // Delete dependent data first
+        await client.query('DELETE FROM subscriber_sequences WHERE sequence_id = $1', [seqId]);
+        await client.query('DELETE FROM sequence_emails WHERE sequence_id = $1', [seqId]);
+        try {
+            await client.query('DELETE FROM sequence_triggers WHERE sequence_id = $1', [seqId]);
+        } catch (_) { /* table may not exist yet */ }
+
+        // Finally delete sequence
+        await client.query("DELETE FROM sequences WHERE id = $1 AND COALESCE(locale, 'en') = $2", [seqId, loc]);
+
+        await client.query('COMMIT');
         res.json({ success: true });
     } catch (error) {
+        await client.query('ROLLBACK');
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 });
 

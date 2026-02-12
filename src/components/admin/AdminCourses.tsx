@@ -140,7 +140,7 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
   const deleteCourse = async (id: number, title: string) => {
     if (!confirm(`Delete course "${title}" and all its lessons?`)) return;
     try {
-      await fetchWithAdminAuth(`${API_URL}/api/courses/${id}`, { method: 'DELETE' });
+      await fetchWithAdminAuth(`${API_URL}/api/courses/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
       setMessage('Course deleted');
       setCourses((prev) => prev.filter((x) => x.id !== id));
       if (lessonsForCourseId === id) {

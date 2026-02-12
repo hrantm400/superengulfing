@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from '@remix-run/react';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { AdminCourses } from '../components/admin/AdminCourses';
+import { RichTextEditor } from '../components/admin/RichTextEditor';
 import { getApiUrl } from '../lib/api';
 
 interface Subscriber {
@@ -40,6 +41,16 @@ interface Broadcast {
     failed_count: number;
     segment_type?: string;
     segment_tag_ids?: number[];
+    subject_am?: string | null;
+    body_am?: string | null;
+    subject_en?: string | null;
+    body_en?: string | null;
+    segment_locale?: string | null;
+}
+
+interface EmailAttachment {
+    filename: string;
+    path: string;
 }
 
 interface Sequence {
@@ -55,6 +66,8 @@ interface Stats {
     today: number;
     thisWeek: number;
     emailsSent: number;
+    openRate?: number;
+    clickRate?: number;
 }
 
 interface AnalyticsSummary {
@@ -79,6 +92,13 @@ interface SequenceEmail {
     body: string;
     delay_days: number;
     delay_hours: number;
+    subject_am?: string | null;
+    body_am?: string | null;
+    subject_en?: string | null;
+    body_en?: string | null;
+    conditions?: { previous_email_opened?: boolean; has_tags?: string[]; not_has_tags?: string[] } | null;
+    attachments?: EmailAttachment[] | null;
+    stats?: { sent: number; opened: number; clicked: number };
 }
 
 interface AccessRequest {
@@ -99,14 +119,137 @@ interface IndicatorAccessRequest {
     indicator_requested_at: string | null;
 }
 
-import { getApiUrl } from '../lib/api';
-
 const REJECT_REASON_TEMPLATES: { id: string; label: string; text: string }[] = [
     { id: 'verify', label: 'Could not verify (WEEX/account)', text: 'We could not verify your account / UID.' },
     { id: 'criteria', label: 'Does not meet criteria', text: 'Your application does not meet our current criteria.' },
     { id: 'duplicate', label: 'Duplicate or invalid request', text: 'Duplicate or invalid request.' },
     { id: 'other', label: 'Other (enter below)', text: '' },
 ];
+
+/** Sequence subscribers list (loaded on demand) */
+function SequenceSubscribersList({ sequenceId, fetchWithAdminAuth }: { sequenceId: number; fetchWithAdminAuth: (url: string, opts?: RequestInit) => Promise<Response> }) {
+    const [subs, setSubs] = useState<{ id: number; email: string; first_name: string; current_step: number; seq_status: string; started_at: string }[]>([]);
+    const [loaded, setLoaded] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${sequenceId}/subscribers`);
+            const data = await res.json();
+            setSubs(Array.isArray(data) ? data : []);
+            setLoaded(true);
+        } catch { setSubs([]); setLoaded(true); }
+        setLoading(false);
+    };
+
+    if (!loaded) return (
+        <button onClick={load} disabled={loading} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm">
+            {loading ? 'Loading...' : 'Load subscriber list'}
+        </button>
+    );
+
+    if (subs.length === 0) return <p className="text-muted text-sm">No subscribers in this sequence yet.</p>;
+
+    return (
+        <div className="max-h-60 overflow-y-auto">
+            <table className="w-full text-sm">
+                <thead>
+                    <tr className="text-muted text-xs">
+                        <th className="text-left py-1 pr-4">Email</th>
+                        <th className="text-left py-1 pr-4">Name</th>
+                        <th className="text-left py-1 pr-4">Step</th>
+                        <th className="text-left py-1 pr-4">Status</th>
+                        <th className="text-left py-1">Started</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                    {subs.map(sub => (
+                        <tr key={sub.id + '-' + sub.current_step}>
+                            <td className="py-1.5 pr-4 font-mono">{sub.email}</td>
+                            <td className="py-1.5 pr-4 text-muted">{sub.first_name || '—'}</td>
+                            <td className="py-1.5 pr-4">{sub.current_step}</td>
+                            <td className="py-1.5 pr-4">
+                                <span className={`px-2 py-0.5 rounded text-xs ${sub.seq_status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : sub.seq_status === 'completed' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-muted'}`}>{sub.seq_status}</span>
+                            </td>
+                            <td className="py-1.5 text-muted">{new Date(sub.started_at).toLocaleDateString()}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+/** Simple step row for SSR / before client DnD loads (no @dnd-kit on server). */
+function SimpleSequenceStep({
+    em,
+    onEdit,
+    onDelete,
+}: {
+    em: SequenceEmail;
+    onEdit: () => void;
+    onDelete: () => void;
+}) {
+    return (
+        <div className="flex justify-between items-start py-3 border-b border-border last:border-0">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-muted" title="Drag to reorder (loads on client)">
+                    <span className="material-symbols-outlined text-lg">drag_indicator</span>
+                </span>
+                <div className="min-w-0">
+                    <span className="text-muted text-sm mr-2">#{em.position}</span>
+                    <span className="font-medium">{em.subject}</span>
+                    <p className="text-muted text-xs mt-1">Delay: {em.delay_days}d {em.delay_hours}h</p>
+                    {em.stats && em.stats.sent > 0 && (
+                        <p className="text-xs mt-1">
+                            <span className="text-purple-400">Sent {em.stats.sent}</span>
+                            <span className="text-emerald-400 ml-2">Opened {em.stats.opened}</span>
+                            <span className="text-blue-400 ml-2">Clicked {em.stats.clicked}</span>
+                        </p>
+                    )}
+                </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+                <button onClick={onEdit} className="px-3 py-1.5 bg-primary/20 text-primary rounded text-sm hover:bg-primary/30">Edit</button>
+                <button onClick={onDelete} className="px-3 py-1.5 bg-rose-500/20 text-rose-400 rounded text-sm hover:bg-rose-500/30">Delete</button>
+            </div>
+        </div>
+    );
+}
+
+/** Client-only: loads SequenceEmailsSortable so @dnd-kit is never imported on server. */
+function SequenceEmailsListClient(props: {
+    sequenceEmails: SequenceEmail[];
+    setSequenceEmails: React.Dispatch<React.SetStateAction<SequenceEmail[]>>;
+    selectedSequenceId: number | null;
+    fetchWithAdminAuth: (url: string, opts: RequestInit) => Promise<Response>;
+    setEditingSequenceEmailId: (id: number | null) => void;
+    setSequenceEmailForm: (form: { subject: string; body: string; delay_days: number; delay_hours: number; subject_am: string; body_am: string; subject_en: string; body_en: string; conditions: { previous_email_opened?: boolean; has_tags?: string[]; not_has_tags?: string[] } | null; attachments?: EmailAttachment[] }) => void;
+    deleteSequenceEmail: (seqId: number, emailId: number) => Promise<void>;
+    setMessage: (msg: string) => void;
+}) {
+    const [Sortable, setSortable] = useState<React.ComponentType<typeof props> | null>(null);
+    useEffect(() => {
+        import('../components/admin/SequenceEmailsSortable').then((m) => setSortable(() => m.SequenceEmailsSortable));
+    }, []);
+    if (Sortable) return <Sortable {...props} />;
+    return (
+        <div className="space-y-3">
+            {props.sequenceEmails.map((em) => (
+                <SimpleSequenceStep
+                    key={em.id}
+                    em={em}
+                    onEdit={() => {
+                        props.setEditingSequenceEmailId(em.id);
+                        props.setSequenceEmailForm({ subject: em.subject, body: em.body, delay_days: em.delay_days, delay_hours: em.delay_hours, subject_am: em.subject_am || '', body_am: em.body_am || '', subject_en: em.subject_en || '', body_en: em.body_en || '', conditions: em.conditions || null, attachments: em.attachments || [] });
+                    }}
+                    onDelete={() => props.selectedSequenceId != null && props.deleteSequenceEmail(props.selectedSequenceId, em.id)}
+                />
+            ))}
+        </div>
+    );
+}
 
 const Admin: React.FC = () => {
     const location = useLocation();
@@ -158,7 +301,12 @@ const Admin: React.FC = () => {
     // Sequence builder
     const [selectedSequenceId, setSelectedSequenceId] = useState<number | null>(null);
     const [sequenceEmails, setSequenceEmails] = useState<SequenceEmail[]>([]);
-    const [sequenceEmailForm, setSequenceEmailForm] = useState({ subject: '', body: '', delay_days: 0, delay_hours: 0 });
+    const [sequenceEmailForm, setSequenceEmailForm] = useState({
+        subject: '', body: '', delay_days: 0, delay_hours: 0,
+        subject_am: '', body_am: '', subject_en: '', body_en: '',
+        conditions: null as { previous_email_opened?: boolean; has_tags?: string[]; not_has_tags?: string[] } | null,
+        attachments: [] as EmailAttachment[]
+    });
     const [editingSequenceEmailId, setEditingSequenceEmailId] = useState<number | null>(null);
     const [sequenceNameEdit, setSequenceNameEdit] = useState<string | null>(null);
     const [addSubscriberSequenceId, setAddSubscriberSequenceId] = useState<number | null>(null);
@@ -166,13 +314,28 @@ const Admin: React.FC = () => {
     // Form states
     const [newTagName, setNewTagName] = useState('');
     const [newTagColor, setNewTagColor] = useState('#39FF14');
-    const [broadcastForm, setBroadcastForm] = useState({ name: '', subject: '', body: '', segment_type: 'all' as 'all' | 'tags', segment_tag_ids: [] as number[] });
+    const [broadcastForm, setBroadcastForm] = useState({
+        name: '', subject: '', body: '',
+        subject_am: '', body_am: '', subject_en: '', body_en: '',
+        segment_type: 'all' as 'all' | 'tags', segment_tag_ids: [] as number[], segment_locale: '' as '' | 'am' | 'en',
+        attachments: [] as EmailAttachment[]
+    });
     const [templateForm, setTemplateForm] = useState({ name: '', subject: '', body: '' });
     const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
+    const [editingBroadcastId, setEditingBroadcastId] = useState<number | null>(null);
+    const [editingTagId, setEditingTagId] = useState<number | null>(null);
+    const [editTagName, setEditTagName] = useState('');
+    const [editTagColor, setEditTagColor] = useState('#39FF14');
+    const [subscriberSearch, setSubscriberSearch] = useState('');
+    const [subscriberStatusFilter, setSubscriberStatusFilter] = useState<'all' | 'active' | 'unsubscribed' | 'pending'>('all');
+    const [subscriberTagFilter, setSubscriberTagFilter] = useState<number | null>(null);
     const [sequenceForm, setSequenceForm] = useState({ name: '' });
     const [message, setMessage] = useState('');
     const [affiliateLabel, setAffiliateLabel] = useState('');
     const [affiliateUrl, setAffiliateUrl] = useState('');
+    const broadcastFileInputRef = useRef<HTMLInputElement>(null);
+    const sequenceEmailFileInputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
 
     // Reject modal (reason required for Access and Indicator reject)
     const [rejectModal, setRejectModal] = useState<{ type: 'access'; id: number } | { type: 'indicator'; userId: number } | null>(null);
@@ -251,7 +414,7 @@ const Admin: React.FC = () => {
             setSequenceEmails([]);
             setSequenceNameEdit(null);
             setEditingSequenceEmailId(null);
-            setSequenceEmailForm({ subject: '', body: '', delay_days: 0, delay_hours: 0 });
+            setSequenceEmailForm(emptySequenceEmailForm());
         }
     }, [selectedSequenceId]);
 
@@ -318,6 +481,8 @@ const Admin: React.FC = () => {
         }
     };
 
+    const emptySequenceEmailForm = () => ({ subject: '', body: '', delay_days: 0, delay_hours: 0, subject_am: '', body_am: '', subject_en: '', body_en: '', conditions: null as { previous_email_opened?: boolean; has_tags?: string[]; not_has_tags?: string[] } | null, attachments: [] as EmailAttachment[] });
+
     const addSequenceEmail = async () => {
         if (!selectedSequenceId || !sequenceEmailForm.subject || !sequenceEmailForm.body) return;
         try {
@@ -328,10 +493,16 @@ const Admin: React.FC = () => {
                     subject: sequenceEmailForm.subject,
                     body: sequenceEmailForm.body,
                     delay_days: sequenceEmailForm.delay_days || 0,
-                    delay_hours: sequenceEmailForm.delay_hours || 0
+                    delay_hours: sequenceEmailForm.delay_hours || 0,
+                    subject_am: sequenceEmailForm.subject_am || null,
+                    body_am: sequenceEmailForm.body_am || null,
+                    subject_en: sequenceEmailForm.subject_en || null,
+                    body_en: sequenceEmailForm.body_en || null,
+                    conditions: sequenceEmailForm.conditions || null,
+                    attachments: sequenceEmailForm.attachments?.length ? sequenceEmailForm.attachments : undefined
                 })
             });
-            setSequenceEmailForm({ subject: '', body: '', delay_days: 0, delay_hours: 0 });
+            setSequenceEmailForm(emptySequenceEmailForm());
             fetchSequenceEmails(selectedSequenceId);
             fetchAll();
             setMessage('Email added to sequence');
@@ -386,11 +557,17 @@ const Admin: React.FC = () => {
                     subject: sequenceEmailForm.subject,
                     body: sequenceEmailForm.body,
                     delay_days: sequenceEmailForm.delay_days || 0,
-                    delay_hours: sequenceEmailForm.delay_hours || 0
+                    delay_hours: sequenceEmailForm.delay_hours || 0,
+                    subject_am: sequenceEmailForm.subject_am || null,
+                    body_am: sequenceEmailForm.body_am || null,
+                    subject_en: sequenceEmailForm.subject_en || null,
+                    body_en: sequenceEmailForm.body_en || null,
+                    conditions: sequenceEmailForm.conditions || null,
+                    attachments: sequenceEmailForm.attachments?.length ? sequenceEmailForm.attachments : undefined
                 })
             });
             setEditingSequenceEmailId(null);
-            setSequenceEmailForm({ subject: '', body: '', delay_days: 0, delay_hours: 0 });
+            setSequenceEmailForm(emptySequenceEmailForm());
             setMessage('Step updated');
             fetchSequenceEmails(selectedSequenceId);
             fetchAll();
@@ -405,7 +582,7 @@ const Admin: React.FC = () => {
             await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${seqId}/emails/${emailId}`, { method: 'DELETE' });
             if (editingSequenceEmailId === emailId) {
                 setEditingSequenceEmailId(null);
-                setSequenceEmailForm({ subject: '', body: '', delay_days: 0, delay_hours: 0 });
+                setSequenceEmailForm(emptySequenceEmailForm());
             }
             setMessage('Step removed');
             fetchSequenceEmails(seqId);
@@ -481,10 +658,10 @@ const Admin: React.FC = () => {
             const [statsRes, subsRes, tagsRes, templatesRes, broadcastsRes, seqRes] = await Promise.all([
                 fetchWithAdminAuth(`${getApiUrl()}/api/stats?locale=${locale}`),
                 fetchWithAdminAuth(`${getApiUrl()}/api/subscribers?locale=${locale}`),
-                fetchWithAdminAuth(`${getApiUrl()}/api/tags`),
-                fetchWithAdminAuth(`${getApiUrl()}/api/templates`),
-                fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts`),
-                fetchWithAdminAuth(`${getApiUrl()}/api/sequences`)
+                fetchWithAdminAuth(`${getApiUrl()}/api/tags?locale=${locale}`),
+                fetchWithAdminAuth(`${getApiUrl()}/api/templates?locale=${locale}`),
+                fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts?locale=${locale}`),
+                fetchWithAdminAuth(`${getApiUrl()}/api/sequences?locale=${locale}`)
             ]);
 
             setStats(await statsRes.json());
@@ -506,15 +683,59 @@ const Admin: React.FC = () => {
         await fetchWithAdminAuth(`${getApiUrl()}/api/tags`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: newTagName, color: newTagColor })
+            body: JSON.stringify({ name: newTagName, color: newTagColor, locale: adminAudienceLocale })
         });
         setNewTagName('');
         fetchAll();
     };
 
     const deleteTag = async (id: number) => {
-        await fetchWithAdminAuth(`${getApiUrl()}/api/tags/${id}`, { method: 'DELETE' });
+        if (!confirm('Delete this tag?')) return;
+        await fetchWithAdminAuth(`${getApiUrl()}/api/tags/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
         fetchAll();
+    };
+
+    const startEditTag = (tag: Tag) => {
+        setEditingTagId(tag.id);
+        setEditTagName(tag.name);
+        setEditTagColor(tag.color);
+    };
+
+    const updateTag = async () => {
+        if (!editingTagId || !editTagName.trim()) return;
+        try {
+            await fetchWithAdminAuth(`${getApiUrl()}/api/tags/${editingTagId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: editTagName.trim(), color: editTagColor })
+            });
+            setEditingTagId(null);
+            setEditTagName('');
+            setEditTagColor('#39FF14');
+            setMessage('Tag updated');
+            fetchAll();
+        } catch (e) {
+            setMessage('Failed to update tag');
+        }
+    };
+
+    const uploadFile = async (file: File, onSuccess: (att: EmailAttachment) => void) => {
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/upload`, { method: 'POST', body: formData });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.path && data.filename) {
+                onSuccess({ filename: data.filename, path: data.path });
+            } else {
+                setMessage(data.error || 'Upload failed');
+            }
+        } catch {
+            setMessage('Upload failed');
+        } finally {
+            setUploading(false);
+        }
     };
 
     const createBroadcast = async () => {
@@ -526,11 +747,18 @@ const Admin: React.FC = () => {
                 name: broadcastForm.name,
                 subject: broadcastForm.subject,
                 body: broadcastForm.body,
+                subject_am: broadcastForm.subject_am || null,
+                body_am: broadcastForm.body_am || null,
+                subject_en: broadcastForm.subject_en || null,
+                body_en: broadcastForm.body_en || null,
                 segment_type: broadcastForm.segment_type || 'all',
-                segment_tag_ids: broadcastForm.segment_type === 'tags' ? broadcastForm.segment_tag_ids : []
+                segment_tag_ids: broadcastForm.segment_type === 'tags' ? broadcastForm.segment_tag_ids : [],
+                segment_locale: broadcastForm.segment_locale || null,
+                attachments: broadcastForm.attachments.length ? broadcastForm.attachments : undefined,
+                locale: adminAudienceLocale
             })
         });
-        setBroadcastForm({ name: '', subject: '', body: '', segment_type: 'all', segment_tag_ids: [] });
+        setBroadcastForm({ name: '', subject: '', body: '', subject_am: '', body_am: '', subject_en: '', body_en: '', segment_type: 'all', segment_tag_ids: [], segment_locale: '', attachments: [] });
         setMessage('Broadcast created!');
         fetchAll();
     };
@@ -544,12 +772,74 @@ const Admin: React.FC = () => {
         fetchAll();
     };
 
+    const deleteBroadcast = async (id: number) => {
+        if (!confirm('Delete this broadcast? This cannot be undone.')) return;
+        try {
+            await fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
+            setMessage('Broadcast deleted');
+            fetchAll();
+        } catch (e) {
+            setMessage('Failed to delete broadcast');
+        }
+    };
+
+    const startEditBroadcast = (b: Broadcast) => {
+        setEditingBroadcastId(b.id);
+        setBroadcastForm({
+            name: b.name || '',
+            subject: b.subject || '',
+            body: b.body || '',
+            subject_am: b.subject_am || '',
+            body_am: b.body_am || '',
+            subject_en: b.subject_en || '',
+            body_en: b.body_en || '',
+            segment_type: (b.segment_type as 'all' | 'tags') || 'all',
+            segment_tag_ids: b.segment_tag_ids || [],
+            segment_locale: (b.segment_locale || '') as '' | 'am' | 'en',
+            attachments: []
+        });
+    };
+
+    const updateBroadcast = async () => {
+        if (!editingBroadcastId) return;
+        try {
+            await fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${editingBroadcastId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: broadcastForm.name,
+                    subject: broadcastForm.subject,
+                    body: broadcastForm.body,
+                    subject_am: broadcastForm.subject_am || null,
+                    body_am: broadcastForm.body_am || null,
+                    subject_en: broadcastForm.subject_en || null,
+                    body_en: broadcastForm.body_en || null,
+                    segment_type: broadcastForm.segment_type || 'all',
+                    segment_tag_ids: broadcastForm.segment_type === 'tags' ? broadcastForm.segment_tag_ids : [],
+                    segment_locale: broadcastForm.segment_locale || null,
+                    attachments: broadcastForm.attachments.length ? broadcastForm.attachments : undefined
+                })
+            });
+            setEditingBroadcastId(null);
+            setBroadcastForm({ name: '', subject: '', body: '', subject_am: '', body_am: '', subject_en: '', body_en: '', segment_type: 'all', segment_tag_ids: [], segment_locale: '', attachments: [] });
+            setMessage('Broadcast updated!');
+            fetchAll();
+        } catch (e) {
+            setMessage('Failed to update broadcast');
+        }
+    };
+
+    const cancelEditBroadcast = () => {
+        setEditingBroadcastId(null);
+        setBroadcastForm({ name: '', subject: '', body: '', subject_am: '', body_am: '', subject_en: '', body_en: '', segment_type: 'all', segment_tag_ids: [], segment_locale: '', attachments: [] });
+    };
+
     const createTemplate = async () => {
         if (!templateForm.name) return;
         await fetchWithAdminAuth(`${getApiUrl()}/api/templates`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(templateForm)
+            body: JSON.stringify({ ...templateForm, locale: adminAudienceLocale })
         });
         setTemplateForm({ name: '', subject: '', body: '' });
         fetchAll();
@@ -570,7 +860,7 @@ const Admin: React.FC = () => {
 
     const deleteTemplate = async (id: number) => {
         if (!confirm('Delete this template?')) return;
-        await fetchWithAdminAuth(`${getApiUrl()}/api/templates/${id}`, { method: 'DELETE' });
+        await fetchWithAdminAuth(`${getApiUrl()}/api/templates/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
         if (editingTemplateId === id) setEditingTemplateId(null);
         setTemplateForm({ name: '', subject: '', body: '' });
         fetchAll();
@@ -582,10 +872,22 @@ const Admin: React.FC = () => {
         await fetchWithAdminAuth(`${getApiUrl()}/api/sequences`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(sequenceForm)
+            body: JSON.stringify({ ...sequenceForm, locale: adminAudienceLocale })
         });
         setSequenceForm({ name: '' });
         fetchAll();
+    };
+
+    const deleteSequence = async (id: number) => {
+        if (!confirm('Delete this sequence? All steps and subscriber progress will be removed. This cannot be undone.')) return;
+        try {
+            await fetchWithAdminAuth(`${getApiUrl()}/api/sequences/${id}?locale=${adminAudienceLocale}`, { method: 'DELETE' });
+            if (selectedSequenceId === id) setSelectedSequenceId(null);
+            setMessage('Sequence deleted');
+            fetchAll();
+        } catch (e) {
+            setMessage('Failed to delete sequence');
+        }
     };
 
     const deleteSubscriber = async (id: number) => {
@@ -637,7 +939,7 @@ const Admin: React.FC = () => {
     );
 
     return (
-        <div className="min-h-screen bg-background text-foreground flex">
+        <div className="min-h-screen bg-background text-foreground flex pt-24 md:pt-28">
             {/* Sidebar */}
             <aside className="w-64 bg-surface border-r border-border p-4 flex flex-col gap-2">
                 <div className="flex items-center gap-2 px-4 py-4 mb-4">
@@ -699,6 +1001,7 @@ const Admin: React.FC = () => {
                             Armenian
                         </button>
                     </div>
+                    <span className="text-xs text-muted ml-2">All content created for: <strong className="text-foreground">{adminAudienceLocale === 'am' ? 'Armenian' : 'English'}</strong></span>
                 </div>
 
                 {/* Dashboard */}
@@ -706,22 +1009,30 @@ const Admin: React.FC = () => {
                     <div>
                         <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
                             <div className="bg-surface rounded-card p-6 border border-border shadow-card hover:shadow-card-hover hover:-translate-y-1 hover:border-primary/20 transition-all duration-300">
                                 <p className="text-muted text-sm">Total Subscribers</p>
-                                <p className="text-4xl font-bold text-primary mt-2">{stats.total}</p>
+                                <p className="text-3xl font-bold text-primary mt-2">{stats.total}</p>
                             </div>
                             <div className="bg-surface rounded-card p-6 border border-border shadow-card hover:shadow-card-hover hover:-translate-y-1 hover:border-primary/20 transition-all duration-300">
                                 <p className="text-muted text-sm">Today</p>
-                                <p className="text-4xl font-bold text-emerald-400 mt-2">+{stats.today}</p>
+                                <p className="text-3xl font-bold text-emerald-400 mt-2">+{stats.today}</p>
                             </div>
                             <div className="bg-surface rounded-card p-6 border border-border shadow-card hover:shadow-card-hover hover:-translate-y-1 hover:border-primary/20 transition-all duration-300">
                                 <p className="text-muted text-sm">This Week</p>
-                                <p className="text-4xl font-bold text-blue-400 mt-2">+{stats.thisWeek}</p>
+                                <p className="text-3xl font-bold text-blue-400 mt-2">+{stats.thisWeek}</p>
                             </div>
                             <div className="bg-surface rounded-card p-6 border border-border shadow-card hover:shadow-card-hover hover:-translate-y-1 hover:border-primary/20 transition-all duration-300">
                                 <p className="text-muted text-sm">Emails Sent</p>
-                                <p className="text-4xl font-bold text-purple-400 mt-2">{stats.emailsSent}</p>
+                                <p className="text-3xl font-bold text-purple-400 mt-2">{stats.emailsSent}</p>
+                            </div>
+                            <div className="bg-surface rounded-card p-6 border border-border shadow-card hover:shadow-card-hover hover:-translate-y-1 hover:border-primary/20 transition-all duration-300">
+                                <p className="text-muted text-sm">Open Rate</p>
+                                <p className="text-3xl font-bold text-amber-400 mt-2">{stats.openRate ?? 0}%</p>
+                            </div>
+                            <div className="bg-surface rounded-card p-6 border border-border shadow-card hover:shadow-card-hover hover:-translate-y-1 hover:border-primary/20 transition-all duration-300">
+                                <p className="text-muted text-sm">Click Rate</p>
+                                <p className="text-3xl font-bold text-cyan-400 mt-2">{stats.clickRate ?? 0}%</p>
                             </div>
                         </div>
 
@@ -814,6 +1125,35 @@ const Admin: React.FC = () => {
                             </div>
                         )}
 
+                        {/* Search & filters */}
+                        <div className="flex flex-wrap gap-3 mb-4">
+                            <input
+                                type="text"
+                                value={subscriberSearch}
+                                onChange={(e) => setSubscriberSearch(e.target.value)}
+                                placeholder="Search by email or name..."
+                                className="flex-1 min-w-[200px] bg-background border border-border rounded-lg px-4 py-2 text-sm"
+                            />
+                            <select
+                                value={subscriberStatusFilter}
+                                onChange={(e) => setSubscriberStatusFilter(e.target.value as typeof subscriberStatusFilter)}
+                                className="bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                            >
+                                <option value="all">All statuses</option>
+                                <option value="active">Active</option>
+                                <option value="pending">Pending</option>
+                                <option value="unsubscribed">Unsubscribed</option>
+                            </select>
+                            <select
+                                value={subscriberTagFilter ?? ''}
+                                onChange={(e) => setSubscriberTagFilter(e.target.value ? Number(e.target.value) : null)}
+                                className="bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                            >
+                                <option value="">All tags</option>
+                                {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                        </div>
+
                         <div className="bg-surface rounded-xl border border-border overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-surfaceElevated">
@@ -823,6 +1163,8 @@ const Admin: React.FC = () => {
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs text-muted">#</th>
                                         <th className="px-6 py-3 text-left text-xs text-muted">Email</th>
+                                        <th className="px-6 py-3 text-left text-xs text-muted">Name</th>
+                                        <th className="px-6 py-3 text-left text-xs text-muted">Status</th>
                                         <th className="px-6 py-3 text-left text-xs text-muted">Source</th>
                                         <th className="px-6 py-3 text-left text-xs text-muted">Tags</th>
                                         <th className="px-6 py-3 text-left text-xs text-muted">Date</th>
@@ -830,13 +1172,25 @@ const Admin: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
-                                    {subscribers.map((sub, idx) => (
+                                    {subscribers
+                                        .filter(sub => {
+                                            const q = subscriberSearch.toLowerCase();
+                                            if (q && !sub.email.toLowerCase().includes(q) && !(sub.first_name || '').toLowerCase().includes(q)) return false;
+                                            if (subscriberStatusFilter !== 'all' && sub.status !== subscriberStatusFilter) return false;
+                                            if (subscriberTagFilter && !sub.tags.some(t => t.id === subscriberTagFilter)) return false;
+                                            return true;
+                                        })
+                                        .map((sub, idx) => (
                                         <tr key={sub.id} className="hover:bg-surfaceElevated">
                                             <td className="px-4 py-4">
                                                 <input type="checkbox" checked={selectedSubscriberIds.includes(sub.id)} onChange={(e) => setSelectedSubscriberIds(e.target.checked ? [...selectedSubscriberIds, sub.id] : selectedSubscriberIds.filter(id => id !== sub.id))} className="rounded" />
                                             </td>
                                             <td className="px-6 py-4 text-sm text-muted">{idx + 1}</td>
                                             <td className="px-6 py-4 text-sm font-mono">{sub.email}</td>
+                                            <td className="px-6 py-4 text-sm text-muted">{sub.first_name || '—'}</td>
+                                            <td className="px-6 py-4 text-sm">
+                                                <span className={`px-2 py-1 rounded text-xs ${sub.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : sub.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>{sub.status}</span>
+                                            </td>
                                             <td className="px-6 py-4 text-sm">
                                                 <span className="px-2 py-1 bg-primary/10 text-primary rounded text-xs">{sub.source}</span>
                                             </td>
@@ -856,6 +1210,7 @@ const Admin: React.FC = () => {
                                     ))}
                                 </tbody>
                             </table>
+                            {subscribers.length === 0 && <p className="p-6 text-muted text-sm text-center">No subscribers for {adminAudienceLocale === 'am' ? 'Armenian' : 'English'} audience yet.</p>}
                         </div>
 
                         {editSubscriberId && (
@@ -917,14 +1272,33 @@ const Admin: React.FC = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {tags.map(tag => (
-                                <div key={tag.id} className="bg-surface rounded-xl p-4 border border-border flex justify-between items-center">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-4 h-4 rounded-full" style={{ background: tag.color }}></div>
-                                        <span>{tag.name}</span>
-                                    </div>
-                                    <button onClick={() => deleteTag(tag.id)} className="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                <div key={tag.id} className="bg-surface rounded-xl p-4 border border-border">
+                                    {editingTagId === tag.id ? (
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex gap-2">
+                                                <input type="text" value={editTagName} onChange={(e) => setEditTagName(e.target.value)} className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm" />
+                                                <input type="color" value={editTagColor} onChange={(e) => setEditTagColor(e.target.value)} className="w-10 h-8 rounded cursor-pointer" />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={updateTag} className="px-3 py-1 bg-primary text-black rounded text-sm font-semibold">Save</button>
+                                                <button onClick={() => setEditingTagId(null)} className="px-3 py-1 bg-white/10 rounded text-sm">Cancel</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-4 h-4 rounded-full" style={{ background: tag.color }}></div>
+                                                <span>{tag.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => startEditTag(tag)} className="text-blue-400 hover:text-blue-300 text-sm">Edit</button>
+                                                <button onClick={() => deleteTag(tag.id)} className="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
+                            {tags.length === 0 && <p className="text-muted text-sm col-span-3">No tags for {adminAudienceLocale === 'am' ? 'Armenian' : 'English'} audience. Create your first tag above.</p>}
                         </div>
                     </div>
                 )}
@@ -984,6 +1358,7 @@ const Admin: React.FC = () => {
                                     </div>
                                 </div>
                             ))}
+                            {templates.length === 0 && <p className="text-muted text-sm">No templates for {adminAudienceLocale === 'am' ? 'Armenian' : 'English'} audience. Create your first template above.</p>}
                         </div>
                     </div>
                 )}
@@ -994,7 +1369,7 @@ const Admin: React.FC = () => {
                         <h1 className="text-3xl font-bold mb-6">Broadcasts</h1>
 
                         <div className="bg-surface rounded-xl p-6 border border-border mb-6">
-                            <h3 className="font-semibold mb-4">Create New Broadcast</h3>
+                            <h3 className="font-semibold mb-4">{editingBroadcastId ? 'Edit Broadcast' : 'Create New Broadcast'}</h3>
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-muted text-sm mb-1">Pick template (optional)</label>
@@ -1026,23 +1401,87 @@ const Admin: React.FC = () => {
                                     placeholder="Email subject"
                                     className="w-full bg-background border border-border rounded-lg px-4 py-2"
                                 />
-                                <textarea
+                                <RichTextEditor
                                     value={broadcastForm.body}
-                                    onChange={(e) => setBroadcastForm({ ...broadcastForm, body: e.target.value })}
-                                    placeholder="Email body (HTML supported). Use {{first_name}}, {{email}}, {{unsubscribe_url}}"
-                                    rows={8}
-                                    className="w-full bg-background border border-border rounded-lg px-4 py-2 font-mono text-sm"
+                                    onChange={(body) => setBroadcastForm({ ...broadcastForm, body })}
+                                    placeholder="Email body (HTML). Use {{first_name}}, {{email}}, {{unsubscribe_url}}"
+                                    minHeight="200px"
+                                    className="w-full"
                                 />
+                                <div className="border-t border-border pt-4 mt-4">
+                                    <label className="block text-muted text-sm font-semibold mb-2">Versions by language (optional)</label>
+                                    <p className="text-muted text-xs mb-2">If set, AM subscribers get Armenian content, EN get English. Otherwise the subject/body above are used for all.</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-xs text-primary font-medium">Armenian (AM)</span>
+                                            <input type="text" value={broadcastForm.subject_am} onChange={(e) => setBroadcastForm({ ...broadcastForm, subject_am: e.target.value })} placeholder="Subject (AM)" className="w-full mt-1 bg-background border border-border rounded-lg px-4 py-2 text-sm" />
+                                            <textarea value={broadcastForm.body_am} onChange={(e) => setBroadcastForm({ ...broadcastForm, body_am: e.target.value })} placeholder="Body (AM)" rows={3} className="w-full mt-1 bg-background border border-border rounded-lg px-4 py-2 font-mono text-xs" />
+                                        </div>
+                                        <div>
+                                            <span className="text-xs text-primary font-medium">English (EN)</span>
+                                            <input type="text" value={broadcastForm.subject_en} onChange={(e) => setBroadcastForm({ ...broadcastForm, subject_en: e.target.value })} placeholder="Subject (EN)" className="w-full mt-1 bg-background border border-border rounded-lg px-4 py-2 text-sm" />
+                                            <textarea value={broadcastForm.body_en} onChange={(e) => setBroadcastForm({ ...broadcastForm, body_en: e.target.value })} placeholder="Body (EN)" rows={3} className="w-full mt-1 bg-background border border-border rounded-lg px-4 py-2 font-mono text-xs" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-muted text-sm mb-2">Attachments</label>
+                                    <input
+                                        ref={broadcastFileInputRef}
+                                        type="file"
+                                        className="hidden"
+                                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                uploadFile(file, (att) => setBroadcastForm(f => ({ ...f, attachments: [...f.attachments, att] })));
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => broadcastFileInputRef.current?.click()}
+                                        disabled={uploading}
+                                        className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm mb-2"
+                                    >
+                                        {uploading ? 'Uploading…' : 'Attach files'}
+                                    </button>
+                                    {broadcastForm.attachments.length > 0 && (
+                                        <ul className="mt-2 space-y-1">
+                                            {broadcastForm.attachments.map((a, i) => (
+                                                <li key={i} className="flex items-center gap-2 text-sm">
+                                                    <span className="text-muted truncate">{a.filename}</span>
+                                                    <button type="button" onClick={() => setBroadcastForm(f => ({ ...f, attachments: f.attachments.filter((_, j) => j !== i) }))} className="text-rose-400 hover:underline">Remove</button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
                                 <div>
                                     <label className="block text-muted text-sm mb-2">Send to</label>
-                                    <select
-                                        value={broadcastForm.segment_type}
-                                        onChange={(e) => setBroadcastForm({ ...broadcastForm, segment_type: e.target.value as 'all' | 'tags' })}
-                                        className="bg-background border border-border rounded-lg px-4 py-2"
-                                    >
-                                        <option value="all">All active subscribers</option>
-                                        <option value="tags">Subscribers with tag(s)</option>
-                                    </select>
+                                    <div className="flex flex-wrap gap-4 items-center">
+                                        <select
+                                            value={broadcastForm.segment_type}
+                                            onChange={(e) => setBroadcastForm({ ...broadcastForm, segment_type: e.target.value as 'all' | 'tags' })}
+                                            className="bg-background border border-border rounded-lg px-4 py-2"
+                                        >
+                                            <option value="all">All active subscribers</option>
+                                            <option value="tags">Subscribers with tag(s)</option>
+                                        </select>
+                                        <label className="flex items-center gap-2">
+                                            <span className="text-muted text-sm">Locale filter:</span>
+                                            <select
+                                                value={broadcastForm.segment_locale}
+                                                onChange={(e) => setBroadcastForm({ ...broadcastForm, segment_locale: e.target.value as '' | 'am' | 'en' })}
+                                                className="bg-background border border-border rounded-lg px-4 py-2"
+                                            >
+                                                <option value="">All locales</option>
+                                                <option value="am">Armenian only</option>
+                                                <option value="en">English only</option>
+                                            </select>
+                                        </label>
+                                    </div>
                                     {broadcastForm.segment_type === 'tags' && (
                                         <div className="mt-2 flex flex-wrap gap-2">
                                             {tags.map(t => (
@@ -1065,7 +1504,14 @@ const Admin: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
-                                <button onClick={createBroadcast} className="px-6 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">Create Broadcast</button>
+                                {editingBroadcastId ? (
+                                    <div className="flex gap-3">
+                                        <button onClick={updateBroadcast} className="px-6 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm">Update Broadcast</button>
+                                        <button onClick={cancelEditBroadcast} className="px-6 py-2 bg-white/10 rounded-lg">Cancel</button>
+                                    </div>
+                                ) : (
+                                    <button onClick={createBroadcast} className="px-6 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">Create Broadcast</button>
+                                )}
                             </div>
                         </div>
 
@@ -1128,6 +1574,9 @@ const Admin: React.FC = () => {
                                             )}
                                             {b.status === 'draft' && (
                                                 <>
+                                                    <button onClick={() => startEditBroadcast(b)} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30">
+                                                        Edit
+                                                    </button>
                                                     <button onClick={() => sendBroadcast(b.id)} className="px-4 py-2 bg-primary text-black font-bold rounded-lg text-sm shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">
                                                         Send Now
                                                     </button>
@@ -1157,6 +1606,9 @@ const Admin: React.FC = () => {
                                                     </button>
                                                 </>
                                             )}
+                                            <button onClick={() => deleteBroadcast(b.id)} className="px-4 py-2 bg-rose-500/20 text-rose-400 rounded-lg text-sm hover:bg-rose-500/30">
+                                                Delete
+                                            </button>
                                         </div>
                                     </div>
                                     {b.sent_count > 0 && (
@@ -1175,6 +1627,7 @@ const Admin: React.FC = () => {
                                     )}
                                 </div>
                             ))}
+                            {broadcasts.length === 0 && <p className="text-muted text-sm">No broadcasts for {adminAudienceLocale === 'am' ? 'Armenian' : 'English'} audience. Create your first broadcast above.</p>}
                         </div>
                     </div>
                 )}
@@ -1273,6 +1726,9 @@ const Admin: React.FC = () => {
                                                         Activate
                                                     </button>
                                                 )}
+                                                <button onClick={() => selectedSequenceId != null && deleteSequence(selectedSequenceId)} className="px-6 py-2 bg-rose-500/20 text-rose-400 rounded-lg font-semibold hover:bg-rose-500/30">
+                                                    Delete sequence
+                                                </button>
                                             </div>
 
                                             {seq.status === 'draft' && (
@@ -1286,12 +1742,12 @@ const Admin: React.FC = () => {
                                                             placeholder="Subject"
                                                             className="w-full bg-background border border-border rounded-lg px-4 py-2"
                                                         />
-                                                        <textarea
+                                                        <RichTextEditor
                                                             value={sequenceEmailForm.body}
-                                                            onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body: e.target.value })}
-                                                            placeholder="Body (HTML)"
-                                                            rows={4}
-                                                            className="w-full bg-background border border-border rounded-lg px-4 py-2 font-mono text-sm"
+                                                            onChange={(body) => setSequenceEmailForm({ ...sequenceEmailForm, body })}
+                                                            placeholder="Body (HTML). Use {{first_name}}, {{unsubscribe_url}}"
+                                                            minHeight="140px"
+                                                            className="w-full"
                                                         />
                                                         <div className="flex gap-4">
                                                             <label className="flex items-center gap-2">
@@ -1315,10 +1771,55 @@ const Admin: React.FC = () => {
                                                                 />
                                                             </label>
                                                         </div>
+                                                        <div className="border-t border-border pt-4">
+                                                            <span className="text-muted text-xs font-semibold">Versions by language (optional)</span>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                                                                <div><input type="text" value={sequenceEmailForm.subject_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_am: e.target.value })} placeholder="Subject (AM)" className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_am: e.target.value })} placeholder="Body (AM)" rows={2} className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
+                                                                <div><input type="text" value={sequenceEmailForm.subject_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_en: e.target.value })} placeholder="Subject (EN)" className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_en: e.target.value })} placeholder="Body (EN)" rows={2} className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="border-t border-border pt-4">
+                                                            <span className="text-muted text-xs font-semibold">Conditions (optional)</span>
+                                                            <label className="flex items-center gap-2 mt-2">
+                                                                <input type="checkbox" checked={sequenceEmailForm.conditions?.previous_email_opened === true} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, previous_email_opened: e.target.checked } })} className="rounded" />
+                                                                <span className="text-sm">Send only if previous email was opened</span>
+                                                            </label>
+                                                            <input type="text" value={(sequenceEmailForm.conditions?.has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Has tags (comma-separated)" className="w-full mt-2 bg-background border border-border rounded-lg px-3 py-1.5 text-sm" />
+                                                            <input type="text" value={(sequenceEmailForm.conditions?.not_has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, not_has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Not has tags (comma-separated)" className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm" />
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-muted text-xs font-semibold">Attachments</span>
+                                                            <input
+                                                                ref={sequenceEmailFileInputRef}
+                                                                type="file"
+                                                                className="hidden"
+                                                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) {
+                                                                        uploadFile(file, (att) => setSequenceEmailForm(f => ({ ...f, attachments: [...(f.attachments || []), att] })));
+                                                                        e.target.value = '';
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <button type="button" onClick={() => sequenceEmailFileInputRef.current?.click()} disabled={uploading} className="mt-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm">
+                                                                {uploading ? 'Uploading…' : 'Attach files'}
+                                                            </button>
+                                                            {sequenceEmailForm.attachments?.length > 0 && (
+                                                                <ul className="mt-2 space-y-1">
+                                                                    {sequenceEmailForm.attachments.map((a, i) => (
+                                                                        <li key={i} className="flex items-center gap-2 text-sm">
+                                                                            <span className="text-muted truncate">{a.filename}</span>
+                                                                            <button type="button" onClick={() => setSequenceEmailForm(f => ({ ...f, attachments: (f.attachments || []).filter((_, j) => j !== i) }))} className="text-rose-400 hover:underline">Remove</button>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            )}
+                                                        </div>
                                                         {editingSequenceEmailId ? (
                                                             <div className="flex gap-3">
                                                                 <button onClick={updateSequenceEmail} className="px-6 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm">Update Step</button>
-                                                                <button onClick={() => { setEditingSequenceEmailId(null); setSequenceEmailForm({ subject: '', body: '', delay_days: 0, delay_hours: 0 }); }} className="px-6 py-2 bg-white/10 rounded-lg">Cancel</button>
+                                                                <button onClick={() => { setEditingSequenceEmailId(null); setSequenceEmailForm(emptySequenceEmailForm()); }} className="px-6 py-2 bg-white/10 rounded-lg">Cancel</button>
                                                             </div>
                                                         ) : (
                                                             <button onClick={addSequenceEmail} className="px-6 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">Add Email</button>
@@ -1337,9 +1838,22 @@ const Admin: React.FC = () => {
                                                             <label className="flex items-center gap-2"><span className="text-muted text-sm">Delay days</span><input type="number" min={0} value={sequenceEmailForm.delay_days} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, delay_days: parseInt(e.target.value) || 0 })} className="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm" /></label>
                                                             <label className="flex items-center gap-2"><span className="text-muted text-sm">Delay hours</span><input type="number" min={0} value={sequenceEmailForm.delay_hours} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, delay_hours: parseInt(e.target.value) || 0 })} className="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm" /></label>
                                                         </div>
+                                                        <div className="border-t border-border pt-4">
+                                                            <span className="text-muted text-xs font-semibold">AM/EN (optional)</span>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                                                                <div><input type="text" value={sequenceEmailForm.subject_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_am: e.target.value })} placeholder="Subject (AM)" className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_am: e.target.value })} placeholder="Body (AM)" rows={2} className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
+                                                                <div><input type="text" value={sequenceEmailForm.subject_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_en: e.target.value })} placeholder="Subject (EN)" className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_en: e.target.value })} placeholder="Body (EN)" rows={2} className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="border-t border-border pt-4">
+                                                            <span className="text-muted text-xs font-semibold">Conditions</span>
+                                                            <label className="flex items-center gap-2 mt-2"><input type="checkbox" checked={sequenceEmailForm.conditions?.previous_email_opened === true} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, previous_email_opened: e.target.checked } })} className="rounded" /><span className="text-sm">Only if previous opened</span></label>
+                                                            <input type="text" value={(sequenceEmailForm.conditions?.has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Has tags (comma-separated)" className="w-full mt-2 bg-background border border-border rounded-lg px-3 py-1.5 text-sm" />
+                                                            <input type="text" value={(sequenceEmailForm.conditions?.not_has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, not_has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Not has tags" className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm" />
+                                                        </div>
                                                         <div className="flex gap-3">
                                                             <button onClick={updateSequenceEmail} className="px-6 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm">Update Step</button>
-                                                            <button onClick={() => { setEditingSequenceEmailId(null); setSequenceEmailForm({ subject: '', body: '', delay_days: 0, delay_hours: 0 }); }} className="px-6 py-2 bg-white/10 rounded-lg">Cancel</button>
+                                                            <button onClick={() => { setEditingSequenceEmailId(null); setSequenceEmailForm(emptySequenceEmailForm()); }} className="px-6 py-2 bg-white/10 rounded-lg">Cancel</button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1347,24 +1861,20 @@ const Admin: React.FC = () => {
 
                                             <div className="bg-surface rounded-xl p-6 border border-border mb-6">
                                                 <h3 className="font-semibold mb-4">Sequence Emails</h3>
+                                                <p className="text-muted text-xs mb-2">Drag steps to reorder.</p>
                                                 {sequenceEmails.length === 0 ? (
                                                     <p className="text-muted text-sm">No emails yet. Add emails above (draft only).</p>
                                                 ) : (
-                                                    <div className="space-y-3">
-                                                        {sequenceEmails.map((em) => (
-                                                            <div key={em.id} className="flex justify-between items-start py-3 border-b border-border last:border-0">
-                                                                <div>
-                                                                    <span className="text-muted text-sm mr-2">#{em.position}</span>
-                                                                    <span className="font-medium">{em.subject}</span>
-                                                                    <p className="text-muted text-xs mt-1">Delay: {em.delay_days}d {em.delay_hours}h</p>
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <button onClick={() => { setEditingSequenceEmailId(em.id); setSequenceEmailForm({ subject: em.subject, body: em.body, delay_days: em.delay_days, delay_hours: em.delay_hours }); }} className="px-3 py-1.5 bg-primary/20 text-primary rounded text-sm hover:bg-primary/30">Edit</button>
-                                                                    <button onClick={() => deleteSequenceEmail(selectedSequenceId, em.id)} className="px-3 py-1.5 bg-rose-500/20 text-rose-400 rounded text-sm hover:bg-rose-500/30">Delete</button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                                    <SequenceEmailsListClient
+                                                        sequenceEmails={sequenceEmails}
+                                                        setSequenceEmails={setSequenceEmails}
+                                                        selectedSequenceId={selectedSequenceId}
+                                                        fetchWithAdminAuth={fetchWithAdminAuth}
+                                                        setEditingSequenceEmailId={setEditingSequenceEmailId}
+                                                        setSequenceEmailForm={setSequenceEmailForm}
+                                                        deleteSequenceEmail={deleteSequenceEmail}
+                                                        setMessage={setMessage}
+                                                    />
                                                 )}
                                             </div>
 
@@ -1385,6 +1895,12 @@ const Admin: React.FC = () => {
                                                         Choose subscribers to add
                                                     </button>
                                                 )}
+                                            </div>
+
+                                            {/* Subscribers in this sequence */}
+                                            <div className="bg-surface rounded-xl p-6 border border-border mt-6">
+                                                <h3 className="font-semibold mb-4">Subscribers in this Sequence</h3>
+                                                <SequenceSubscribersList sequenceId={selectedSequenceId} fetchWithAdminAuth={fetchWithAdminAuth} />
                                             </div>
                                         </div>
                                     ) : (
@@ -1426,9 +1942,13 @@ const Admin: React.FC = () => {
                                                 <button onClick={() => setSelectedSequenceId(seq.id)} className="px-4 py-2 bg-primary/20 text-primary rounded-lg text-sm">
                                                     Manage
                                                 </button>
+                                                <button onClick={() => deleteSequence(seq.id)} className="px-4 py-2 bg-rose-500/20 text-rose-400 rounded-lg text-sm hover:bg-rose-500/30">
+                                                    Delete
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
+                                    {sequences.length === 0 && <p className="text-muted text-sm">No sequences for {adminAudienceLocale === 'am' ? 'Armenian' : 'English'} audience. Create your first sequence above.</p>}
                                 </div>
                             </>
                         )}
@@ -1655,7 +2175,7 @@ const Admin: React.FC = () => {
                     </div>
                 )}
 
-                {activeTab === 'courses' && <AdminCourses setMessage={setMessage} />}
+                {activeTab === 'courses' && <AdminCourses setMessage={setMessage} adminAudienceLocale={adminAudienceLocale} />}
 
                 {/* Settings */}
                 {activeTab === 'settings' && (
