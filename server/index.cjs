@@ -2845,17 +2845,23 @@ app.delete('/api/sequences/:id', requireAdminAuth, async (req, res) => {
         // Delete dependent data first
         await client.query('DELETE FROM subscriber_sequences WHERE sequence_id = $1', [seqId]);
         await client.query('DELETE FROM sequence_emails WHERE sequence_id = $1', [seqId]);
-        try {
-            await client.query('DELETE FROM sequence_triggers WHERE sequence_id = $1', [seqId]);
-        } catch (_) { /* table may not exist yet */ }
+        
+        // Delete sequence triggers (should cascade, but let's be explicit)
+        await client.query('DELETE FROM sequence_triggers WHERE sequence_id = $1', [seqId]);
 
         // Finally delete sequence
-        await client.query("DELETE FROM sequences WHERE id = $1 AND COALESCE(locale, 'en') = $2", [seqId, loc]);
+        const deleteResult = await client.query("DELETE FROM sequences WHERE id = $1 AND COALESCE(locale, 'en') = $2 RETURNING id", [seqId, loc]);
+        
+        if (deleteResult.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Sequence not found or already deleted' });
+        }
 
         await client.query('COMMIT');
         res.json({ success: true });
     } catch (error) {
         await client.query('ROLLBACK');
+        console.error('DELETE sequence error:', error);
         res.status(500).json({ error: error.message });
     } finally {
         client.release();
