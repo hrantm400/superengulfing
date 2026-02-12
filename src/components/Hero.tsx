@@ -25,9 +25,17 @@ const Hero: React.FC = () => {
       const data = await res.json();
 
       if (data.success) {
-        setStatus('success');
-        setMessage(data.message);
-        setEmail('');
+        if (data.subscriptionStatus === 'already_subscribed') {
+          setStatus('error');
+          setMessage(t('home.hero.emailAlreadyUsed'));
+        } else if (data.subscriptionStatus === 'pending_confirmation') {
+          setStatus('error');
+          setMessage(t('home.hero.pendingConfirm'));
+        } else {
+          setStatus('success');
+          setMessage(data.message);
+          setEmail('');
+        }
       } else {
         setStatus('error');
         setMessage(data.message);
@@ -60,8 +68,10 @@ const Hero: React.FC = () => {
           <h1 className={`text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter text-foreground drop-shadow-2xl animate-fade-in-up opacity-0 [animation-fill-mode:forwards] ${locale === 'am' ? 'leading-[1.35] max-w-4xl mx-auto text-balance' : 'leading-[1]'}`} style={{ animationDelay: '0.2s' }}>
             {locale === 'am' ? (
               <span className="block">
-                {t('home.hero.headline1')}{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-foreground via-primary to-primary-glow font-extrabold relative inline-block pb-2">
+                <span className="block text-[0.4em] leading-snug">
+                  {t('home.hero.headline1')}
+                </span>
+                <span className="block mt-2 text-[0.6em] text-transparent bg-clip-text bg-gradient-to-r from-foreground via-primary to-primary-glow font-extrabold relative inline-block pb-2">
                   {t('home.hero.headline2')}
                   <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary opacity-50" preserveAspectRatio="none" viewBox="0 0 100 10">
                     <path d="M0 5 Q 50 10 100 5" fill="none" stroke="currentColor" strokeWidth="2"></path>

@@ -33,9 +33,10 @@ interface LessonResourceRow {
 
 interface AdminCoursesProps {
   setMessage: (msg: string) => void;
+  adminAudienceLocale: 'en' | 'am';
 }
 
-export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage }) => {
+export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAudienceLocale }) => {
   const { fetchWithAdminAuth } = useAdminAuth();
   const [courses, setCourses] = useState<CourseRow[]>([]);
   const [courseForm, setCourseForm] = useState({ title: '', description: '', image_url: '' });
@@ -50,12 +51,17 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage }) => {
   const [lessonResources, setLessonResources] = useState<LessonResourceRow[]>([]);
   const [resourceForm, setResourceForm] = useState({ title: '', url: '' });
 
-  useEffect(() => {
-    fetchWithAdminAuth(`${API_URL}/api/courses`)
+  const loadCourses = () => {
+    fetchWithAdminAuth(`${API_URL}/api/courses?locale=${adminAudienceLocale}`)
       .then((r) => r.json())
       .then((d) => setCourses(d.courses || []))
       .catch(() => setCourses([]));
-  }, []);
+  };
+
+  useEffect(() => {
+    loadCourses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminAudienceLocale]);
 
   useEffect(() => {
     if (lessonsForCourseId != null) {
@@ -119,12 +125,13 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage }) => {
             title: courseForm.title.trim(),
             description: courseForm.description.trim() || null,
             image_url: courseForm.image_url.trim() || null,
+            locale: adminAudienceLocale,
           }),
         });
         setMessage('Course created');
       }
       setShowCourseModal(false);
-      fetchWithAdminAuth(`${API_URL}/api/courses`).then((r) => r.json()).then((d) => setCourses(d.courses || []));
+      loadCourses();
     } catch (e) {
       setMessage('Failed to save course');
     }
@@ -211,7 +218,7 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage }) => {
       fetchWithAdminAuth(`${API_URL}/api/courses/${lessonsForCourseId}/lessons`).then((r) => r.json()).then((d) => {
         setLessons(d.lessons || []);
       });
-      fetchWithAdminAuth(`${API_URL}/api/courses`).then((r) => r.json()).then((d) => setCourses(d.courses || []));
+      loadCourses();
     } catch (e) {
       setMessage('Failed to save lesson');
     }
@@ -223,7 +230,7 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage }) => {
       await fetchWithAdminAuth(`${API_URL}/api/lessons/${l.id}`, { method: 'DELETE' });
       setMessage('Lesson deleted');
       setLessons((prev) => prev.filter((x) => x.id !== l.id));
-      fetchWithAdminAuth(`${API_URL}/api/courses`).then((r) => r.json()).then((d) => setCourses(d.courses || []));
+      loadCourses();
     } catch (e) {
       setMessage('Failed to delete lesson');
     }

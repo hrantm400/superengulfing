@@ -29,7 +29,7 @@ type FilterPill = 'all' | 'in_progress' | 'completed' | 'available';
 
 const AcademyPage: React.FC = () => {
   const navigate = useNavigate();
-  const { localizePath } = useLocale();
+  const { localizePath, locale } = useLocale();
   const { t } = useTranslation();
   const [myCourses, setMyCourses] = useState<MyCourse[]>([]);
   const [catalog, setCatalog] = useState<CatalogCourse[]>([]);
@@ -44,7 +44,7 @@ const AcademyPage: React.FC = () => {
       try {
         const [myRes, catalogRes] = await Promise.all([
           authFetch('/api/courses/my-courses'),
-          fetch(`${getApiUrl()}/api/courses`),
+          fetch(`${getApiUrl()}/api/courses?locale=${locale}`),
         ]);
         if (myRes.ok) {
           const data = await myRes.json();
@@ -62,7 +62,7 @@ const AcademyPage: React.FC = () => {
       }
     };
     load();
-  }, []);
+  }, [locale]);
 
   const enrolledIds = new Set(myCourses.map((c) => c.id));
   const availableCourses = catalog.filter((c) => !enrolledIds.has(c.id));

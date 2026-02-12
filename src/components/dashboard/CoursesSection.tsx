@@ -58,7 +58,7 @@ interface CoursesSectionProps {
 }
 
 export const CoursesSection: React.FC<CoursesSectionProps> = ({ embedded = false }) => {
-  const { localizePath } = useLocale();
+  const { localizePath, locale } = useLocale();
   const { t } = useTranslation();
   const [myCourses, setMyCourses] = useState<MyCourse[]>([]);
   const [catalog, setCatalog] = useState<CatalogCourse[]>([]);
@@ -74,7 +74,7 @@ export const CoursesSection: React.FC<CoursesSectionProps> = ({ embedded = false
       try {
         const [myRes, catalogRes, resumeRes] = await Promise.all([
           authFetch('/api/courses/my-courses'),
-          fetch(`${getApiUrl()}/api/courses`),
+          fetch(`${getApiUrl()}/api/courses?locale=${locale}`),
           authFetch('/api/courses/resume'),
         ]);
         if (myRes.ok) {
@@ -99,7 +99,7 @@ export const CoursesSection: React.FC<CoursesSectionProps> = ({ embedded = false
       }
     };
     load();
-  }, []);
+  }, [locale]);
 
   const enrolledIds = new Set(myCourses.map((c) => c.id));
   const availableCourses = catalog.filter((c) => !enrolledIds.has(c.id));

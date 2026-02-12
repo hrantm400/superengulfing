@@ -128,8 +128,8 @@ const Dashboard: React.FC = () => {
       <div className="fixed inset-0 bg-subtle-gradient pointer-events-none z-0 opacity-50 dark:opacity-20" />
       <div className="fixed inset-0 grid-bg pointer-events-none z-0 opacity-[0.4] dark:opacity-[0.3]" />
 
-      {/* Cinematic Onboarding Overlay (V5 Elite) */}
-      {onboardingStep && (
+      {/* Cinematic Onboarding Overlay (V5 Elite) - disabled */}
+      {false && onboardingStep && (
         <MagicCertificate
           onSubmitName={handleNameConfirm}
           onAgree={handleAgree}
@@ -154,14 +154,7 @@ const Dashboard: React.FC = () => {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-4 md:mt-0">
-              <button
-                type="button"
-                onClick={handleTestOnboarding}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-sm font-medium hover:bg-amber-500/20 transition-colors"
-                title="Reset onboarding to test certificate flow"
-              >
-                <TestTube className="w-4 h-4" /> {t('dashboard.testOnboarding')}
-              </button>
+              {/* Test onboarding button removed */}
               <button
                 type="button"
                 onClick={() => setShowProfile((v) => !v)}
@@ -184,16 +177,7 @@ const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {profile?.onboarding_completed && (
-            <div className="animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.2s' }}>
-              <CertificateSection
-                initialCollapsed={profile.certificate_section_collapsed}
-                onCollapsedChange={(collapsed) =>
-                  setProfile((p) => (p ? { ...p, certificate_section_collapsed: collapsed } : null))
-                }
-              />
-            </div>
-          )}
+          {/* Certificate section removed from dashboard UI */}
 
           <div className="animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.25s' }}>
             <StatCards profile={profile} loadProfile={loadProfile} />

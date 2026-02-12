@@ -8,6 +8,8 @@ const nodemailer = require('nodemailer');
 const { Pool } = require('pg');
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
@@ -19,6 +21,9 @@ const generateToken = () => crypto.randomBytes(32).toString('hex');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust proxy (Nginx etc. sets X-Forwarded-For); required for express-rate-limit behind reverse proxy
+app.set('trust proxy', 1);
+
 // Middleware (20MB limit so certificate PNG base64 fits)
 const isProduction = process.env.NODE_ENV === 'production';
 app.use(cors(isProduction ? { origin: process.env.CORS_ORIGIN || 'https://your-domain.com' } : undefined));
@@ -27,6 +32,11 @@ app.use(express.json({ limit: 20 * 1024 * 1024 }));
 
 // Serve static files (PDFs, etc.) from /public folder
 app.use('/download', express.static(path.join(__dirname, 'public')));
+
+// Uploads dir for email attachments (images, documents)
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
 
 // Test: GET /api/ping returns 200 if this server is running (use to verify port 3001 is this app)
 app.get('/api/ping', (req, res) => res.json({ ok: true, message: 'Dashboard API' }));
@@ -94,6 +104,23 @@ const requireAdminAuth = (req, res, next) => {
         return res.status(401).json({ error: 'Invalid or expired admin token' });
     }
 };
+
+// Email attachments upload (admin): images and documents for broadcasts/sequences
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+        const base = (file.originalname || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+        cb(null, Date.now() + '-' + base);
+    }
+});
+const uploadMulter = multer({ storage, limits: { fileSize: 15 * 1024 * 1024 } });
+app.post('/api/upload', requireAdminAuth, uploadMulter.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const apiUrl = process.env.API_URL || 'http://localhost:3001';
+    const filename = path.basename(req.file.path);
+    const relativePath = 'uploads/' + filename;
+    res.json({ url: apiUrl + '/uploads/' + encodeURIComponent(filename), path: relativePath, filename: req.file.originalname || filename });
+});
 
 app.get('/api/me', requireAuth, async (req, res) => {
     try {
@@ -823,7 +850,9 @@ app.post('/api/admin-auth/request-code', async (req, res) => {
     try {
         const existing = await pool.query('SELECT secret, confirmed FROM admin_2fa_secrets WHERE email = $1', [email]);
         if (existing.rows.length > 0 && existing.rows[0].confirmed) {
-            return res.json({ success: true, emailMasked: mask, setupRequired: false });
+            const base32 = existing.rows[0].secret;
+            const otpauthUrl = `otpauth://totp/SuperEngulfing%20Admin:${encodeURIComponent(email)}?secret=${base32}&issuer=SuperEngulfing`;
+            return res.json({ success: true, emailMasked: mask, setupRequired: false, otpauthUrl });
         }
         const secret = speakeasy.generateSecret({ name: `SuperEngulfing Admin (${email})`, issuer: 'SuperEngulfing', length: 20 });
         await pool.query(
@@ -857,7 +886,7 @@ app.post('/api/admin-auth/verify', async (req, res) => {
             secret: row.rows[0].secret,
             encoding: 'base32',
             token: code,
-            window: 1
+            window: 2
         });
         if (!valid) {
             return res.status(401).json({ success: false, error: 'Invalid or expired code' });
@@ -931,9 +960,9 @@ app.post('/api/subscribe', async (req, res) => {
 
         if (existing.rows.length > 0) {
             if (existing.rows[0].confirmed_at) {
-                return res.json({ success: true, message: 'You are already subscribed!' });
+                return res.json({ success: true, subscriptionStatus: 'already_subscribed', message: 'This email has already been used.' });
             } else {
-                return res.json({ success: true, message: 'Please check your email and confirm your subscription!' });
+                return res.json({ success: true, subscriptionStatus: 'pending_confirmation', message: 'Please check your email and confirm your subscription.' });
             }
         }
 
@@ -955,7 +984,7 @@ app.post('/api/subscribe', async (req, res) => {
             [result.rows[0].id, 'confirmation', 'Confirm your subscription', 'sent']
         );
 
-        res.status(201).json({ success: true, message: 'Please check your email and click the confirmation link!' });
+        res.status(201).json({ success: true, subscriptionStatus: 'confirmation_sent', message: 'Please check your email and click the confirmation link!' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -977,9 +1006,14 @@ app.get('/api/confirm/:token', async (req, res) => {
 
         const subscriber = result.rows[0];
 
+        // Determine subscriber locale once
+        const subLocale = subscriber.locale === 'am' ? 'am' : 'en';
+        const thankYouBase = (process.env.THANK_YOU_URL || 'http://localhost:5173/thank-you').replace(/\/thank-you\/?$/i, '') || (process.env.THANK_YOU_URL || 'http://localhost:5173');
+        const thankYouUrl = subLocale === 'am' ? `${thankYouBase}/am/thank-you?confirmed=1` : `${thankYouBase}/thank-you?confirmed=1`;
+
         if (subscriber.confirmed_at) {
-            // Already confirmed - redirect to thank you page
-            return res.redirect(process.env.THANK_YOU_URL || 'http://localhost:5173/thank-you');
+            // Already confirmed - redirect to thank you page (locale-specific)
+            return res.redirect(thankYouUrl);
         }
 
         // Update subscriber to confirmed
@@ -997,8 +1031,35 @@ app.get('/api/confirm/:token', async (req, res) => {
             [subscriber.id, 'welcome', 'Welcome Email with PDF', 'sent']
         );
 
-        // Redirect to thank you page with PDF download
-        res.redirect(process.env.THANK_YOU_URL || 'http://localhost:5173/thank-you');
+        // Auto-add to ALL active sequences matching subscriber locale
+        try {
+            const activeSeqs = await pool.query(
+                "SELECT id FROM sequences WHERE status = 'active' AND COALESCE(locale, 'en') = $1",
+                [subLocale]
+            );
+            for (const seq of activeSeqs.rows) {
+                const existing = await pool.query(
+                    'SELECT id FROM subscriber_sequences WHERE subscriber_id = $1 AND sequence_id = $2',
+                    [subscriber.id, seq.id]
+                );
+                if (existing.rows.length === 0) {
+                    const firstEmail = await pool.query(
+                        'SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 ORDER BY position LIMIT 1',
+                        [seq.id]
+                    );
+                    const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
+                    const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
+                    const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
+                    await pool.query(
+                        'INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at) VALUES ($1, $2, 0, $3)',
+                        [subscriber.id, seq.id, nextEmailAt]
+                    );
+                }
+            }
+        } catch (e) { console.error('Auto-add to sequences error:', e.message); }
+
+        // Redirect to thank you page (same locale as subscriber) with confirmation flag
+        res.redirect(thankYouUrl);
     } catch (error) {
         res.status(500).send('Error confirming subscription');
     }
@@ -1022,12 +1083,9 @@ app.post('/api/subscribers/:id/tags', requireAdminAuth, async (req, res) => {
                 const existing = await pool.query('SELECT id FROM subscriber_sequences WHERE subscriber_id = $1 AND sequence_id = $2', [id, seqId]);
                 if (existing.rows.length > 0) continue;
                 const firstEmail = await pool.query('SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 ORDER BY position LIMIT 1', [seqId]);
-                let nextEmailAt = new Date();
-                if (firstEmail.rows.length > 0) {
-                    const { delay_days, delay_hours } = firstEmail.rows[0];
-                    nextEmailAt.setDate(nextEmailAt.getDate() + (delay_days || 0));
-                    nextEmailAt.setHours(nextEmailAt.getHours() + (delay_hours || 0));
-                }
+                const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
+                const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
+                const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
                 await pool.query('INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at) VALUES ($1, $2, 0, $3)', [id, seqId, nextEmailAt]);
             }
         } catch (e) {
@@ -1369,15 +1427,20 @@ function isValidVideoUrl(url, videoType) {
     }
 }
 
-// GET /api/courses - List all courses (public, for catalog)
+// GET /api/courses - List all courses (public, for catalog). Optional ?locale=am|en to filter by audience.
 app.get('/api/courses', async (req, res) => {
+    const { locale } = req.query;
+    const hasLocale = (locale === 'am' || locale === 'en');
+    const params = hasLocale ? [locale] : [];
+    const whereClause = hasLocale ? "WHERE COALESCE(c.locale, 'en') = $1" : "";
     try {
         const result = await pool.query(`
             SELECT c.id, c.title, c.description, c.image_url, c.created_at,
                    (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count
             FROM courses c
+            ${whereClause}
             ORDER BY c.created_at DESC
-        `);
+        `, params);
         res.json({ courses: result.rows });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1528,12 +1591,13 @@ app.put('/api/progress', requireAuth, async (req, res) => {
 
 // POST /api/courses - Create course (admin)
 app.post('/api/courses', requireAdminAuth, async (req, res) => {
-    const { title, description, image_url } = req.body;
+    const { title, description, image_url, locale: reqLocale } = req.body;
+    const locale = (reqLocale === 'am' || reqLocale === 'en') ? reqLocale : 'en';
     if (!title || !title.trim()) return res.status(400).json({ error: 'title required' });
     try {
         const result = await pool.query(
-            'INSERT INTO courses (title, description, image_url, updated_at) VALUES ($1, $2, $3, NOW()) RETURNING *',
-            [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null]
+            'INSERT INTO courses (title, description, image_url, updated_at, locale) VALUES ($1, $2, $3, NOW(), $4) RETURNING *',
+            [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null, locale]
         );
         res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -1544,12 +1608,19 @@ app.post('/api/courses', requireAdminAuth, async (req, res) => {
 // PUT /api/courses/:id - Update course (admin)
 app.put('/api/courses/:id', requireAdminAuth, async (req, res) => {
     const id = req.params.id;
-    const { title, description, image_url } = req.body;
+    const { title, description, image_url, locale: reqLocale } = req.body;
     if (!title || !title.trim()) return res.status(400).json({ error: 'title required' });
     try {
+        const updates = ['title = $1', 'description = $2', 'image_url = $3', 'updated_at = NOW()'];
+        const params = [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null];
+        if (reqLocale === 'am' || reqLocale === 'en') {
+            params.push(reqLocale);
+            updates.push(`locale = $${params.length}`);
+        }
+        params.push(id);
         const result = await pool.query(
-            'UPDATE courses SET title = $1, description = $2, image_url = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
-            [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null, id]
+            `UPDATE courses SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *`,
+            params
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
         res.json(result.rows[0]);
@@ -1837,12 +1908,9 @@ app.post('/api/subscribers/bulk-sequence', requireAdminAuth, async (req, res) =>
     }
     try {
         const firstEmail = await pool.query('SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 ORDER BY position LIMIT 1', [sequence_id]);
-        let nextEmailAt = new Date();
-        if (firstEmail.rows.length > 0) {
-            const { delay_days, delay_hours } = firstEmail.rows[0];
-            nextEmailAt.setDate(nextEmailAt.getDate() + (delay_days || 0));
-            nextEmailAt.setHours(nextEmailAt.getHours() + (delay_hours || 0));
-        }
+        const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
+        const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
+        const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
         let count = 0;
         for (const id of subscriber_ids) {
             const existing = await pool.query('SELECT id FROM subscriber_sequences WHERE subscriber_id = $1 AND sequence_id = $2', [id, sequence_id]);
@@ -1909,26 +1977,75 @@ app.put('/api/subscribers/:id', requireAdminAuth, async (req, res) => {
 
 // ==================== TAGS ====================
 
-// GET /api/tags - List all tags
+// GET /api/tags - List all tags; optional ?locale=am|en
 app.get('/api/tags', requireAdminAuth, async (req, res) => {
+    const { locale } = req.query;
+    const localeFilter = (locale === 'am' || locale === 'en') ? 'WHERE locale = $1' : '';
+    const params = (locale === 'am' || locale === 'en') ? [locale] : [];
     try {
-        const result = await pool.query('SELECT * FROM tags ORDER BY name');
+        const result = await pool.query(
+            'SELECT * FROM tags ' + localeFilter + ' ORDER BY name',
+            params
+        );
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// POST /api/tags - Create tag
+// POST /api/tags - Create tag (body: name, color, locale?)
 app.post('/api/tags', requireAdminAuth, async (req, res) => {
-    const { name, color } = req.body;
+    const { name, color, locale: reqLocale } = req.body;
+    const locale = (reqLocale === 'am' || reqLocale === 'en') ? reqLocale : 'en';
 
     try {
         const result = await pool.query(
-            'INSERT INTO tags (name, color) VALUES ($1, $2) RETURNING *',
-            [name, color || '#39FF14']
+            'INSERT INTO tags (name, color, locale) VALUES ($1, $2, $3) RETURNING *',
+            [name, color || '#39FF14', locale]
         );
         res.status(201).json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT /api/tags/:id - Update tag (name, color)
+app.put('/api/tags/:id', requireAdminAuth, async (req, res) => {
+    const { name, color } = req.body;
+    try {
+        const updates = [];
+        const params = [];
+        if (name) { params.push(name); updates.push('name = $' + params.length); }
+        if (color) { params.push(color); updates.push('color = $' + params.length); }
+        if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
+        params.push(req.params.id);
+        const result = await pool.query(
+            'UPDATE tags SET ' + updates.join(', ') + ' WHERE id = $' + params.length + ' RETURNING *',
+            params
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Tag not found' });
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT /api/tags/:id - Update tag (name, color)
+app.put('/api/tags/:id', requireAdminAuth, async (req, res) => {
+    const { name, color } = req.body;
+    try {
+        const updates = [];
+        const params = [];
+        if (name) { params.push(name); updates.push('name = $' + params.length); }
+        if (color) { params.push(color); updates.push('color = $' + params.length); }
+        if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
+        params.push(req.params.id);
+        const result = await pool.query(
+            'UPDATE tags SET ' + updates.join(', ') + ' WHERE id = $' + params.length + ' RETURNING *',
+            params
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Tag not found' });
+        res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1946,24 +2063,31 @@ app.delete('/api/tags/:id', requireAdminAuth, async (req, res) => {
 
 // ==================== TEMPLATES ====================
 
-// GET /api/templates - List templates
+// GET /api/templates - List templates; optional ?locale=am|en
 app.get('/api/templates', requireAdminAuth, async (req, res) => {
+    const { locale } = req.query;
+    const localeFilter = (locale === 'am' || locale === 'en') ? 'WHERE locale = $1' : '';
+    const params = (locale === 'am' || locale === 'en') ? [locale] : [];
     try {
-        const result = await pool.query('SELECT * FROM templates ORDER BY created_at DESC');
+        const result = await pool.query(
+            'SELECT * FROM templates ' + localeFilter + ' ORDER BY created_at DESC',
+            params
+        );
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// POST /api/templates - Create template
+// POST /api/templates - Create template (body: name, subject, body, locale?)
 app.post('/api/templates', requireAdminAuth, async (req, res) => {
-    const { name, subject, body } = req.body;
+    const { name, subject, body, locale: reqLocale } = req.body;
+    const locale = (reqLocale === 'am' || reqLocale === 'en') ? reqLocale : 'en';
 
     try {
         const result = await pool.query(
-            'INSERT INTO templates (name, subject, body) VALUES ($1, $2, $3) RETURNING *',
-            [name, subject, body]
+            'INSERT INTO templates (name, subject, body, locale) VALUES ($1, $2, $3, $4) RETURNING *',
+            [name, subject, body, locale]
         );
         res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -1971,14 +2095,21 @@ app.post('/api/templates', requireAdminAuth, async (req, res) => {
     }
 });
 
-// PUT /api/templates/:id - Update template
+// PUT /api/templates/:id - Update template (name, subject, body, locale?)
 app.put('/api/templates/:id', requireAdminAuth, async (req, res) => {
-    const { name, subject, body } = req.body;
+    const { name, subject, body, locale: reqLocale } = req.body;
 
     try {
+        const updates = ['name = $1', 'subject = $2', 'body = $3', 'updated_at = NOW()'];
+        const params = [name, subject, body];
+        if (reqLocale === 'am' || reqLocale === 'en') {
+            params.push(reqLocale);
+            updates.push('locale = $' + params.length);
+        }
+        params.push(req.params.id);
         const result = await pool.query(
-            'UPDATE templates SET name = $1, subject = $2, body = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
-            [name, subject, body, req.params.id]
+            'UPDATE templates SET ' + updates.join(', ') + ' WHERE id = $' + params.length + ' RETURNING *',
+            params
         );
         res.json(result.rows[0]);
     } catch (error) {
@@ -1998,114 +2129,166 @@ app.delete('/api/templates/:id', requireAdminAuth, async (req, res) => {
 
 // ==================== BROADCASTS ====================
 
-// GET /api/broadcasts - List all broadcasts
+// GET /api/broadcasts - List all broadcasts; optional ?locale=am|en
 app.get('/api/broadcasts', requireAdminAuth, async (req, res) => {
+    const { locale } = req.query;
+    const localeFilter = (locale === 'am' || locale === 'en') ? 'WHERE locale = $1' : '';
+    const params = (locale === 'am' || locale === 'en') ? [locale] : [];
     try {
-        const result = await pool.query('SELECT * FROM broadcasts ORDER BY created_at DESC');
+        const result = await pool.query(
+            'SELECT * FROM broadcasts ' + localeFilter + ' ORDER BY created_at DESC',
+            params
+        );
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// POST /api/broadcasts - Create broadcast
+// POST /api/broadcasts - Create broadcast (body includes locale?)
 app.post('/api/broadcasts', requireAdminAuth, async (req, res) => {
-    const { name, subject, body } = req.body;
+    const { name, subject, body, subject_am, body_am, subject_en, body_en, segment_locale, attachments, locale: reqLocale } = req.body;
+    const locale = (reqLocale === 'am' || reqLocale === 'en') ? reqLocale : 'en';
 
     try {
-        const result = await pool.query(
-            'INSERT INTO broadcasts (name, subject, body) VALUES ($1, $2, $3) RETURNING *',
-            [name, subject, body]
-        );
+        const attachmentsJson = Array.isArray(attachments) ? JSON.stringify(attachments) : '[]';
+        let result;
+        try {
+            result = await pool.query(
+                `INSERT INTO broadcasts (name, subject, body, subject_am, body_am, subject_en, body_en, segment_locale, attachments, locale)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10) RETURNING *`,
+                [name || null, subject || '', body || '', subject_am || null, body_am || null, subject_en || null, body_en || null, segment_locale || null, attachmentsJson, locale]
+            );
+        } catch (colErr) {
+            if (/column "attachments" does not exist/i.test(colErr.message)) {
+                result = await pool.query(
+                    `INSERT INTO broadcasts (name, subject, body, subject_am, body_am, subject_en, body_en, segment_locale, locale)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+                    [name || null, subject || '', body || '', subject_am || null, body_am || null, subject_en || null, body_en || null, segment_locale || null, locale]
+                );
+            } else if (/column "locale" does not exist/i.test(colErr.message)) {
+                result = await pool.query(
+                    `INSERT INTO broadcasts (name, subject, body, subject_am, body_am, subject_en, body_en, segment_locale, attachments)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb) RETURNING *`,
+                    [name || null, subject || '', body || '', subject_am || null, body_am || null, subject_en || null, body_en || null, segment_locale || null, attachmentsJson]
+                );
+            } else throw colErr;
+        }
         res.status(201).json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Get subscribers for a broadcast (all active or by segment tags)
+// Get subscribers for a broadcast (all active or by segment tags; optional segment_locale filter)
 async function getBroadcastSubscribers(broadcast) {
     const segmentType = broadcast.segment_type || 'all';
     const tagIds = broadcast.segment_tag_ids && Array.isArray(broadcast.segment_tag_ids) ? broadcast.segment_tag_ids : [];
+    const segmentLocale = broadcast.segment_locale === 'am' || broadcast.segment_locale === 'en' ? broadcast.segment_locale : null;
+    const localeCondition = segmentLocale ? " AND COALESCE(s.locale, 'en') = $" + (tagIds.length > 0 ? "2" : "1") : "";
+    const localeParam = segmentLocale ? [segmentLocale] : [];
     if (segmentType === 'tags' && tagIds.length > 0) {
         const result = await pool.query(`
             SELECT DISTINCT s.* FROM subscribers s
             INNER JOIN subscriber_tags st ON s.id = st.subscriber_id
-            WHERE s.status = 'active' AND st.tag_id = ANY($1::int[])
-        `, [tagIds]);
+            WHERE s.status = 'active' AND st.tag_id = ANY($1::int[]) ${localeCondition}
+        `, segmentLocale ? [tagIds, segmentLocale] : [tagIds]);
         return result.rows;
     }
-    const result = await pool.query("SELECT * FROM subscribers WHERE status = 'active'");
+    const result = await pool.query(
+        "SELECT * FROM subscribers WHERE status = 'active'" + (segmentLocale ? " AND COALESCE(locale, 'en') = $1" : ""),
+        segmentLocale ? [segmentLocale] : []
+    );
     return result.rows;
 }
 
-// POST /api/broadcasts/:id/send - Send broadcast now. Body: optional { ab_test: true, subject_b: "..." } for A/B test (sends 20%, remainder after 24h)
+// Run broadcast send (used by POST handler and by job worker). Returns { sentCount, failedCount, useAbTest } or throws.
+async function runBroadcastSend(broadcastId, options = {}) {
+    const { ab_test, subject_b } = options;
+    const id = broadcastId;
+    const broadcast = await pool.query('SELECT * FROM broadcasts WHERE id = $1', [id]);
+    if (broadcast.rows.length === 0) throw new Error('Broadcast not found');
+    const b = broadcast.rows[0];
+    if (ab_test && subject_b) {
+        await pool.query(
+            'UPDATE broadcasts SET subject_b = $1, ab_test_ends_at = NOW() + INTERVAL \'24 hours\', ab_test_winner = NULL WHERE id = $2',
+            [subject_b, id]
+        );
+    }
+    const subscribers = await getBroadcastSubscribers(b);
+    let toSend = subscribers;
+    const useAbTest = ab_test && subject_b && toSend.length > 0;
+    if (useAbTest) {
+        const shuffled = [...toSend].sort(() => Math.random() - 0.5);
+        const twentyPct = Math.max(2, Math.ceil(shuffled.length * 0.2));
+        toSend = shuffled.slice(0, twentyPct);
+    }
+    let sentCount = 0;
+    let failedCount = 0;
+    for (let i = 0; i < toSend.length; i++) {
+        const sub = toSend[i];
+        const subLocale = sub.locale === 'am' ? 'am' : 'en';
+        const content = pickContentByLocale(b, subLocale);
+        const useSubjectB = useAbTest && i >= Math.floor(toSend.length / 2);
+        const subjectToUse = useSubjectB && b.subject_b ? b.subject_b : content.subject;
+        try {
+            const subj = replaceMergeTags(subjectToUse, sub);
+            const bodyPersonal = replaceMergeTags(content.body, sub);
+            const logResult = await pool.query(
+                'INSERT INTO email_log (subscriber_id, email_type, reference_id, subject, status) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+                [sub.id, 'broadcast', id, subj, 'sending']
+            );
+            const logId = logResult.rows[0].id;
+            const mailOpts = {
+                from: process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>',
+                to: sub.email,
+                subject: subj,
+                html: wrapEmailTemplate(bodyPersonal, logId)
+            };
+            const attachList = Array.isArray(b.attachments) ? b.attachments : (typeof b.attachments === 'string' ? (() => { try { return JSON.parse(b.attachments); } catch (_) { return []; } })() : []);
+            if (attachList.length > 0) {
+                mailOpts.attachments = attachList.map((a) => {
+                    const fullPath = path.isAbsolute(a.path) ? a.path : path.join(__dirname, a.path);
+                    return fs.existsSync(fullPath) ? { filename: a.filename || path.basename(a.path), path: fullPath } : null;
+                }).filter(Boolean);
+            }
+            await transporter.sendMail(mailOpts);
+            await pool.query("UPDATE email_log SET status = 'sent' WHERE id = $1", [logId]);
+            sentCount++;
+            await throttleAfterSend();
+        } catch (e) {
+            failedCount++;
+        }
+    }
+    await pool.query(
+        "UPDATE broadcasts SET status = 'sent', sent_at = NOW(), sent_count = $1, failed_count = $2 WHERE id = $3",
+        [sentCount, failedCount, id]
+    );
+    return { sentCount, failedCount, useAbTest };
+}
+
+// POST /api/broadcasts/:id/send - Send broadcast now. Body: optional { ab_test, subject_b, use_queue: true } to enqueue instead of send inline
 app.post('/api/broadcasts/:id/send', requireAdminAuth, async (req, res) => {
     const { id } = req.params;
-    const { ab_test, subject_b } = req.body || {};
+    const { ab_test, subject_b, use_queue } = req.body || {};
 
     try {
-        const broadcast = await pool.query('SELECT * FROM broadcasts WHERE id = $1', [id]);
-        if (broadcast.rows.length === 0) {
-            return res.status(404).json({ error: 'Broadcast not found' });
-        }
-
-        const b = broadcast.rows[0];
-        let { subject, body } = b;
-        if (ab_test && subject_b) {
-            await pool.query(
-                'UPDATE broadcasts SET subject_b = $1, ab_test_ends_at = NOW() + INTERVAL \'24 hours\', ab_test_winner = NULL WHERE id = $2',
-                [subject_b, id]
-            );
-        }
-        const subscribers = { rows: await getBroadcastSubscribers(b) };
-        let toSend = subscribers.rows;
-        const useAbTest = ab_test && subject_b && toSend.length > 0;
-        if (useAbTest) {
-            const shuffled = [...toSend].sort(() => Math.random() - 0.5);
-            const twentyPct = Math.max(2, Math.ceil(shuffled.length * 0.2));
-            toSend = shuffled.slice(0, twentyPct);
-        }
-
-        let sentCount = 0;
-        let failedCount = 0;
-
-        for (let i = 0; i < toSend.length; i++) {
-            const sub = toSend[i];
-            const useSubjectB = useAbTest && i >= Math.floor(toSend.length / 2);
-            const subjectToUse = useSubjectB && b.subject_b ? b.subject_b : subject;
+        if (use_queue) {
             try {
-                const subj = replaceMergeTags(subjectToUse, sub);
-                const bodyPersonal = replaceMergeTags(body, sub);
-                // Create log first for tracking ID
-                const logResult = await pool.query(
-                    'INSERT INTO email_log (subscriber_id, email_type, reference_id, subject, status) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-                    [sub.id, 'broadcast', id, subj, 'sending']
+                const job = await pool.query(
+                    'INSERT INTO email_send_jobs (job_type, reference_id, status, payload) VALUES ($1, $2, $3, $4) RETURNING id',
+                    ['broadcast', id, 'pending', JSON.stringify({ ab_test: !!ab_test, subject_b: subject_b || null })]
                 );
-                const logId = logResult.rows[0].id;
-
-                await transporter.sendMail({
-                    from: process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>',
-                    to: sub.email,
-                    subject: subj,
-                    html: wrapEmailTemplate(bodyPersonal, logId)
-                });
-
-                // Update to sent
-                await pool.query("UPDATE email_log SET status = 'sent' WHERE id = $1", [logId]);
-                sentCount++;
-                await throttleAfterSend();
+                return res.json({ success: true, jobId: job.rows[0].id, message: 'Broadcast queued for sending' });
             } catch (e) {
-                failedCount++;
+                if (/relation "email_send_jobs" does not exist/i.test(e.message)) {
+                    return res.status(501).json({ error: 'Job queue not available. Run migration 022_email_send_jobs.sql' });
+                }
+                throw e;
             }
         }
-
-        await pool.query(
-            "UPDATE broadcasts SET status = 'sent', sent_at = NOW(), sent_count = $1, failed_count = $2 WHERE id = $3",
-            [sentCount, failedCount, id]
-        );
-
-        res.json({ success: true, sentCount, failedCount, abTest: useAbTest ? '20% sent; remainder in 24h' : null });
+        const result = await runBroadcastSend(id, { ab_test, subject_b });
+        res.json({ success: true, sentCount: result.sentCount, failedCount: result.failedCount, abTest: result.useAbTest ? '20% sent; remainder in 24h' : null });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -2156,10 +2339,10 @@ app.post('/api/broadcasts/:id/schedule', requireAdminAuth, async (req, res) => {
     }
 });
 
-// PUT /api/broadcasts/:id - Update broadcast (name, subject, body, segment_type, segment_tag_ids)
+// PUT /api/broadcasts/:id - Update broadcast (name, subject, body, segment_type, segment_tag_ids, locale fields, attachments, locale)
 app.put('/api/broadcasts/:id', requireAdminAuth, async (req, res) => {
     const { id } = req.params;
-    const { name, subject, body, segment_type, segment_tag_ids } = req.body;
+    const { name, subject, body, segment_type, segment_tag_ids, subject_am, body_am, subject_en, body_en, segment_locale, attachments } = req.body;
     try {
         const updates = [];
         const params = [];
@@ -2168,6 +2351,13 @@ app.put('/api/broadcasts/:id', requireAdminAuth, async (req, res) => {
         if (body !== undefined) { params.push(body); updates.push('body = $' + params.length); }
         if (segment_type !== undefined) { params.push(segment_type); updates.push('segment_type = $' + params.length); }
         if (segment_tag_ids !== undefined) { params.push(JSON.stringify(segment_tag_ids)); updates.push('segment_tag_ids = $' + params.length); }
+        if (subject_am !== undefined) { params.push(subject_am); updates.push('subject_am = $' + params.length); }
+        if (body_am !== undefined) { params.push(body_am); updates.push('body_am = $' + params.length); }
+        if (subject_en !== undefined) { params.push(subject_en); updates.push('subject_en = $' + params.length); }
+        if (body_en !== undefined) { params.push(body_en); updates.push('body_en = $' + params.length); }
+        if (segment_locale !== undefined) { params.push(segment_locale); updates.push('segment_locale = $' + params.length); }
+        if (attachments !== undefined) { params.push(Array.isArray(attachments) ? JSON.stringify(attachments) : '[]'); updates.push('attachments = $' + params.length + '::jsonb'); }
+        if (req.body.locale === 'am' || req.body.locale === 'en') { params.push(req.body.locale); updates.push('locale = $' + params.length); }
         if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
         params.push(id);
         const result = await pool.query(
@@ -2287,41 +2477,67 @@ app.delete('/api/sequence-triggers/:id', requireAdminAuth, async (req, res) => {
     }
 });
 
-// GET /api/sequences - List sequences
+// GET /api/sequences - List sequences; optional ?locale=am|en
 app.get('/api/sequences', requireAdminAuth, async (req, res) => {
+    const { locale } = req.query;
+    const localeFilter = (locale === 'am' || locale === 'en') ? 'WHERE s.locale = $1' : '';
+    const params = (locale === 'am' || locale === 'en') ? [locale] : [];
     try {
         const result = await pool.query(`
-      SELECT s.*, 
+      SELECT s.*,
         (SELECT COUNT(*) FROM sequence_emails WHERE sequence_id = s.id) as email_count,
         (SELECT COUNT(*) FROM subscriber_sequences WHERE sequence_id = s.id) as subscriber_count
-      FROM sequences s ORDER BY created_at DESC
-    `);
+      FROM sequences s ${localeFilter} ORDER BY s.created_at DESC
+    `, params);
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// POST /api/sequences - Create sequence
+// POST /api/sequences - Create sequence (body: name, locale?)
 app.post('/api/sequences', requireAdminAuth, async (req, res) => {
-    const { name } = req.body;
+    const { name, locale: reqLocale } = req.body;
+    const locale = (reqLocale === 'am' || reqLocale === 'en') ? reqLocale : 'en';
 
     try {
-        const result = await pool.query('INSERT INTO sequences (name) VALUES ($1) RETURNING *', [name]);
+        const result = await pool.query('INSERT INTO sequences (name, locale) VALUES ($1, $2) RETURNING *', [name, locale]);
         res.status(201).json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// GET /api/sequences/:id/emails - Get emails in sequence
+// GET /api/sequences/:id/emails - Get emails in sequence (with per-step stats)
 app.get('/api/sequences/:id/emails', requireAdminAuth, async (req, res) => {
     try {
         const result = await pool.query(
             'SELECT * FROM sequence_emails WHERE sequence_id = $1 ORDER BY position',
             [req.params.id]
         );
-        res.json(result.rows);
+        const emails = result.rows;
+        // Attach per-step analytics
+        if (emails.length > 0) {
+            try {
+                const ids = emails.map(e => e.id);
+                const statsResult = await pool.query(`
+                    SELECT reference_id,
+                        COUNT(*) FILTER (WHERE status IN ('sent','opened','clicked')) as sent,
+                        COUNT(*) FILTER (WHERE status IN ('opened','clicked')) as opened,
+                        COUNT(*) FILTER (WHERE status = 'clicked') as clicked
+                    FROM email_log WHERE email_type = 'sequence' AND reference_id = ANY($1::int[])
+                    GROUP BY reference_id
+                `, [ids]);
+                const statsMap = {};
+                for (const r of statsResult.rows) {
+                    statsMap[r.reference_id] = { sent: parseInt(r.sent) || 0, opened: parseInt(r.opened) || 0, clicked: parseInt(r.clicked) || 0 };
+                }
+                for (const e of emails) {
+                    e.stats = statsMap[e.id] || { sent: 0, opened: 0, clicked: 0 };
+                }
+            } catch (_) { /* stats columns may not exist yet */ }
+        }
+        res.json(emails);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -2329,18 +2545,19 @@ app.get('/api/sequences/:id/emails', requireAdminAuth, async (req, res) => {
 
 // POST /api/sequences/:id/emails - Add email to sequence
 app.post('/api/sequences/:id/emails', requireAdminAuth, async (req, res) => {
-    const { subject, body, delay_days, delay_hours } = req.body;
+    const { subject, body, delay_days, delay_hours, subject_am, body_am, subject_en, body_en, conditions, attachments } = req.body;
 
     try {
-        // Get next position
         const posResult = await pool.query(
             'SELECT COALESCE(MAX(position), 0) + 1 as next FROM sequence_emails WHERE sequence_id = $1',
             [req.params.id]
         );
-
+        const conditionsJson = conditions != null ? JSON.stringify(conditions) : null;
+        const attachmentsJson = Array.isArray(attachments) ? JSON.stringify(attachments) : '[]';
         const result = await pool.query(
-            'INSERT INTO sequence_emails (sequence_id, position, subject, body, delay_days, delay_hours) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [req.params.id, posResult.rows[0].next, subject, body, delay_days || 0, delay_hours || 0]
+            `INSERT INTO sequence_emails (sequence_id, position, subject, body, delay_days, delay_hours, subject_am, body_am, subject_en, body_en, conditions, attachments)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb) RETURNING *`,
+            [req.params.id, posResult.rows[0].next, subject || '', body || '', delay_days || 0, delay_hours || 0, subject_am || null, body_am || null, subject_en || null, body_en || null, conditionsJson, attachmentsJson]
         );
         res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -2352,12 +2569,28 @@ app.post('/api/sequences/:id/emails', requireAdminAuth, async (req, res) => {
 app.put('/api/sequences/:seqId/emails/:emailId', requireAdminAuth, async (req, res) => {
     const seqId = req.params.seqId;
     const emailId = req.params.emailId;
-    const { subject, body, delay_days, delay_hours } = req.body;
+    const { subject, body, delay_days, delay_hours, subject_am, body_am, subject_en, body_en, conditions, attachments } = req.body;
 
     try {
+        const updates = [
+            'subject = COALESCE($1, subject)',
+            'body = COALESCE($2, body)',
+            'delay_days = COALESCE($3, delay_days)',
+            'delay_hours = COALESCE($4, delay_hours)'
+        ];
+        const params = [subject, body, delay_days != null ? delay_days : null, delay_hours != null ? delay_hours : null];
+        let idx = 5;
+        if (subject_am !== undefined) { updates.push(`subject_am = $${idx}`); params.push(subject_am); idx++; }
+        if (body_am !== undefined) { updates.push(`body_am = $${idx}`); params.push(body_am); idx++; }
+        if (subject_en !== undefined) { updates.push(`subject_en = $${idx}`); params.push(subject_en); idx++; }
+        if (body_en !== undefined) { updates.push(`body_en = $${idx}`); params.push(body_en); idx++; }
+        if (conditions !== undefined) { updates.push(`conditions = $${idx}`); params.push(conditions && typeof conditions === 'object' ? JSON.stringify(conditions) : conditions); idx++; }
+        if (attachments !== undefined) { updates.push(`attachments = $${idx}::jsonb`); params.push(Array.isArray(attachments) ? JSON.stringify(attachments) : '[]'); idx++; }
+        params.push(emailId, seqId);
+        const n = params.length;
         const result = await pool.query(
-            'UPDATE sequence_emails SET subject = COALESCE($1, subject), body = COALESCE($2, body), delay_days = COALESCE($3, delay_days), delay_hours = COALESCE($4, delay_hours) WHERE id = $5 AND sequence_id = $6 RETURNING *',
-            [subject, body, delay_days != null ? delay_days : null, delay_hours != null ? delay_hours : null, emailId, seqId]
+            `UPDATE sequence_emails SET ${updates.join(', ')} WHERE id = $${n - 1} AND sequence_id = $${n} RETURNING *`,
+            params
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Sequence email not found' });
         res.json(result.rows[0]);
@@ -2380,9 +2613,26 @@ app.delete('/api/sequences/:seqId/emails/:emailId', requireAdminAuth, async (req
     }
 });
 
-// PUT /api/sequences/:id - Update sequence
+// PUT /api/sequences/:id/emails/reorder - Reorder steps. Body: { orderedIds: number[] }
+app.put('/api/sequences/:id/emails/reorder', requireAdminAuth, async (req, res) => {
+    const seqId = req.params.id;
+    const { orderedIds } = req.body || {};
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+        return res.status(400).json({ error: 'orderedIds array required' });
+    }
+    try {
+        for (let i = 0; i < orderedIds.length; i++) {
+            await pool.query('UPDATE sequence_emails SET position = $1 WHERE id = $2 AND sequence_id = $3', [i + 1, orderedIds[i], seqId]);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PUT /api/sequences/:id - Update sequence (name, status, locale?)
 app.put('/api/sequences/:id', requireAdminAuth, async (req, res) => {
-    const { name, status } = req.body;
+    const { name, status, locale: reqLocale } = req.body;
 
     try {
         const updates = [];
@@ -2396,7 +2646,12 @@ app.put('/api/sequences/:id', requireAdminAuth, async (req, res) => {
             params.push(status);
             updates.push(`status = $${params.length}`);
         }
+        if (reqLocale === 'am' || reqLocale === 'en') {
+            params.push(reqLocale);
+            updates.push(`locale = $${params.length}`);
+        }
 
+        if (updates.length === 0) return res.status(400).json({ error: 'No updates provided' });
         params.push(req.params.id);
         const result = await pool.query(
             `UPDATE sequences SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *`,
@@ -2440,6 +2695,31 @@ app.get('/api/sequences/:id/analytics', requireAdminAuth, async (req, res) => {
     }
 });
 
+// GET /api/sequences/:id/emails/:emailId/analytics - Per-step analytics
+app.get('/api/sequences/:id/emails/:emailId/analytics', requireAdminAuth, async (req, res) => {
+    const emailId = req.params.emailId;
+    try {
+        const r = await pool.query(`
+            SELECT
+                COUNT(*) FILTER (WHERE status IN ('sent', 'opened', 'clicked')) as sent,
+                COUNT(*) FILTER (WHERE status IN ('opened', 'clicked')) as opened,
+                COUNT(*) FILTER (WHERE status = 'clicked') as clicked
+            FROM email_log WHERE email_type = 'sequence' AND reference_id = $1
+        `, [emailId]);
+        const row = r.rows[0];
+        const sent = parseInt(row.sent, 10) || 0;
+        const opened = parseInt(row.opened, 10) || 0;
+        const clicked = parseInt(row.clicked, 10) || 0;
+        res.json({
+            sent, opened, clicked,
+            openRate: sent > 0 ? (opened / sent * 100).toFixed(1) : '0',
+            clickRate: opened > 0 ? (clicked / opened * 100).toFixed(1) : '0'
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // POST /api/sequences/:id/activate - Activate sequence
 app.post('/api/sequences/:id/activate', requireAdminAuth, async (req, res) => {
     try {
@@ -2470,6 +2750,23 @@ app.delete('/api/sequences/:id', requireAdminAuth, async (req, res) => {
     }
 });
 
+// GET /api/sequences/:id/subscribers - List subscribers in a sequence with their progress
+app.get('/api/sequences/:id/subscribers', requireAdminAuth, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT ss.id as ss_id, ss.current_step, ss.status as seq_status, ss.next_email_at, ss.started_at,
+                   s.id, s.email, COALESCE(s.first_name, '') as first_name
+            FROM subscriber_sequences ss
+            INNER JOIN subscribers s ON s.id = ss.subscriber_id
+            WHERE ss.sequence_id = $1
+            ORDER BY ss.started_at DESC
+        `, [req.params.id]);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // POST /api/subscribers/:id/sequences/:seqId - Add subscriber to sequence
 app.post('/api/subscribers/:id/sequences/:seqId', requireAdminAuth, async (req, res) => {
     const { id, seqId } = req.params;
@@ -2485,23 +2782,23 @@ app.post('/api/subscribers/:id/sequences/:seqId', requireAdminAuth, async (req, 
             return res.json({ success: true, message: 'Already in sequence' });
         }
 
-        // Get first email's delay
+        // Get first email's delay (0,0 = send as soon as scheduler runs)
         const firstEmail = await pool.query(
             'SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 ORDER BY position LIMIT 1',
             [seqId]
         );
 
-        let nextEmailAt = new Date();
-        if (firstEmail.rows.length > 0) {
-            const { delay_days, delay_hours } = firstEmail.rows[0];
-            nextEmailAt.setDate(nextEmailAt.getDate() + (delay_days || 0));
-            nextEmailAt.setHours(nextEmailAt.getHours() + (delay_hours || 0));
-        }
+        const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
+        const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
+        const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
 
         await pool.query(
             'INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at) VALUES ($1, $2, $3, $4)',
             [id, seqId, 0, nextEmailAt]
         );
+
+        // Trigger sequence processor soon so 0-delay first email goes out within seconds
+        setTimeout(() => { processSequenceEmails().catch(() => {}); }, 3000);
 
         res.json({ success: true });
     } catch (error) {
@@ -2552,27 +2849,47 @@ app.get('/api/stats', requireAdminAuth, async (req, res) => {
         const today = await pool.query("SELECT COUNT(*) FROM subscribers WHERE created_at >= CURRENT_DATE" + (localeFilter ? ' AND locale = $1' : ''), params);
         const thisWeek = await pool.query("SELECT COUNT(*) FROM subscribers WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'" + (localeFilter ? ' AND locale = $1' : ''), params);
         const emailsSent = await pool.query('SELECT COUNT(*) FROM email_log');
-        return { total, today, thisWeek, emailsSent };
+        // Open / click rates
+        let openRate = 0, clickRate = 0;
+        try {
+            const rateRow = await pool.query(`
+                SELECT 
+                    COUNT(*) FILTER (WHERE status IN ('sent','opened','clicked')) as sent,
+                    COUNT(*) FILTER (WHERE status IN ('opened','clicked')) as opened,
+                    COUNT(*) FILTER (WHERE status = 'clicked') as clicked
+                FROM email_log
+            `);
+            const s = parseInt(rateRow.rows[0].sent) || 0;
+            const o = parseInt(rateRow.rows[0].opened) || 0;
+            const c = parseInt(rateRow.rows[0].clicked) || 0;
+            openRate = s > 0 ? Math.round(o / s * 1000) / 10 : 0;
+            clickRate = s > 0 ? Math.round(c / s * 1000) / 10 : 0;
+        } catch (_) {}
+        return { total, today, thisWeek, emailsSent, openRate, clickRate };
     };
     try {
-        const { total, today, thisWeek, emailsSent } = await runStats();
+        const { total, today, thisWeek, emailsSent, openRate, clickRate } = await runStats();
         res.json({
             total: parseInt(total.rows[0].count),
             today: parseInt(today.rows[0].count),
             thisWeek: parseInt(thisWeek.rows[0].count),
-            emailsSent: parseInt(emailsSent.rows[0].count)
+            emailsSent: parseInt(emailsSent.rows[0].count),
+            openRate,
+            clickRate
         });
     } catch (error) {
         if (error.message && /column.*locale.*does not exist/i.test(error.message)) {
             try {
                 await pool.query("ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS locale VARCHAR(10) DEFAULT 'en'");
                 await pool.query('CREATE INDEX IF NOT EXISTS idx_subscribers_locale ON subscribers(locale)');
-                const { total, today, thisWeek, emailsSent } = await runStats();
+                const { total, today, thisWeek, emailsSent, openRate, clickRate } = await runStats();
                 return res.json({
                     total: parseInt(total.rows[0].count),
                     today: parseInt(today.rows[0].count),
                     thisWeek: parseInt(thisWeek.rows[0].count),
-                    emailsSent: parseInt(emailsSent.rows[0].count)
+                    emailsSent: parseInt(emailsSent.rows[0].count),
+                    openRate: openRate || 0,
+                    clickRate: clickRate || 0
                 });
             } catch (e2) {
                 return res.status(500).json({ error: e2.message });
@@ -2611,23 +2928,48 @@ function throttleAfterSend() {
     return new Promise(resolve => setTimeout(resolve, delayBetweenEmailsMs));
 }
 
-// Replace merge tags in subject/body for broadcasts and sequences. subscriber: { email, first_name, custom_fields (optional) }
+// Replace merge tags in subject/body for broadcasts and sequences. subscriber: { email, first_name, custom_fields (optional), locale (optional) }
 function replaceMergeTags(text, subscriber) {
     if (!text || typeof text !== 'string') return text;
     const apiUrl = process.env.API_URL || 'http://localhost:3001';
     const first = (subscriber && subscriber.first_name) ? String(subscriber.first_name).trim() : '';
     const email = (subscriber && subscriber.email) ? subscriber.email : '';
     const unsubscribeUrl = `${apiUrl}/api/unsubscribe?email=${encodeURIComponent(email)}`;
+    const locale = (subscriber && subscriber.locale) ? subscriber.locale : 'en';
     let out = text
         .replace(/\{\{first_name\}\}/g, first)
         .replace(/\{\{email\}\}/g, email)
-        .replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl);
+        .replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl)
+        .replace(/\{\{locale\}\}/g, locale);
     if (subscriber && subscriber.custom_fields && typeof subscriber.custom_fields === 'object') {
         for (const [key, value] of Object.entries(subscriber.custom_fields)) {
             if (key && value != null) out = out.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value));
         }
     }
     return out;
+}
+
+// Compute next_email_at for first sequence step. If delay is 0,0 use past so scheduler sends within ~1 min.
+function getNextEmailAtForFirstStep(delay_days, delay_hours) {
+    const d = delay_days || 0;
+    const h = delay_hours || 0;
+    if (d === 0 && h === 0) {
+        const past = new Date();
+        past.setTime(past.getTime() - 60000);
+        return past;
+    }
+    const next = new Date();
+    next.setDate(next.getDate() + d);
+    next.setHours(next.getHours() + h);
+    return next;
+}
+
+// Pick subject/body by subscriber locale from a broadcast or sequence_emails row (with subject_am, body_am, subject_en, body_en).
+function pickContentByLocale(row, locale) {
+    const loc = locale === 'am' ? 'am' : 'en';
+    const subject = (loc === 'am' && row.subject_am) ? row.subject_am : ((loc === 'en' && row.subject_en) ? row.subject_en : row.subject);
+    const body = (loc === 'am' && row.body_am) ? row.body_am : ((loc === 'en' && row.body_en) ? row.body_en : row.body);
+    return { subject: subject || row.subject, body: body || row.body };
 }
 
 function wrapEmailTemplate(body, logId = null) {
@@ -2698,6 +3040,7 @@ function wrapEmailTemplate(body, logId = null) {
 async function sendConfirmationEmail(email, token, locale = 'en') {
     const apiUrl = process.env.API_URL || 'http://localhost:3001';
     const confirmUrl = `${apiUrl}/api/confirm/${token}`;
+    console.log('[sendConfirmationEmail] API_URL=', apiUrl, '→ confirmUrl=', confirmUrl);
     const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
     const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
     const isAm = locale === 'am';
@@ -2707,7 +3050,7 @@ async function sendConfirmationEmail(email, token, locale = 'en') {
                 <p>Ողջույն,</p>
                 <p>Շնորհակալություն <strong>SuperEngulfing</strong>-ին միանալու համար: Ձեր <strong>Liquidity Sweep Cheatsheet</strong> PDF-ը ստանալու համար խնդրում ենք հաստատել բաժանորդագրությունը՝ սեղմելով ներքևի կոճակը:</p>
                 <p style="text-align: center; margin: 28px 0;">
-                    <a href="${confirmUrl}" class="btn">Հաստատել բաժանորդագրությունը</a>
+                    <a href="${confirmUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Հաստատել բաժանորդագրությունը</a>
                 </p>
                 <div class="divider"></div>
                 <p class="muted">Եթե դուք չեք բաժանորդագրվել, կարող եք պարզապես անտեսել այս նամակը:</p>
@@ -2716,7 +3059,7 @@ async function sendConfirmationEmail(email, token, locale = 'en') {
                 <p>Hello,</p>
                 <p>Thank you for signing up to <strong>SuperEngulfing</strong>. To receive your <strong>Liquidity Sweep Cheatsheet</strong> PDF, please confirm your subscription by clicking the button below.</p>
                 <p style="text-align: center; margin: 28px 0;">
-                    <a href="${confirmUrl}" class="btn">Confirm my subscription</a>
+                    <a href="${confirmUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Confirm my subscription</a>
                 </p>
                 <div class="divider"></div>
                 <p class="muted">If you didn't sign up for this, you can safely ignore this email.</p>
@@ -2785,7 +3128,7 @@ async function sendWelcomeEmail(email, locale = 'en') {
                 <p>Ողջույն,</p>
                 <p>Շնորհակալություն բաժանորդագրությունը հաստատելու համար: Ինչպես և խոստացել էինք, ահա ձեր <strong>Liquidity Sweep Cheatsheet</strong>-ը:</p>
                 <p style="text-align: center; margin: 28px 0;">
-                    <a href="${pdfLink}" class="btn">Ներբեռնել PDF-ը</a>
+                    <a href="${pdfLink}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Ներբեռնել PDF-ը</a>
                 </p>
                 <p><strong>Ինչ կա ներսում.</strong></p>
                 <ul>
@@ -2800,7 +3143,7 @@ async function sendWelcomeEmail(email, locale = 'en') {
                 <p>Hello,</p>
                 <p>Thank you for confirming your subscription. As promised, here is your <strong>Liquidity Sweep Cheatsheet</strong>.</p>
                 <p style="text-align: center; margin: 28px 0;">
-                    <a href="${pdfLink}" class="btn">Download your PDF</a>
+                    <a href="${pdfLink}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Download your PDF</a>
                 </p>
                 <p><strong>What's inside:</strong></p>
                 <ul>
@@ -2850,7 +3193,7 @@ async function sendAdminNewAccessRequestNotification(applicantEmail, uid, locale
                     <tr><td style="padding: 12px 16px; color: #94a3b8; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">Applicant email</td><td style="padding: 12px 16px; color: #f8fafc; font-weight: 500;">${applicantEmail}</td></tr>
                     <tr><td style="padding: 12px 16px; color: #94a3b8; font-size: 12px;">WEEX UID</td><td style="padding: 12px 16px; color: #f8fafc; font-weight: 500; font-family: monospace;">${uid}</td></tr>
                 </table>
-                ${adminUrl ? `<p style="margin-top: 20px;"><a href="${adminUrl}" class="btn">Review in Admin</a></p>` : ''}
+                ${adminUrl ? `<p style="margin-top: 20px;"><a href="${adminUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Review in Admin</a></p>` : ''}
             `;
     const textContent = `New access request – SuperEngulfing\n\nSomeone has submitted an access request.\nApplicant email: ${applicantEmail}\nUID: ${uid}${adminUrl ? `\nReview in Admin: ${adminUrl}` : ''}`;
     try {
@@ -2892,7 +3235,7 @@ async function sendAdminIndicatorAccessRequestNotification(firstName, email, tra
                     <tr><td style="padding: 12px 16px; color: #94a3b8; font-size: 12px;">Requested at</td><td style="padding: 12px 16px; color: #f8fafc; font-weight: 500;">${dateStr}</td></tr>
                 </table>
                 <p style="margin-top: 24px;"><strong>Grant access:</strong></p>
-                <p style="margin: 12px 0 20px 0;"><a href="${TRADINGVIEW_INDICATOR_URL}" class="btn">Open TradingView – SuperEngulfing REV + RUN</a></p>
+                <p style="margin: 12px 0 20px 0;"><a href="${TRADINGVIEW_INDICATOR_URL}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Open TradingView – SuperEngulfing REV + RUN</a></p>
                 ${adminUrl ? `<p class="muted"><a href="${adminUrl}">Open Admin panel</a></p>` : ''}
             `;
     const textContent = `New indicator access request – SuperEngulfing\n\nName: ${firstName || '—'}\nEmail: ${email}\nTradingView username: ${tradingview_username}\nRequested at: ${dateStr}\n\nGrant access: ${TRADINGVIEW_INDICATOR_URL}${adminUrl ? `\nAdmin: ${adminUrl}` : ''}`;
@@ -2970,7 +3313,7 @@ async function sendUserIndicatorAccessApprovedEmail(email, firstName) {
                     <li>Find <strong>SuperEngulfing: REV + RUN</strong> in Indicators → Invite-Only Scripts.</li>
                 </ol>
                 <p style="text-align: center; margin: 28px 0;">
-                    <a href="${TRADINGVIEW_INDICATOR_URL}" class="btn">Open TradingView – SuperEngulfing</a>
+                    <a href="${TRADINGVIEW_INDICATOR_URL}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Open TradingView – SuperEngulfing</a>
                 </p>
                 <p class="muted">If you have any questions, reply to this email.</p>
             `;
@@ -3089,7 +3432,7 @@ async function sendSetPasswordEmail(email, token, locale = 'en') {
                 <p><strong>Ձեր մուտքանունը (Login):</strong> <span style="font-family: monospace; color: #39FF14;">${email}</span></p>
                 <p>Սեղմեք ներքևի կոճակը՝ գաղտնաբառը սահմանելու համար: Հղումը վավեր է <strong>24 ժամ</strong>:</p>
                 <p style="text-align: center; margin: 28px 0;">
-                    <a href="${setPasswordUrl}" class="btn">Սահմանել գաղտնաբառը</a>
+                    <a href="${setPasswordUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Սահմանել գաղտնաբառը</a>
                 </p>
                 <div class="divider"></div>
                 <p class="muted">Եթե դուք մուտքի հարցում չեք ուղարկել, կարող եք անտեսել այս նամակը:</p>
@@ -3100,7 +3443,7 @@ async function sendSetPasswordEmail(email, token, locale = 'en') {
                 <p><strong>Your login:</strong> <span style="font-family: monospace; color: #39FF14;">${email}</span></p>
                 <p>Click the button below to set your password. This link is valid for <strong>24 hours</strong>.</p>
                 <p style="text-align: center; margin: 28px 0;">
-                    <a href="${setPasswordUrl}" class="btn">Set your password</a>
+                    <a href="${setPasswordUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Set your password</a>
                 </p>
                 <div class="divider"></div>
                 <p class="muted">If you didn't request access, you can ignore this email.</p>
@@ -3171,13 +3514,25 @@ const TRACKING_PIXEL = Buffer.from(
 // GET /api/track/open/:logId - Track email open
 app.get('/api/track/open/:logId', async (req, res) => {
     const { logId } = req.params;
+    const ip = req.ip || req.connection?.remoteAddress || null;
+    const ua = req.get('user-agent') || null;
 
     try {
-        // Update email_log to mark as opened
         await pool.query(
             "UPDATE email_log SET status = 'opened', opened_at = NOW() WHERE id = $1 AND status = 'sent'",
             [logId]
         );
+        const logRow = await pool.query('SELECT subscriber_id FROM email_log WHERE id = $1', [logId]);
+        if (logRow.rows.length > 0) {
+            try {
+                await pool.query(
+                    'INSERT INTO email_opens (email_log_id, subscriber_id, opened_at, ip_address, user_agent) VALUES ($1, $2, NOW(), $3, $4)',
+                    [logId, logRow.rows[0].subscriber_id || null, ip, ua]
+                );
+            } catch (e) {
+                if (!/relation "email_opens" does not exist/i.test(e.message)) console.error('email_opens insert error:', e.message);
+            }
+        }
         console.log(`👁️ Email opened: log ID ${logId}`);
     } catch (error) {
         console.error('Track open error:', error.message);
@@ -3380,8 +3735,10 @@ async function processScheduledBroadcasts() {
 
             for (const sub of subscribers.rows) {
                 try {
-                    const subj = replaceMergeTags(broadcast.subject, sub);
-                    const bodyPersonal = replaceMergeTags(broadcast.body, sub);
+                    const subLocale = sub.locale === 'am' ? 'am' : 'en';
+                    const content = pickContentByLocale(broadcast, subLocale);
+                    const subj = replaceMergeTags(content.subject, sub);
+                    const bodyPersonal = replaceMergeTags(content.body, sub);
                     await transporter.sendMail({
                         from: process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>',
                         to: sub.email,
@@ -3439,8 +3796,10 @@ async function processAbTestRemainder() {
             let sentCount = 0;
             for (const sub of remaining) {
                 try {
+                    const subLocale = sub.locale === 'am' ? 'am' : 'en';
+                    const content = pickContentByLocale(broadcast, subLocale);
                     const subj = replaceMergeTags(winningSubject, sub);
-                    const bodyPersonal = replaceMergeTags(broadcast.body, sub);
+                    const bodyPersonal = replaceMergeTags(content.body, sub);
                     await transporter.sendMail({
                         from: process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>',
                         to: sub.email,
@@ -3460,12 +3819,46 @@ async function processAbTestRemainder() {
     }
 }
 
+// Check sequence step conditions (previous_email_opened, has_tags, not_has_tags). stepPosition = step we're about to send.
+async function checkSequenceStepConditions(subscriberId, sequenceId, stepPosition, conditions) {
+    if (!conditions || typeof conditions !== 'object') return true;
+    if (conditions.previous_email_opened && stepPosition > 1) {
+        const prevStep = await pool.query(
+            'SELECT id FROM sequence_emails WHERE sequence_id = $1 AND position = $2',
+            [sequenceId, stepPosition - 1]
+        );
+        if (prevStep.rows.length === 0) return true;
+        const prevOpened = await pool.query(
+            "SELECT id FROM email_log WHERE subscriber_id = $1 AND email_type = 'sequence' AND reference_id = $2 AND status IN ('opened', 'clicked')",
+            [subscriberId, prevStep.rows[0].id]
+        );
+        if (prevOpened.rows.length === 0) return false;
+    }
+    if (conditions.has_tags && Array.isArray(conditions.has_tags) && conditions.has_tags.length > 0) {
+        const tagNames = conditions.has_tags;
+        const hasAll = await pool.query(`
+            SELECT COUNT(DISTINCT t.id) as c FROM subscriber_tags st
+            JOIN tags t ON st.tag_id = t.id
+            WHERE st.subscriber_id = $1 AND t.name = ANY($2::text[])
+        `, [subscriberId, tagNames]);
+        if (parseInt(hasAll.rows[0].c, 10) < tagNames.length) return false;
+    }
+    if (conditions.not_has_tags && Array.isArray(conditions.not_has_tags) && conditions.not_has_tags.length > 0) {
+        const hasAny = await pool.query(`
+            SELECT 1 FROM subscriber_tags st
+            JOIN tags t ON st.tag_id = t.id
+            WHERE st.subscriber_id = $1 AND t.name = ANY($2::text[]) LIMIT 1
+        `, [subscriberId, conditions.not_has_tags]);
+        if (hasAny.rows.length > 0) return false;
+    }
+    return true;
+}
+
 // Process sequence emails
 async function processSequenceEmails() {
     try {
-        // Get all subscriber_sequences where next_email_at <= now and sequence is active
         const dueEmails = await pool.query(`
-            SELECT ss.*, s.email, s.first_name, s.custom_fields, seq.status as sequence_status
+            SELECT ss.*, s.email, s.first_name, s.custom_fields, COALESCE(s.locale, 'en') as locale, seq.status as sequence_status
             FROM subscriber_sequences ss
             JOIN subscribers s ON ss.subscriber_id = s.id
             JOIN sequences seq ON ss.sequence_id = seq.id
@@ -3493,32 +3886,66 @@ async function processSequenceEmails() {
             }
 
             const seqEmail = emailResult.rows[0];
+            const stepPosition = subSeq.current_step + 1;
+            const conditions = typeof seqEmail.conditions === 'string' ? (() => { try { return JSON.parse(seqEmail.conditions); } catch (_) { return null; } })() : seqEmail.conditions;
+            const shouldSend = await checkSequenceStepConditions(subSeq.subscriber_id, subSeq.sequence_id, stepPosition, conditions);
 
-            // Send the email
+            if (!shouldSend) {
+                // Skip this step, schedule next or complete
+                const nextEmail = await pool.query(
+                    'SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 AND position = $2',
+                    [subSeq.sequence_id, subSeq.current_step + 2]
+                );
+                if (nextEmail.rows.length > 0) {
+                    const { delay_days, delay_hours } = nextEmail.rows[0];
+                    const nextAt = new Date();
+                    nextAt.setDate(nextAt.getDate() + (delay_days || 0));
+                    nextAt.setHours(nextAt.getHours() + (delay_hours || 0));
+                    await pool.query(
+                        'UPDATE subscriber_sequences SET current_step = current_step + 1, next_email_at = $1 WHERE id = $2',
+                        [nextAt, subSeq.id]
+                    );
+                } else {
+                    await pool.query(
+                        "UPDATE subscriber_sequences SET current_step = current_step + 1, status = 'completed' WHERE id = $1",
+                        [subSeq.id]
+                    );
+                }
+                continue;
+            }
+
             try {
-                const subscriber = { email: subSeq.email, first_name: subSeq.first_name, custom_fields: subSeq.custom_fields || {} };
-                const subj = replaceMergeTags(seqEmail.subject, subscriber);
-                const bodyPersonal = replaceMergeTags(seqEmail.body, subscriber);
-                // Log first
+                const subLocale = subSeq.locale === 'am' ? 'am' : 'en';
+                const content = pickContentByLocale(seqEmail, subLocale);
+                const subscriber = { email: subSeq.email, first_name: subSeq.first_name, custom_fields: subSeq.custom_fields || {}, locale: subLocale };
+                const subj = replaceMergeTags(content.subject, subscriber);
+                const bodyPersonal = replaceMergeTags(content.body, subscriber);
                 const logResult = await pool.query(
                     'INSERT INTO email_log (subscriber_id, email_type, reference_id, subject, status) VALUES ($1, $2, $3, $4, $5) RETURNING id',
                     [subSeq.subscriber_id, 'sequence', seqEmail.id, subj, 'sending']
                 );
                 const logId = logResult.rows[0].id;
 
-                await transporter.sendMail({
+                const mailOpts = {
                     from: process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>',
                     to: subSeq.email,
                     subject: subj,
                     html: wrapEmailTemplate(bodyPersonal, logId)
-                });
+                };
+                const attachList = Array.isArray(seqEmail.attachments) ? seqEmail.attachments : (typeof seqEmail.attachments === 'string' ? (() => { try { return JSON.parse(seqEmail.attachments); } catch (_) { return []; } })() : []);
+                if (attachList.length > 0) {
+                    mailOpts.attachments = attachList.map((a) => {
+                        const fullPath = path.isAbsolute(a.path) ? a.path : path.join(__dirname, a.path);
+                        return fs.existsSync(fullPath) ? { filename: a.filename || path.basename(a.path), path: fullPath } : null;
+                    }).filter(Boolean);
+                }
+                await transporter.sendMail(mailOpts);
 
                 await pool.query("UPDATE email_log SET status = 'sent' WHERE id = $1", [logId]);
 
-                console.log(`📧 Sequence email sent to ${subSeq.email}: ${seqEmail.subject}`);
+                console.log(`📧 Sequence email sent to ${subSeq.email}: ${content.subject}`);
                 await throttleAfterSend();
 
-                // Get next email delay
                 const nextEmail = await pool.query(
                     'SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 AND position = $2',
                     [subSeq.sequence_id, subSeq.current_step + 2]
@@ -3535,7 +3962,6 @@ async function processSequenceEmails() {
                         [nextAt, subSeq.id]
                     );
                 } else {
-                    // This was the last email
                     await pool.query(
                         "UPDATE subscriber_sequences SET current_step = current_step + 1, status = 'completed' WHERE id = $1",
                         [subSeq.id]
@@ -3550,6 +3976,39 @@ async function processSequenceEmails() {
     }
 }
 
+// Process one pending job from email_send_jobs (broadcast send queue)
+async function processEmailSendJobs() {
+    try {
+        const pick = await pool.query(
+            `UPDATE email_send_jobs SET status = 'processing', started_at = NOW() WHERE id = (
+                SELECT id FROM email_send_jobs WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1
+            ) RETURNING *`
+        );
+        if (pick.rows.length === 0) return;
+        const job = pick.rows[0];
+        const payload = job.payload && typeof job.payload === 'object' ? job.payload : (typeof job.payload === 'string' ? (() => { try { return JSON.parse(job.payload); } catch (_) { return {}; } })() : {});
+        try {
+            if (job.job_type === 'broadcast') {
+                await runBroadcastSend(job.reference_id, { ab_test: payload.ab_test, subject_b: payload.subject_b });
+            }
+            await pool.query("UPDATE email_send_jobs SET status = 'completed', completed_at = NOW() WHERE id = $1", [job.id]);
+            console.log(`✅ Job ${job.id} (${job.job_type} ${job.reference_id}) completed`);
+        } catch (err) {
+            const retryCount = (job.retry_count || 0) + 1;
+            const maxRetries = job.max_retries != null ? job.max_retries : 3;
+            if (retryCount < maxRetries) {
+                await pool.query("UPDATE email_send_jobs SET status = 'pending', started_at = NULL, retry_count = $1, error_message = $2 WHERE id = $3", [retryCount, err.message, job.id]);
+                console.log(`⚠️ Job ${job.id} failed, will retry (${retryCount}/${maxRetries}): ${err.message}`);
+            } else {
+                await pool.query("UPDATE email_send_jobs SET status = 'failed', completed_at = NOW(), retry_count = $1, error_message = $2 WHERE id = $3", [retryCount, err.message, job.id]);
+                console.error(`❌ Job ${job.id} failed: ${err.message}`);
+            }
+        }
+    } catch (e) {
+        if (!/relation "email_send_jobs" does not exist/i.test(e.message)) console.error('Job worker error:', e.message);
+    }
+}
+
 // Run scheduler every minute
 function startScheduler() {
     console.log('⏰ Scheduler started - checking every minute');
@@ -3558,6 +4017,7 @@ function startScheduler() {
         await processScheduledBroadcasts();
         await processAbTestRemainder();
         await processSequenceEmails();
+        await processEmailSendJobs();
     }, 60000); // Every 60 seconds
 
     // Also run immediately on startup
@@ -3565,6 +4025,7 @@ function startScheduler() {
         await processScheduledBroadcasts();
         await processAbTestRemainder();
         await processSequenceEmails();
+        await processEmailSendJobs();
     }, 5000);
 }
 
@@ -3602,6 +4063,12 @@ app.listen(PORT, async () => {
             const migration018Sql = fs.readFileSync(migration018Path, 'utf8');
             await pool.query(migration018Sql);
             console.log('   Admin 2FA migration (018) applied');
+        }
+        const migration023Path = path.join(__dirname, 'migrations', '023_email_attachments.sql');
+        if (fs.existsSync(migration023Path)) {
+            const migration023Sql = fs.readFileSync(migration023Path, 'utf8');
+            await pool.query(migration023Sql);
+            console.log('   Email attachments migration (023) applied');
         }
         console.log('   Profile: GET/PUT /api/me, PUT /api/me/password | Courses: /api/courses/resume, /api/me, etc.');
     } catch (e) {
