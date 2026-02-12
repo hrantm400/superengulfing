@@ -2846,8 +2846,16 @@ app.delete('/api/sequences/:id', requireAdminAuth, async (req, res) => {
         await client.query('DELETE FROM subscriber_sequences WHERE sequence_id = $1', [seqId]);
         await client.query('DELETE FROM sequence_emails WHERE sequence_id = $1', [seqId]);
         
-        // Delete sequence triggers (should cascade, but let's be explicit)
-        await client.query('DELETE FROM sequence_triggers WHERE sequence_id = $1', [seqId]);
+        // Delete sequence triggers (table may not exist in older databases)
+        try {
+            await client.query('DELETE FROM sequence_triggers WHERE sequence_id = $1', [seqId]);
+        } catch (err) {
+            if (err.code !== '42P01') { // 42P01 = undefined_table
+                throw err; // Re-throw if it's not a missing table error
+            }
+            // Table doesn't exist, that's fine - continue
+            console.log('sequence_triggers table not found, skipping...');
+        }
 
         // Finally delete sequence
         const deleteResult = await client.query("DELETE FROM sequences WHERE id = $1 AND COALESCE(locale, 'en') = $2 RETURNING id", [seqId, loc]);
