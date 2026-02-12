@@ -25,6 +25,8 @@ export default function AdminGate() {
   const [rememberDuration, setRememberDuration] = useState('1d');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  /** After first admin verifies 2FA, show QR so second admin can scan too. */
+  const [showQrForSecondAdmin, setShowQrForSecondAdmin] = useState(false);
 
   const handleStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,10 +56,14 @@ export default function AdminGate() {
     try {
       const result = await verify(pendingEmail, code, rememberMe, rememberDuration);
       if (result.success) {
-        setStep(1);
-        setPassword('');
-        setPendingEmail('');
-        setCode('');
+        if (otpauthUrl) {
+          setShowQrForSecondAdmin(true);
+        } else {
+          setStep(1);
+          setPassword('');
+          setPendingEmail('');
+          setCode('');
+        }
       } else {
         setError(result.error || 'Invalid or expired code');
       }
@@ -66,14 +72,40 @@ export default function AdminGate() {
     }
   };
 
+  const layoutClass = 'min-h-screen bg-background text-foreground flex items-center justify-center p-4 pt-24 md:pt-28';
+  const cardClass = 'w-full max-w-md bg-surface border border-border rounded-card p-8 shadow-card';
+  const btnClass = 'w-full py-3 rounded-lg font-medium bg-primary text-black hover:opacity-90 transition-opacity disabled:opacity-50';
+
+  if (isValid && showQrForSecondAdmin) {
+    return (
+      <div className={layoutClass}>
+        <div className={cardClass}>
+          <h1 className="text-2xl font-bold mb-2 text-center">Admin panel</h1>
+          <p className="text-muted text-sm mb-4 text-center">
+            You’re signed in. Leave this QR code visible so another admin can scan it and add the same code to their Authenticator app.
+          </p>
+          {otpauthUrl && (
+            <div className="flex justify-center my-6">
+              <QRCodeSVG value={otpauthUrl} size={200} level="M" />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => { setShowQrForSecondAdmin(false); setOtpauthUrl(''); }}
+            className={btnClass}
+          >
+            Continue to panel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (isValid) {
     return <Admin />;
   }
 
-  const layoutClass = 'min-h-screen bg-background text-foreground flex items-center justify-center p-4';
-  const cardClass = 'w-full max-w-md bg-surface border border-border rounded-card p-8 shadow-card';
   const inputClass = 'w-full px-4 py-3 rounded-lg bg-background border border-border text-foreground focus:ring-2 focus:ring-primary focus:border-primary outline-none';
-  const btnClass = 'w-full py-3 rounded-lg font-medium bg-primary text-black hover:opacity-90 transition-opacity disabled:opacity-50';
   const labelClass = 'block text-sm font-medium text-muted mb-2';
 
   return (
@@ -102,19 +134,22 @@ export default function AdminGate() {
 
         {step === 2 && (
           <form onSubmit={handleStep2}>
-            {setupRequired ? (
-              <>
-                <h2 className="text-lg font-semibold mb-2">Set up Google Authenticator</h2>
-                <p className="text-muted text-sm mb-4">
-                  Scan this QR code with Google Authenticator (or similar app), then enter the 6-digit code below.
+            {otpauthUrl && (
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold mb-2">
+                  {setupRequired ? 'Set up Google Authenticator' : 'QR code for admins'}
+                </h2>
+                <p className="text-muted text-sm mb-2">
+                  {setupRequired
+                    ? 'Scan this QR code with Google Authenticator (or similar app), then enter the 6-digit code below.'
+                    : 'Another admin can scan this QR to add the same code to their app. Then enter your 6-digit code below.'}
                 </p>
-                {otpauthUrl && (
-                  <div className="flex justify-center my-6">
-                    <QRCodeSVG value={otpauthUrl} size={200} level="M" />
-                  </div>
-                )}
-              </>
-            ) : (
+                <div className="flex justify-center my-4">
+                  <QRCodeSVG value={otpauthUrl} size={200} level="M" />
+                </div>
+              </div>
+            )}
+            {!otpauthUrl && (
               <p className="text-muted text-sm mb-4">
                 Enter the 6-digit code from your authenticator app.
               </p>

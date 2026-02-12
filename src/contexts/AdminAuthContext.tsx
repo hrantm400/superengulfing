@@ -56,7 +56,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch(`${getApiUrl()}/api/admin-auth/request-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: password.trim() })
+        body: JSON.stringify({ password: password.trim().toLowerCase() })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
