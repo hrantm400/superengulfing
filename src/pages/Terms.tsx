@@ -23,115 +23,115 @@ const Terms: React.FC = () => {
           <article className="space-y-10 text-muted-foreground">
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">1.</span> ACCEPTANCE OF THE PROTOCOL
+                <span className="text-primary font-mono">1.</span> {t('terms.section1.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed">
-                By accessing the SuperEngulfing website, submitting your email address, or utilizing the proprietary resources provided (including the &quot;SuperEngulfing&quot; TradingView indicator, the &quot;Liquidity Trap&quot; PDF, and the Video Course), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, you are unauthorized to access the SuperEngulfing ecosystem or utilize its proprietary logic in any way apart from using it for your own trading.
+                {t('terms.section1.content')}
               </p>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">2.</span> THE EXCHANGE (ACCESS & CONSIDERATION)
+                <span className="text-primary font-mono">2.</span> {t('terms.section2.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed mb-4">
-                Access to the SuperEngulfing resources is provided on a &quot;Freemium&quot; basis.
+                {t('terms.section2.content1')}
               </p>
               <p className="text-sm md:text-base leading-relaxed mb-2">
-                <strong className="text-foreground">The Consideration:</strong> In exchange for access to these institutional-grade tools, you agree to provide a valid email address and subscribe to our newsletter/communication channels.
+                {t('terms.section2.content2')}
               </p>
               <p className="text-sm md:text-base leading-relaxed mb-2">
-                <strong className="text-foreground">The Deliverables:</strong> Upon registration, you are granted a limited, non-transferable, revocable license to:
+                {t('terms.section2.content3')}
               </p>
               <ul className="list-disc pl-6 space-y-1 text-sm md:text-base leading-relaxed">
-                <li>Download and view the SuperEngulfing PDF Strategy Guide.</li>
-                <li>Access the Video Course materials.</li>
-                <li>Utilize the SuperEngulfing Indicator on the TradingView platform (subject to TradingView&apos;s own Terms of Service).</li>
+                <li>{t('terms.section2.item1')}</li>
+                <li>{t('terms.section2.item2')}</li>
+                <li>{t('terms.section2.item3')}</li>
               </ul>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">3.</span> INTELLECTUAL PROPERTY & PROPRIETARY LOGIC
+                <span className="text-primary font-mono">3.</span> {t('terms.section3.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed mb-4">
-                All content provided is the exclusive intellectual property of SuperEngulfing.com owned by Hayk Muradyan.
+                {t('terms.section3.content1')}
               </p>
               <p className="text-sm md:text-base leading-relaxed mb-2">
-                <strong className="text-foreground">The Code:</strong> The Pine Script logic driving the SuperEngulfing indicator (specifically the REV/RUN logic, Wick Grab detection, and PLUS (+) layer definitions) is proprietary. You may not reverse engineer, decompile, or copy the source code.
+                {t('terms.section3.content2')}
               </p>
               <p className="text-sm md:text-base leading-relaxed mb-2">
-                <strong className="text-foreground">The Content:</strong> The PDF guide and Video Course are for your personal educational use only. Redistribution, resale, or plagiarism of the &quot;SuperEngulfing&quot; methodology is strictly prohibited.
+                {t('terms.section3.content3')}
               </p>
               <p className="text-sm md:text-base leading-relaxed">
-                <strong className="text-foreground">Enforcement:</strong> Any unauthorized distribution of our proprietary logic will result in the immediate revocation of indicator access and potential legal action.
+                {t('terms.section3.content4')}
               </p>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">4.</span> RISK DISCLOSURE (NO FINANCIAL ADVICE)
+                <span className="text-primary font-mono">4.</span> {t('terms.section4.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed mb-4">
-                Trading involves a substantial risk of loss and is not suitable for every investor.
+                {t('terms.section4.content1')}
               </p>
               <p className="text-sm md:text-base leading-relaxed mb-2">
-                <strong className="text-foreground">Educational Purpose:</strong> The SuperEngulfing indicator, PDF, and Course are strictly for educational and informational purposes. They do not constitute financial advice, investment recommendations, or a signal service.
+                {t('terms.section4.content2')}
               </p>
               <p className="text-sm md:text-base leading-relaxed mb-2">
-                <strong className="text-foreground">No Guarantees:</strong> While the SuperEngulfing logic (REV/RUN) creates high-probability setups based on historical market structure, past performance is not indicative of future results.
+                {t('terms.section4.content3')}
               </p>
               <p className="text-sm md:text-base leading-relaxed">
-                <strong className="text-foreground">User Responsibility:</strong> You acknowledge that you are solely responsible for your trading decisions. SuperEngulfing assumes no liability for any financial losses incurred while using our tools or strategies (including the Strategies Playbook).
+                {t('terms.section4.content4')}
               </p>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">5.</span> TRADINGVIEW INDICATOR ACCESS
+                <span className="text-primary font-mono">5.</span> {t('terms.section5.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed mb-4">
-                <strong className="text-foreground">Platform Dependency:</strong> Access to the indicator requires a valid TradingView account. We are not affiliated with TradingView and cannot guarantee their platform&apos;s uptime.
+                {t('terms.section5.content1')}
               </p>
               <p className="text-sm md:text-base leading-relaxed">
-                <strong className="text-foreground">Revocation Rights:</strong> We reserve the right to remove your access to the SuperEngulfing indicator at any time, without notice, should we detect abuse, sharing of access, or violation of these terms.
+                {t('terms.section5.content2')}
               </p>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">6.</span> PRIVACY & DATA USAGE
+                <span className="text-primary font-mono">6.</span> {t('terms.section6.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed mb-4">
-                <strong className="text-foreground">The Vault:</strong> We respect the sanctity of your data. Your email address is collected solely for the purpose of delivering the requested resources and providing you with further intelligence regarding SuperEngulfing updates, market analysis, or product offers.
+                {t('terms.section6.content1')}
               </p>
               <p className="text-sm md:text-base leading-relaxed">
-                <strong className="text-foreground">No Third-Party Sales:</strong> We do not sell, trade, or rent your personal identification information to others.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">7.</span> LIMITATION OF LIABILITY
-              </h2>
-              <p className="text-sm md:text-base leading-relaxed">
-                To the fullest extent permitted by law, SuperEngulfing and its officers shall not be liable for any direct, indirect, incidental, or consequential damages resulting from your use or inability to use the website, the indicator, or the educational materials.
+                {t('terms.section6.content2')}
               </p>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">8.</span> GOVERNING LAW
+                <span className="text-primary font-mono">7.</span> {t('terms.section7.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed">
-                These terms shall be governed by and construed in accordance with the laws of the United States of America, without regard to its conflict of law provisions.
+                {t('terms.section7.content')}
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+                <span className="text-primary font-mono">8.</span> {t('terms.section8.title')}
+              </h2>
+              <p className="text-sm md:text-base leading-relaxed">
+                {t('terms.section8.content')}
               </p>
             </section>
 
             <section className="rounded-xl border border-primary/20 bg-primary/5 p-6 md:p-8">
-              <h2 className="text-lg font-semibold text-foreground mb-3">ACKNOWLEDGMENT</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-3">{t('terms.acknowledgment.title')}</h2>
               <p className="text-sm md:text-base leading-relaxed">
-                By clicking &quot;Submit,&quot; &quot;Download,&quot; or &quot;Get Access,&quot; you acknowledge that you have read, understood, and agree to be bound by these Terms & Conditions.
+                {t('terms.acknowledgment.content')}
               </p>
             </section>
           </article>
