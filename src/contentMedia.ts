@@ -6,12 +6,12 @@ export interface ContentMedia {
 }
 
 const en: ContentMedia = {
-  welcomeVideoUrl: 'https://fast.wistia.net/embed/iframe/bb9a8qt24g?videoFoam=true',
+  welcomeVideoUrl: 'https://fast.wistia.net/embed/iframe/itbz1tz9q3?videoFoam=true',
   welcomePdfUrl: 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing',
 };
 
 const am: ContentMedia = {
-  welcomeVideoUrl: 'https://fast.wistia.net/embed/iframe/bb9a8qt24g?videoFoam=true',
+  welcomeVideoUrl: 'https://fast.wistia.net/embed/iframe/xerm5log0a?videoFoam=true',
   welcomePdfUrl: 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing',
 };
 
