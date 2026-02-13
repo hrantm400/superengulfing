@@ -5,6 +5,7 @@ import { FeatureCards } from '../components/dashboard/FeatureCards';
 import { ProfileSection } from '../components/dashboard/ProfileSection';
 import { CertificateSection } from '../components/dashboard/CertificateSection';
 import { MagicCertificate } from '../components/cinematic/MagicCertificate';
+import AnimatedSection from '../components/ui/AnimatedSection';
 import { authFetch } from '../lib/api';
 import { useTranslation } from '../locales';
 import { User, ChevronDown, TestTube } from 'lucide-react';
@@ -142,7 +143,7 @@ const Dashboard: React.FC = () => {
       <div className="flex-1 relative z-10 pt-20 md:pt-24 px-4 md:px-6 lg:px-8 pb-4 md:pb-6 lg:pb-8">
         <div className="max-w-[1440px] mx-auto space-y-8">
 
-          <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-2 animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.1s' }}>
+          <AnimatedSection className="flex flex-col md:flex-row justify-between items-end md:items-center mb-2" delayMs={80}>
             <div>
               <h2 className="text-3xl font-bold tracking-tight mb-1 text-foreground">
                 {t('dashboard.welcome')}{profile?.first_name?.trim() ? `, ${profile.first_name.trim()}` : ''}
@@ -171,32 +172,32 @@ const Dashboard: React.FC = () => {
                 {t('dashboard.volatilityHigh')}
               </div>
             </div>
-          </div>
+          </AnimatedSection>
 
           {showProfile && (
-            <div className="animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.15s' }}>
+            <AnimatedSection className="" delayMs={140}>
               <ProfileSection />
-            </div>
+            </AnimatedSection>
           )}
 
           {/* Certificate section removed from dashboard UI */}
 
-          <div className="animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.25s' }}>
+          <AnimatedSection delayMs={200}>
             <StatCards profile={profile} loadProfile={loadProfile} />
-          </div>
+          </AnimatedSection>
 
-          <section className="animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.3s' }}>
+          <AnimatedSection delayMs={240} className="">
             <div className="mb-4 flex items-center gap-3">
               <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">{t('dashboard.patternLab')}</h2>
               <div className="h-px flex-1 bg-border/50 hidden md:block" />
               <p className="text-sm text-muted mt-0.5">{t('dashboard.patternLabSub')}</p>
             </div>
             <ChartSection />
-          </section>
+          </AnimatedSection>
 
-          <div className="animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.35s' }}>
+          <AnimatedSection delayMs={260}>
             <FeatureCards />
-          </div>
+          </AnimatedSection>
 
         </div>
       </div>

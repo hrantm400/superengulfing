@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import PdfSuccessPopup from './PdfSuccessPopup';
 import { useTranslation } from '../locales';
 import { getApiUrl } from '../lib/api';
+import AnimatedSection from './ui/AnimatedSection';
 
 type PatternType = 'bull' | 'bear';
 type SetupType = 'RUN' | 'REV';
@@ -291,61 +292,63 @@ const PatternShowcase: React.FC = () => {
         onClose={() => setStatus('idle')}
       />
       <section className="py-24 px-4 bg-background relative border-t border-border">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-16 space-y-4">
-          <h2 className="text-3xl md:text-5xl font-bold text-foreground tracking-tight animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.05s' }}>
-            {t('home.patternShowcase.title')}
-          </h2>
-          <p className="text-muted max-w-2xl mx-auto animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.1s' }}>
-            {t('home.patternShowcase.subline')}
-          </p>
-        </div>
+        <div className="max-w-6xl mx-auto">
+          <AnimatedSection className="text-center mb-16 space-y-4" delayMs={80}>
+            <h2 className="text-3xl md:text-5xl font-bold text-foreground tracking-tight">
+              {t('home.patternShowcase.title')}
+            </h2>
+            <p className="text-muted max-w-2xl mx-auto">
+              {t('home.patternShowcase.subline')}
+            </p>
+          </AnimatedSection>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-20">
-          {PATTERNS.map((pattern, idx) => (
-            <PatternCard key={idx} config={pattern} index={idx} />
-          ))}
-        </div>
+          <AnimatedSection className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-20">
+            {PATTERNS.map((pattern, idx) => (
+              <PatternCard key={idx} config={pattern} index={idx} />
+            ))}
+          </AnimatedSection>
 
-        {/* CTA Section */}
-        <div className="max-w-md mx-auto relative z-10">
-          <div className="absolute inset-0 bg-primary/5 blur-3xl -z-10 rounded-full"></div>
+          {/* CTA Section */}
+          <AnimatedSection className="max-w-md mx-auto relative z-10" delayMs={120}>
+            <div className="absolute inset-0 bg-primary/5 blur-3xl -z-10 rounded-full"></div>
 
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                <span className="material-symbols-outlined text-muted">mail</span>
+            <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                  <span className="material-symbols-outlined text-muted">mail</span>
+                </div>
+                <input
+                  type="email"
+                  required
+                  disabled={status === 'loading'}
+                  className="w-full h-14 bg-surface/80 border border-border rounded-lg px-12 text-foreground placeholder:text-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 transition-all duration-300 backdrop-blur-md input-glow font-mono disabled:opacity-50"
+                  placeholder={t('home.patternShowcase.placeholder')}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
-              <input
-                type="email"
-                required
+
+              <button
                 disabled={status === 'loading'}
-                className="w-full h-14 bg-surface/80 border border-border rounded-lg px-12 text-foreground placeholder:text-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 transition-all duration-300 backdrop-blur-md input-glow font-mono disabled:opacity-50"
-                placeholder={t('home.patternShowcase.placeholder')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+                className="w-full h-16 bg-primary hover:bg-primary-glow text-black rounded-lg font-bold text-lg md:text-xl shadow-glow-primary hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100"
+              >
+                {status === 'loading'
+                  ? t('home.patternShowcase.sending')
+                  : t('home.patternShowcase.getPdf')}
+                <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">download</span>
+              </button>
 
-            <button
-              disabled={status === 'loading'}
-              className="w-full h-16 bg-primary hover:bg-primary-glow text-black rounded-lg font-bold text-lg md:text-xl shadow-glow-primary hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100"
-            >
-              {status === 'loading' ? t('home.patternShowcase.sending') : t('home.patternShowcase.getPdf')}
-              <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">download</span>
-            </button>
+              {status === 'error' && (
+                <div className="text-red-400 text-sm font-medium text-center animate-scale-in">{message}</div>
+              )}
+            </form>
 
-            {status === 'error' && (
-              <div className="text-red-400 text-sm font-medium text-center animate-scale-in">{message}</div>
-            )}
-          </form>
-
-          <p className="mt-4 text-center text-[10px] text-muted font-mono uppercase tracking-widest">
-            {t('home.patternShowcase.footer')}
-          </p>
+            <p className="mt-4 text-center text-[10px] text-muted font-mono uppercase tracking-widest">
+              {t('home.patternShowcase.footer')}
+            </p>
+          </AnimatedSection>
         </div>
-      </div>
-    </section>
+      </section>
     </>
   );
 };

@@ -4,6 +4,7 @@ import { useLocale } from '../contexts/LocaleContext';
 import { getContentMedia } from '../contentMedia';
 import { getApiUrl } from '../lib/api';
 import { useTranslation } from '../locales';
+import AnimatedSection from '../components/ui/AnimatedSection';
 
 const ThankYou: React.FC = () => {
     const { locale, localizePath } = useLocale();
@@ -63,7 +64,7 @@ const ThankYou: React.FC = () => {
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
 
                     {/* Success Badge */}
-                    <div className="mb-12 space-y-4 animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.1s' }}>
+                    <AnimatedSection className="mb-12 space-y-4" delayMs={60}>
                         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-widest mb-4">
                             <span className="material-symbols-outlined text-sm">check_circle</span>
                             {t('thankYou.badge')}
@@ -78,12 +79,12 @@ const ThankYou: React.FC = () => {
                         <p className="text-muted text-lg font-light max-w-2xl mx-auto">
                             {t('thankYou.subline')}
                         </p>
-                    </div>
+                    </AnimatedSection>
 
                     {/* Wistia Video Embed */}
-                    <div
-                        className="rounded-card overflow-hidden mb-12 bg-surface/40 backdrop-blur-xl shadow-card hover:shadow-card-hover border border-border hover:border-primary/20 relative transition-all duration-300 hover:-translate-y-1 animate-fade-in-up opacity-0 [animation-fill-mode:forwards]"
-                        style={{ animationDelay: '0.2s' }}
+                    <AnimatedSection
+                        className="rounded-card overflow-hidden mb-12 bg-surface/40 backdrop-blur-xl shadow-card hover:shadow-card-hover border border-border hover:border-primary/20 relative transition-all duration-300 hover:-translate-y-1"
+                        delayMs={120}
                     >
                         <div className="relative pb-[56.25%] h-0 overflow-hidden bg-black">
                             <iframe
@@ -98,10 +99,10 @@ const ThankYou: React.FC = () => {
                             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                             <span className="text-xs font-mono uppercase tracking-widest text-foreground/70">{t('thankYou.welcomeCircle')}</span>
                         </div>
-                    </div>
+                    </AnimatedSection>
 
                     {/* CTA Section */}
-                    <div className="space-y-6 mb-24">
+                    <AnimatedSection className="space-y-6 mb-24" delayMs={160}>
                         <Link
                             to={localizePath('/course-access')}
                             className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-10 py-5 md:px-14 md:py-6 rounded-2xl font-bold text-lg md:text-xl text-black bg-primary hover:bg-primary-glow border-2 border-primary/30 shadow-[0_0_24px_rgba(57,255,20,0.2)] hover:shadow-[0_0_32px_rgba(57,255,20,0.35)] transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-0"
@@ -109,9 +110,10 @@ const ThankYou: React.FC = () => {
                             <span className="material-symbols-outlined text-2xl">rocket_launch</span>
                             {t('thankYou.cta')}
                         </Link>
-                    </div>
+                    </AnimatedSection>
 
                     {/* Blueprint Section */}
+                    <AnimatedSection asChild={false} className="relative" delayMs={200}>
                     <section className="relative">
                         {/* Background Dots */}
                         <div
@@ -172,6 +174,7 @@ const ThankYou: React.FC = () => {
                             </div>
                         </div>
                     </section>
+                    </AnimatedSection>
 
                 </div>
             </main>

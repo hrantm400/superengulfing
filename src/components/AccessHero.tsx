@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from '../locales';
+import AnimatedSection from './ui/AnimatedSection';
 
 const AccessHero: React.FC = () => {
   const { t } = useTranslation();
@@ -7,7 +8,7 @@ const AccessHero: React.FC = () => {
     <>
       <div className="absolute -top-20 -left-20 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] pointer-events-none"></div>
 
-      <div className="space-y-6 relative z-10">
+      <AnimatedSection className="space-y-6 relative z-10" delayMs={60}>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-primary/20 bg-primary/5 text-primary text-[10px] font-mono uppercase tracking-widest">
           <span className="material-symbols-outlined text-sm">lock_open</span>
           {t('access.hero.badge')}
@@ -21,10 +22,12 @@ const AccessHero: React.FC = () => {
         <p className="text-muted text-lg font-light leading-relaxed max-w-lg">
           {t('access.hero.subtitle')}
         </p>
-      </div>
+      </AnimatedSection>
 
-      <div className="space-y-4">
-        <h3 className="text-xs font-mono text-muted uppercase tracking-widest mb-6">{t('access.hero.whatUnlocking')}</h3>
+      <AnimatedSection className="space-y-4" delayMs={140}>
+        <h3 className="text-xs font-mono text-muted uppercase tracking-widest mb-6">
+          {t('access.hero.whatUnlocking')}
+        </h3>
 
         <FeatureItem
           icon="school"
@@ -43,7 +46,7 @@ const AccessHero: React.FC = () => {
           title={t('access.hero.feature3Title')}
           description={t('access.hero.feature3Desc')}
         />
-      </div>
+      </AnimatedSection>
     </>
   );
 };

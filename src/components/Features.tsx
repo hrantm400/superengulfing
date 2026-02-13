@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from '../locales';
+import AnimatedSection from './ui/AnimatedSection';
 
 interface FeatureCardProps {
   icon: string;
@@ -25,7 +26,7 @@ const Features: React.FC = () => {
   return (
     <section className="py-24 px-4 sm:px-6 border-t border-border bg-background/80 relative overflow-hidden backdrop-blur-sm">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
-      <div className="max-w-4xl mx-auto text-center space-y-10">
+      <AnimatedSection className="max-w-4xl mx-auto text-center space-y-10" delayMs={150}>
         <div className="grid md:grid-cols-3 gap-8">
           <FeatureCard
             index={0}
@@ -46,7 +47,7 @@ const Features: React.FC = () => {
             description={t('home.features.card3Desc')}
           />
         </div>
-      </div>
+      </AnimatedSection>
     </section>
   );
 };

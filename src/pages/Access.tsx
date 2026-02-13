@@ -3,6 +3,7 @@ import AccessBackground from '../components/AccessBackground';
 import AccessHero from '../components/AccessHero';
 import ProcessCard from '../components/ProcessCard';
 import VerificationCard from '../components/VerificationCard';
+import AnimatedSection from '../components/ui/AnimatedSection';
 import { useLocale } from '../contexts/LocaleContext';
 import { getApiUrl } from '../lib/api';
 
@@ -55,15 +56,18 @@ const Access: React.FC = () => {
                     <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-start py-24">
 
                         {/* Left Column: Hero & Features */}
-                        <div className="space-y-10 relative lg:sticky lg:top-32">
+                        <AnimatedSection className="space-y-10 relative lg:sticky lg:top-32" delayMs={80}>
                             <AccessHero />
-                        </div>
+                        </AnimatedSection>
 
                         {/* Right Column: Actions */}
-                        <div className="space-y-6">
-                            <ProcessCard affiliateLabel={affiliate.affiliate_label} affiliateUrl={ensureAbsoluteUrl(affiliate.affiliate_url)} />
+                        <AnimatedSection className="space-y-6" delayMs={140}>
+                            <ProcessCard
+                                affiliateLabel={affiliate.affiliate_label}
+                                affiliateUrl={ensureAbsoluteUrl(affiliate.affiliate_url)}
+                            />
                             <VerificationCard />
-                        </div>
+                        </AnimatedSection>
 
                     </div>
                 </div>
