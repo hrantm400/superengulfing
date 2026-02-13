@@ -4,12 +4,10 @@ import SocialProof from '../components/SocialProof';
 import Features from '../components/Features';
 import PatternShowcase from '../components/PatternShowcase';
 import BackgroundEffects from '../components/BackgroundEffects';
-import FluidBackground from '../components/FluidBackground';
 
 const Home: React.FC = () => {
     return (
         <>
-            <FluidBackground />
             <BackgroundEffects />
             <div className="flex-1 relative z-10 flex flex-col">
                 <Hero />
