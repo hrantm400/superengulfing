@@ -23,65 +23,65 @@ const Disclaimer: React.FC = () => {
           <article className="space-y-10 text-muted-foreground">
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">1.</span> GENERAL RISK DISCLOSURE
+                <span className="text-primary font-mono">1.</span> {t('disclaimer.section1.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed mb-4">
-                Trading foreign exchange and other financial instruments carries a high level of risk and may not be suitable for all investors. The high degree of leverage can work against you as well as for you. Before deciding to trade, you should carefully consider your investment objectives, level of experience, and risk appetite.
+                {t('disclaimer.section1.content1')}
               </p>
               <p className="text-sm md:text-base leading-relaxed">
-                The possibility exists that you could sustain a loss of some or all of your initial investment; therefore, you should not invest money that you cannot afford to lose.
+                {t('disclaimer.section1.content2')}
               </p>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">2.</span> NO FINANCIAL ADVICE
+                <span className="text-primary font-mono">2.</span> {t('disclaimer.section2.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed mb-4">
-                The SuperEngulfing indicator, &quot;Liquidity Trap&quot; PDF, Video Course, and all related materials provided by SuperEngulfing (collectively, &quot;the Materials&quot;) are for educational and informational purposes only.
+                {t('disclaimer.section2.content1')}
               </p>
               <p className="text-sm md:text-base leading-relaxed">
-                SuperEngulfing is not a registered investment advisor or broker-dealer. No part of the Materials should be construed as financial, investment, legal, or tax advice. Any trades placed based on the logic or setups described in the SuperEngulfing Protocol are taken at your own risk.
+                {t('disclaimer.section2.content2')}
               </p>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">3.</span> PERFORMANCE & BACKTESTING
+                <span className="text-primary font-mono">3.</span> {t('disclaimer.section3.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed mb-4">
-                While the SuperEngulfing logic (including REV/RUN and Wick Grab detection) is designed to identify high-probability market structures:
+                {t('disclaimer.section3.content1')}
               </p>
               <p className="text-sm md:text-base leading-relaxed mb-4">
-                <strong className="text-foreground">Hypothetical Performance:</strong> Results based on historical data have inherent limitations and do not represent actual trading.
+                {t('disclaimer.section3.content2')}
               </p>
               <p className="text-sm md:text-base leading-relaxed">
-                <strong className="text-foreground">No Guarantees:</strong> Past performance is not indicative of future results. There is no guarantee that any strategy discussed will result in profits or prevent losses.
+                {t('disclaimer.section3.content3')}
               </p>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">4.</span> INDEMNIFICATION
+                <span className="text-primary font-mono">4.</span> {t('disclaimer.section4.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed">
-                By using these tools, you agree that SuperEngulfing and its team members are not responsible for your trading results. You are solely responsible for your own &quot;due diligence.&quot; Under no circumstances shall SuperEngulfing be held liable for any direct or indirect loss resulting from the use of the SuperEngulfing indicator or educational resources.
+                {t('disclaimer.section4.content')}
               </p>
             </section>
 
             <section>
               <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="text-primary font-mono">5.</span> TECHNOLOGY & PLATFORM RISK
+                <span className="text-primary font-mono">5.</span> {t('disclaimer.section5.title')}
               </h2>
               <p className="text-sm md:text-base leading-relaxed">
-                The SuperEngulfing indicator is hosted on TradingView. SuperEngulfing is not responsible for platform outages, technical glitches, or data inaccuracies provided by third-party charting software.
+                {t('disclaimer.section5.content')}
               </p>
             </section>
 
             <section className="rounded-xl border border-primary/20 bg-primary/5 p-6 md:p-8">
-              <h2 className="text-lg font-semibold text-foreground mb-3">ACKNOWLEDGMENT</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-3">{t('disclaimer.acknowledgment.title')}</h2>
               <p className="text-sm md:text-base leading-relaxed">
-                By utilizing any resources provided by SuperEngulfing, you acknowledge that you have read this Disclaimer and fully understand the risks associated with financial trading.
+                {t('disclaimer.acknowledgment.content')}
               </p>
             </section>
           </article>
