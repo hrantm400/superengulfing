@@ -128,12 +128,14 @@ const Dashboard: React.FC = () => {
       <div className="fixed inset-0 bg-subtle-gradient pointer-events-none z-0 opacity-50 dark:opacity-20" />
       <div className="fixed inset-0 grid-bg pointer-events-none z-0 opacity-[0.4] dark:opacity-[0.3]" />
 
-      {/* Cinematic Onboarding Overlay (V5 Elite) - disabled */}
-      {false && onboardingStep && (
+      {/* Cinematic Onboarding Overlay: name → certificate → success */}
+      {onboardingStep && (
         <MagicCertificate
           onSubmitName={handleNameConfirm}
           onAgree={handleAgree}
           onContinue={handleSuccessContinue}
+          initialStep={onboardingStep === 'certificate' ? 'certificate' : 'trap'}
+          initialName={profile?.first_name?.trim() ?? ''}
         />
       )}
 

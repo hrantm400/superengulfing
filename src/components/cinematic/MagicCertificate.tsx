@@ -10,12 +10,15 @@ interface MagicCertificateProps {
     onSubmitName: (name: string) => Promise<void>;
     onAgree: (certificatePngBase64?: string) => Promise<void>;
     onContinue?: () => void;
+    /** When user already has name (e.g. after first login), skip to certificate step */
+    initialStep?: 'trap' | 'certificate';
+    initialName?: string;
 }
 
-export const MagicCertificate: React.FC<MagicCertificateProps> = ({ onSubmitName, onAgree, onContinue }) => {
+export const MagicCertificate: React.FC<MagicCertificateProps> = ({ onSubmitName, onAgree, onContinue, initialStep = 'trap', initialName = '' }) => {
     const { t } = useTranslation();
-    const [step, setStep] = useState<'trap' | 'certificate' | 'aftermath'>('trap');
-    const [name, setName] = useState('');
+    const [step, setStep] = useState<'trap' | 'certificate' | 'aftermath'>(initialStep);
+    const [name, setName] = useState(initialName);
     const [isSubmittingName, setIsSubmittingName] = useState(false);
     const [typedLength, setTypedLength] = useState(0);
     const [declarationTyped, setDeclarationTyped] = useState(0);
