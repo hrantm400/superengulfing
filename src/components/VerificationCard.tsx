@@ -28,7 +28,7 @@ const VerificationCard: React.FC = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.message || t('access.step3.errorGeneric'));
+        setError(data.code === 'already_exists' ? t('access.step3.errorAlreadyExists') : (data.message || t('access.step3.errorGeneric')));
         return;
       }
       setSuccess(true);

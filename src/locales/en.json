@@ -72,6 +72,7 @@
   "access.step3.submit": "Request Access",
   "access.step3.success": "We’ve received your request! Our team will process it within 24 hours, and you'll receive your access details via email shortly.",
   "access.step3.errorRequired": "Please enter your email and UID.",
+  "access.step3.errorAlreadyExists": "This email is already in our system. You have either already submitted a request or already have an account—please log in.",
   "access.step3.errorGeneric": "Something went wrong. Please try again.",
   "access.step3.verifying": "Verifying...",
   "access.step3.info": "Access will be granted within 24 hours after verification.",

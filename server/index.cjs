@@ -1149,14 +1149,29 @@ app.post('/api/access-requests', async (req, res) => {
     if (!email || !email.includes('@') || !uid || !String(uid).trim()) {
         return res.status(400).json({ success: false, message: 'Email and UID are required' });
     }
+    const emailNorm = email.toLowerCase().trim();
     const locale = (reqLocale === 'am' ? 'am' : 'en');
     try {
+        const existingRequest = await pool.query(
+            'SELECT id FROM access_requests WHERE LOWER(email) = $1 LIMIT 1',
+            [emailNorm]
+        );
+        if (existingRequest.rows.length > 0) {
+            return res.status(409).json({ success: false, code: 'already_exists', message: 'This email already has an access request.' });
+        }
+        const existingUser = await pool.query(
+            'SELECT id FROM dashboard_users WHERE LOWER(email) = $1 LIMIT 1',
+            [emailNorm]
+        );
+        if (existingUser.rows.length > 0) {
+            return res.status(409).json({ success: false, code: 'already_exists', message: 'An account with this email already exists.' });
+        }
         const result = await pool.query(
             'INSERT INTO access_requests (email, uid, status, locale) VALUES ($1, $2, $3, $4) RETURNING *',
-            [email.toLowerCase().trim(), String(uid).trim(), 'pending', locale]
+            [emailNorm, String(uid).trim(), 'pending', locale]
         );
         await sendRequestReceivedEmail(email, locale);
-        await sendAdminNewAccessRequestNotification(email.toLowerCase().trim(), String(uid).trim(), locale);
+        await sendAdminNewAccessRequestNotification(emailNorm, String(uid).trim(), locale);
         res.status(201).json({ success: true, message: 'Request received. We will process it within 24 hours.' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
