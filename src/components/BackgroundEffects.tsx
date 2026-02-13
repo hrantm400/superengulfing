@@ -3,7 +3,7 @@ import React from 'react';
 const BackgroundEffects: React.FC = () => {
   return (
     <>
-      <div className="fixed inset-0 grid-bg pointer-events-none z-0"></div>
+      <div className="fixed inset-0 grid-bg pointer-events-none z-0 opacity-60"></div>
       <div className="absolute top-0 left-0 w-full h-[100vh] overflow-hidden pointer-events-none z-0 flex items-center justify-center">
         <div className="relative w-[600px] h-[500px] opacity-20 md:opacity-25 transform scale-110 md:scale-100">
 

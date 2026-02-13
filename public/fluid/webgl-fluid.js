@@ -54,8 +54,7 @@ fetch("/fluid/config.json")
     runSimulation(config);
   })
   .catch((error) => {
-    // Handle errors if the config fails to load
-    alert("Failed to load config. Check the file or network.");
+    console.warn("[webgl-fluid] Failed to load config:", error);
   });
 
 function runSimulation(config) {
