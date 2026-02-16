@@ -342,10 +342,6 @@ const PatternShowcase: React.FC = () => {
                 <div className="text-red-400 text-sm font-medium text-center animate-scale-in">{message}</div>
               )}
             </form>
-
-            <p className="mt-4 text-center text-[10px] text-muted font-mono uppercase tracking-widest">
-              {t('home.patternShowcase.footer')}
-            </p>
           </AnimatedSection>
         </div>
       </section>
