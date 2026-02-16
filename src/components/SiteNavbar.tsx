@@ -64,6 +64,8 @@ const SiteNavbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
 
+  const telegramUrl = locale === 'am' ? 'https://t.me/+rXXH4RsfH08zMWZi' : 'https://t.me/+ek3QkeAz-NY5NDFi';
+
   // Scroll Animations with Physics
   const { scrollY } = useScroll();
 
@@ -248,7 +250,7 @@ const SiteNavbar: React.FC = () => {
               )}
               {isAuthenticated && (
                 <a
-                  href="https://t.me/superengulfing"
+                  href={telegramUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/5 text-xs font-semibold text-foreground hover:border-[#0088cc]/50 hover:bg-[#0088cc]/10 hover:text-[#0088cc] dark:hover:border-[#0088cc]/50 dark:hover:bg-[#0088cc]/10 transition-all duration-300 active:scale-[0.98]"
@@ -365,7 +367,7 @@ const SiteNavbar: React.FC = () => {
               >
                 {isAuthenticated && (
                   <a
-                    href="https://t.me/superengulfing"
+                    href={telegramUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setIsMobileMenuOpen(false)}
