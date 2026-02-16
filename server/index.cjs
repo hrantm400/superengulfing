@@ -43,12 +43,14 @@ app.get('/api/ping', (req, res) => res.json({ ok: true, message: 'Dashboard API'
 
 // GET /api/site-media - Public: PDF and welcome video URLs per locale (for thank-you page)
 const DEFAULT_WELCOME_VIDEO = 'https://fast.wistia.net/embed/iframe/bb9a8qt24g?videoFoam=true';
+const DEFAULT_PDF_LINK_EN = 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing'; // English: original Liquidity Sweep Cheatsheet
+const DEFAULT_PDF_LINK_AM = 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing';   // Armenian: set PDF_LINK_AM in server/.env for Armenian PDF
 app.get('/api/site-media', (req, res) => {
     const locale = (req.query.locale === 'am' ? 'am' : 'en');
     const pdfEnv = locale === 'am' ? (process.env.PDF_LINK_AM || process.env.PDF_LINK) : (process.env.PDF_LINK_EN || process.env.PDF_LINK);
     const videoEnv = locale === 'am' ? process.env.WELCOME_VIDEO_AM : process.env.WELCOME_VIDEO_EN;
     res.json({
-        welcomePdfUrl: pdfEnv || 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing',
+        welcomePdfUrl: pdfEnv || (locale === 'am' ? DEFAULT_PDF_LINK_AM : DEFAULT_PDF_LINK_EN),
         welcomeVideoUrl: videoEnv || DEFAULT_WELCOME_VIDEO
     });
 });
@@ -3256,10 +3258,10 @@ async function sendAdminPinEmail(email, code) {
     }
 }
 
-// Send welcome email WITH PDF link (sent after confirmation)
+// Send welcome email WITH PDF link (sent after confirmation) — EN: English PDF, AM: Armenian PDF
 async function sendWelcomeEmail(email, locale = 'en') {
     const pdfLinkEnv = locale === 'am' ? (process.env.PDF_LINK_AM || process.env.PDF_LINK) : (process.env.PDF_LINK_EN || process.env.PDF_LINK);
-    const pdfLink = pdfLinkEnv || 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing';
+    const pdfLink = pdfLinkEnv || (locale === 'am' ? DEFAULT_PDF_LINK_AM : DEFAULT_PDF_LINK_EN);
     const apiUrl = process.env.API_URL || 'http://localhost:3001';
     const unsubscribeUrl = `${apiUrl}/api/unsubscribe?email=${encodeURIComponent(email)}`;
     const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
