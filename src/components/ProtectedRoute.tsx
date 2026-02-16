@@ -10,6 +10,7 @@ const ProtectedRoute: React.FC = () => {
     const { profile } = useUser();
 
     useEffect(() => {
+        if (typeof window === 'undefined') return;
         const token = localStorage.getItem('auth_token');
         if (!token) {
             const loginPath = location.pathname.startsWith('/am') ? '/am/login' : '/login';
@@ -30,12 +31,9 @@ const ProtectedRoute: React.FC = () => {
         }
     }, [navigate, localizePath, location.pathname, profile]);
 
-    if (!localStorage.getItem('auth_token')) {
-        return null;
-    }
-    if (profile === null) {
-        return null;
-    }
+    if (typeof window === 'undefined') return null;
+    if (!window.localStorage.getItem('auth_token')) return null;
+    if (profile === null) return null;
 
     return <Outlet />;
 };
