@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from '@remix-run/react';
 import { useLocale } from '../contexts/LocaleContext';
 import { useTranslation } from '../locales';
 import { getApiUrl } from '../lib/api';
+import { Eye, EyeOff } from 'lucide-react';
 
 const SetPassword: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -12,6 +13,8 @@ const SetPassword: React.FC = () => {
     const token = searchParams.get('token') || '';
     const [password, setPasswordState] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -85,31 +88,51 @@ const SetPassword: React.FC = () => {
                                 <label htmlFor="set-password" className="block text-sm font-medium text-muted mb-2">
                                     {t('setPassword.passwordLabel')}
                                 </label>
-                                <input
-                                    id="set-password"
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPasswordState(e.target.value)}
-                                    placeholder="••••••••"
-                                    minLength={6}
-                                    className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
-                                    autoComplete="new-password"
-                                />
+                                <div className="relative">
+                                    <input
+                                        id="set-password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={password}
+                                        onChange={(e) => setPasswordState(e.target.value)}
+                                        placeholder="••••••••"
+                                        minLength={6}
+                                        className="w-full bg-background border border-border rounded-lg px-4 py-3 pr-11 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
+                                        autoComplete="new-password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword((v) => !v)}
+                                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted hover:text-foreground"
+                                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <label htmlFor="set-password-confirm" className="block text-sm font-medium text-muted mb-2">
                                     {t('setPassword.confirmLabel')}
                                 </label>
-                                <input
-                                    id="set-password-confirm"
-                                    type="password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    placeholder="••••••••"
-                                    minLength={6}
-                                    className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
-                                    autoComplete="new-password"
-                                />
+                                <div className="relative">
+                                    <input
+                                        id="set-password-confirm"
+                                        type={showConfirm ? 'text' : 'password'}
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        minLength={6}
+                                        className="w-full bg-background border border-border rounded-lg px-4 py-3 pr-11 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
+                                        autoComplete="new-password"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirm((v) => !v)}
+                                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted hover:text-foreground"
+                                        aria-label={showConfirm ? 'Hide password confirmation' : 'Show password confirmation'}
+                                    >
+                                        {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
                             </div>
                             {error && <p className="text-sm text-red-400 animate-scale-in">{t(`setPassword.${error}`)}</p>}
                             <button

@@ -1269,6 +1269,32 @@ app.post('/api/access-requests/:id/accept', requireAdminAuth, async (req, res) =
     }
 });
 
+// POST /api/access-requests/:id/resend-set-password - Resend set-password email (for accepted requests)
+app.post('/api/access-requests/:id/resend-set-password', requireAdminAuth, async (req, res) => {
+    const id = req.params.id;
+    try {
+        const reqRow = await pool.query('SELECT * FROM access_requests WHERE id = $1', [id]);
+        if (reqRow.rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+        const { email, status: reqStatus, locale: reqLocale } = reqRow.rows[0];
+        const locale = (reqLocale === 'am' ? 'am' : 'en');
+        if (reqStatus !== 'accepted') {
+            return res.status(400).json({ error: 'Only accepted requests can receive set-password email' });
+        }
+        const setPasswordToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        // Cleanup old tokens for this email to avoid clutter
+        await pool.query('DELETE FROM set_password_tokens WHERE email = $1', [email]);
+        await pool.query(
+            'INSERT INTO set_password_tokens (email, token, expires_at) VALUES ($1, $2, $3)',
+            [email, setPasswordToken, expiresAt]
+        );
+        await sendSetPasswordEmail(email, setPasswordToken, locale);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // POST /api/access-requests/:id/reject - Reject request (reason required, email sent to user)
 app.post('/api/access-requests/:id/reject', requireAdminAuth, async (req, res) => {
     const id = req.params.id;

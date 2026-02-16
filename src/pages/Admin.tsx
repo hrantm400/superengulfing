@@ -2127,6 +2127,21 @@ const Admin: React.FC = () => {
                                                         </button>
                                                     </span>
                                                 )}
+                                                {req.status === 'accepted' && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                await fetchWithAdminAuth(`${getApiUrl()}/api/access-requests/${req.id}/resend-set-password`, { method: 'POST' });
+                                                                setMessage('Set-password email re-sent to user.');
+                                                            } catch (e) {
+                                                                setMessage('Failed to resend set-password email');
+                                                            }
+                                                        }}
+                                                        className="px-3 py-1 bg-primary/15 text-primary rounded hover:bg-primary/25 text-xs"
+                                                    >
+                                                        Resend set-password
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
