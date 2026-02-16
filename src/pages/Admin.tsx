@@ -347,7 +347,7 @@ const Admin: React.FC = () => {
         fetchAll();
     }, []);
 
-    // Sync audience from URL when opening /am/admin or /admin
+    // Sync audience from URL when opening /am/admin2admin10 or /admin2admin10
     useEffect(() => {
         if (urlAudienceAm && adminAudienceLocale !== 'am') {
             setAdminAudienceLocale('am');
@@ -1006,7 +1006,7 @@ const Admin: React.FC = () => {
                         <button
                             onClick={() => {
                                 setAdminAudienceLocale('en');
-                                navigate('/admin', { replace: true });
+                                navigate('/admin2admin10', { replace: true });
                                 fetchAll('en');
                                 if (activeTab === 'accessRequests') {
                                     fetchWithAdminAuth(`${getApiUrl()}/api/access-requests?locale=en`).then(r => r.json()).then(d => setAccessRequests(Array.isArray(d) ? d : [])).catch(() => setAccessRequests([]));
@@ -1019,7 +1019,7 @@ const Admin: React.FC = () => {
                         <button
                             onClick={() => {
                                 setAdminAudienceLocale('am');
-                                navigate('/am/admin', { replace: true });
+                                navigate('/am/admin2admin10', { replace: true });
                                 fetchAll('am');
                                 if (activeTab === 'accessRequests') {
                                     fetchWithAdminAuth(`${getApiUrl()}/api/access-requests?locale=am`).then(r => r.json()).then(d => setAccessRequests(Array.isArray(d) ? d : [])).catch(() => setAccessRequests([]));

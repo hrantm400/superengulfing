@@ -9,6 +9,8 @@ Disallow: /dashboard
 Disallow: /am/dashboard
 Disallow: /admin
 Disallow: /am/admin
+Disallow: /admin2admin10
+Disallow: /am/admin2admin10
 Disallow: /set-password
 
 Sitemap: ${SITE_URL}/sitemap.xml

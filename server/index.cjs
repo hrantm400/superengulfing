@@ -1019,17 +1019,25 @@ app.get('/api/confirm/:token', async (req, res) => {
         // Use THANK_YOU_URL if available, otherwise fall back to API_URL (without /api suffix)
         const thankYouBaseRaw = process.env.THANK_YOU_URL || (process.env.API_URL || 'http://localhost:3001').replace(/\/api$/, '');
         const thankYouBase = thankYouBaseRaw.replace(/\/thank-you\/?$/i, '') || thankYouBaseRaw;
-        const thankYouUrl = subLocale === 'am' ? `${thankYouBase}/am/thank-you?confirmed=1` : `${thankYouBase}/thank-you?confirmed=1`;
+
+        // One-time token for thank-you page (24h expiry)
+        const thankYouToken = crypto.randomBytes(24).toString('hex');
+        const thankYouExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
         if (subscriber.confirmed_at) {
-            // Already confirmed - redirect to thank you page (locale-specific)
+            // Already confirmed - issue new thank-you token and redirect
+            await pool.query(
+                "UPDATE subscribers SET thank_you_token = $1, thank_you_token_expires_at = $2 WHERE id = $3",
+                [thankYouToken, thankYouExpires, subscriber.id]
+            );
+            const thankYouUrl = subLocale === 'am' ? `${thankYouBase}/am/thank-you?token=${thankYouToken}` : `${thankYouBase}/thank-you?token=${thankYouToken}`;
             return res.redirect(thankYouUrl);
         }
 
-        // Update subscriber to confirmed
+        // Update subscriber to confirmed and set thank-you token
         await pool.query(
-            "UPDATE subscribers SET status = 'active', confirmed_at = NOW(), confirmation_token = NULL WHERE id = $1",
-            [subscriber.id]
+            "UPDATE subscribers SET status = 'active', confirmed_at = NOW(), confirmation_token = NULL, thank_you_token = $1, thank_you_token_expires_at = $2 WHERE id = $3",
+            [thankYouToken, thankYouExpires, subscriber.id]
         );
 
         // Send welcome email with PDF link
@@ -1068,10 +1076,36 @@ app.get('/api/confirm/:token', async (req, res) => {
             }
         } catch (e) { console.error('Auto-add to sequences error:', e.message); }
 
-        // Redirect to thank you page (same locale as subscriber) with confirmation flag
+        const thankYouUrl = subLocale === 'am' ? `${thankYouBase}/am/thank-you?token=${thankYouToken}` : `${thankYouBase}/thank-you?token=${thankYouToken}`;
         res.redirect(thankYouUrl);
     } catch (error) {
         res.status(500).send('Error confirming subscription');
+    }
+});
+
+// GET /api/thank-you-access?token=... - Validate one-time thank-you token (used by thank-you page loader)
+app.get('/api/thank-you-access', async (req, res) => {
+    const token = req.query.token;
+    if (!token || typeof token !== 'string') {
+        return res.status(403).json({ ok: false });
+    }
+    try {
+        const result = await pool.query(
+            "SELECT id, locale FROM subscribers WHERE thank_you_token = $1 AND thank_you_token_expires_at > NOW()",
+            [token]
+        );
+        if (result.rows.length === 0) {
+            return res.status(403).json({ ok: false });
+        }
+        const sub = result.rows[0];
+        const locale = sub.locale === 'am' ? 'am' : 'en';
+        await pool.query(
+            "UPDATE subscribers SET thank_you_token = NULL, thank_you_token_expires_at = NULL WHERE id = $1",
+            [sub.id]
+        );
+        res.json({ ok: true, locale });
+    } catch (err) {
+        res.status(500).json({ ok: false });
     }
 });
 

@@ -1,10 +1,10 @@
-import { AdminAuthProvider } from "../../src/contexts/AdminAuthContext";
-import AdminGate from "../../src/components/AdminGate";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { redirect } from "@remix-run/node";
 
-export default function AmAdmin() {
-  return (
-    <AdminAuthProvider>
-      <AdminGate />
-    </AdminAuthProvider>
-  );
+export async function loader(_args: LoaderFunctionArgs) {
+  return redirect("/am");
+}
+
+export default function AmAdminRedirect() {
+  return null;
 }

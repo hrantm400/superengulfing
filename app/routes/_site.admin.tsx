@@ -1,14 +1,10 @@
-import type { MetaFunction } from "@remix-run/node";
-import { AdminAuthProvider } from "../../src/contexts/AdminAuthContext";
-import AdminGate from "../../src/components/AdminGate";
-import { getMeta } from "~/lib/seo";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { redirect } from "@remix-run/node";
 
-export const meta: MetaFunction = () => getMeta("admin");
+export async function loader(_args: LoaderFunctionArgs) {
+  return redirect("/");
+}
 
-export default function Admin() {
-  return (
-    <AdminAuthProvider>
-      <AdminGate />
-    </AdminAuthProvider>
-  );
+export default function AdminRedirect() {
+  return null;
 }

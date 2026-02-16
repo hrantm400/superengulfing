@@ -1,36 +1,38 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from '@remix-run/react';
 import { useLocale } from '../contexts/LocaleContext';
-import { getContentMedia } from '../contentMedia';
 import { getApiUrl } from '../lib/api';
 import { useTranslation } from '../locales';
 import AnimatedSection from '../components/ui/AnimatedSection';
 
-const ThankYou: React.FC = () => {
-    const { locale, localizePath } = useLocale();
+type MediaState = { welcomePdfUrl: string; welcomeVideoUrl: string };
+
+const ThankYou: React.FC<{ localeFromLoader?: 'en' | 'am' | null }> = ({ localeFromLoader }) => {
+    const { locale: contextLocale, localizePath } = useLocale();
+    const locale = localeFromLoader ?? contextLocale;
     const { t } = useTranslation();
-    const [media, setMedia] = useState(() => getContentMedia(locale));
+    const [media, setMedia] = useState<MediaState>({ welcomePdfUrl: '', welcomeVideoUrl: '' });
     const pdfLink = media.welcomePdfUrl;
 
     useEffect(() => {
         const apiUrl = getApiUrl();
-        if (apiUrl) {
-            fetch(`${apiUrl}/api/site-media?locale=${locale}`)
-                .then(res => res.ok ? res.json() : null)
-                .then(data => {
-                    if (data?.welcomePdfUrl || data?.welcomeVideoUrl) {
-                        setMedia(prev => ({
-                            welcomePdfUrl: data.welcomePdfUrl || prev.welcomePdfUrl,
-                            welcomeVideoUrl: data.welcomeVideoUrl || prev.welcomeVideoUrl
-                        }));
-                    }
-                })
-                .catch(() => {});
-        }
+        if (!apiUrl || !locale) return;
+        fetch(`${apiUrl}/api/site-media?locale=${locale}`)
+            .then(res => (res.ok ? res.json() : null))
+            .then((data: { welcomePdfUrl?: string; welcomeVideoUrl?: string } | null) => {
+                if (data?.welcomePdfUrl || data?.welcomeVideoUrl) {
+                    setMedia({
+                        welcomePdfUrl: data.welcomePdfUrl || '',
+                        welcomeVideoUrl: data.welcomeVideoUrl || ''
+                    });
+                }
+            })
+            .catch(() => {});
     }, [locale]);
 
-    // Auto-open PDF in new tab after 2 seconds
+    // Auto-open PDF in new tab after 2 seconds (only when we have link from API)
     useEffect(() => {
+        if (!pdfLink) return;
         const timer = setTimeout(() => {
             window.open(pdfLink, '_blank');
         }, 2000);
@@ -81,25 +83,27 @@ const ThankYou: React.FC = () => {
                         </p>
                     </AnimatedSection>
 
-                    {/* Wistia Video Embed */}
-                    <AnimatedSection
-                        className="rounded-card overflow-hidden mb-12 bg-surface/40 backdrop-blur-xl shadow-card hover:shadow-card-hover border border-border hover:border-primary/20 relative transition-all duration-300 hover:-translate-y-1"
-                        delayMs={120}
-                    >
-                        <div className="relative pb-[56.25%] h-0 overflow-hidden bg-black">
-                            <iframe
-                                src={media.welcomeVideoUrl}
-                                title="Welcome Video"
-                                allow="autoplay; fullscreen"
-                                allowFullScreen
-                                className="absolute inset-0 w-full h-full"
-                            />
-                        </div>
-                        <div className="absolute bottom-4 left-4 flex items-center gap-3 z-10 pointer-events-none">
-                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            <span className="text-xs font-mono uppercase tracking-widest text-foreground/70">{t('thankYou.welcomeCircle')}</span>
-                        </div>
-                    </AnimatedSection>
+                    {/* Wistia Video Embed — only from API (env) */}
+                    {media.welcomeVideoUrl && (
+                        <AnimatedSection
+                            className="rounded-card overflow-hidden mb-12 bg-surface/40 backdrop-blur-xl shadow-card hover:shadow-card-hover border border-border hover:border-primary/20 relative transition-all duration-300 hover:-translate-y-1"
+                            delayMs={120}
+                        >
+                            <div className="relative pb-[56.25%] h-0 overflow-hidden bg-black">
+                                <iframe
+                                    src={media.welcomeVideoUrl}
+                                    title="Welcome Video"
+                                    allow="autoplay; fullscreen"
+                                    allowFullScreen
+                                    className="absolute inset-0 w-full h-full"
+                                />
+                            </div>
+                            <div className="absolute bottom-4 left-4 flex items-center gap-3 z-10 pointer-events-none">
+                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                <span className="text-xs font-mono uppercase tracking-widest text-foreground/70">{t('thankYou.welcomeCircle')}</span>
+                            </div>
+                        </AnimatedSection>
+                    )}
 
                     {/* CTA Section */}
                     <AnimatedSection className="space-y-6 mb-24" delayMs={160}>
@@ -158,18 +162,20 @@ const ThankYou: React.FC = () => {
                                         </p>
                                     </div>
 
-                                    {/* Download Button */}
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-2">
-                                        <a
-                                            href={pdfLink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="px-8 py-4 bg-surfaceElevated hover:bg-surface/80 text-foreground border border-border rounded-lg font-bold flex items-center gap-3 transition-all duration-300 group/btn shadow-card hover:shadow-card-hover hover:scale-[1.02] active:scale-[0.98] hover:border-primary/30"
-                                        >
-                                            <span className="material-symbols-outlined text-primary group-hover/btn:translate-y-1 transition-transform">download</span>
-                                            {t('thankYou.downloadNow')}
-                                        </a>
-                                    </div>
+                                    {/* Download Button — only from API (env) */}
+                                    {pdfLink && (
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-2">
+                                            <a
+                                                href={pdfLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-8 py-4 bg-surfaceElevated hover:bg-surface/80 text-foreground border border-border rounded-lg font-bold flex items-center gap-3 transition-all duration-300 group/btn shadow-card hover:shadow-card-hover hover:scale-[1.02] active:scale-[0.98] hover:border-primary/30"
+                                            >
+                                                <span className="material-symbols-outlined text-primary group-hover/btn:translate-y-1 transition-transform">download</span>
+                                                {t('thankYou.downloadNow')}
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

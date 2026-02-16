@@ -240,7 +240,7 @@ const SiteNavbar: React.FC = () => {
 
             {/* Right Actions */}
             <div className="hidden md:flex items-center gap-3">
-              {!isAuthenticated && !location.pathname.startsWith('/admin') && (
+              {!isAuthenticated && !location.pathname.includes('admin2admin10') && (
                 <Link
                   to={locale === 'am' ? (location.pathname.replace(/^\/am/, '') || '/') : `/am${location.pathname}`}
                   className="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-border bg-surface/80 hover:bg-surface hover:border-primary/30 text-muted hover:text-foreground transition-colors"
@@ -408,7 +408,7 @@ const SiteNavbar: React.FC = () => {
                   </Link>
                 )}
 
-                {!isAuthenticated && !location.pathname.startsWith('/admin') && (
+                {!isAuthenticated && !location.pathname.includes('admin2admin10') && (
                 <Link
                   to={locale === 'am' ? (location.pathname.replace(/^\/am/, '') || '/') : `/am${location.pathname}`}
                   onClick={() => setIsMobileMenuOpen(false)}
