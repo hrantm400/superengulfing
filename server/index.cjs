@@ -1545,6 +1545,7 @@ app.get('/api/courses/my-courses', requireAuth, async (req, res) => {
             FROM enrollments e
             JOIN courses c ON c.id = e.course_id
             WHERE e.user_id = $1
+              AND COALESCE(c.locale, 'en') = (SELECT COALESCE(locale, 'en') FROM dashboard_users WHERE id = $1)
             ORDER BY e.enrolled_at DESC
         `, [userId]);
         const courses = result.rows.map(row => ({
@@ -1578,6 +1579,7 @@ app.get('/api/courses/resume', requireAuth, async (req, res) => {
             FROM enrollments e
             JOIN courses c ON c.id = e.course_id
             WHERE e.user_id = $1
+              AND COALESCE(c.locale, 'en') = (SELECT COALESCE(locale, 'en') FROM dashboard_users WHERE id = $1)
             ORDER BY e.enrolled_at DESC
         `, [userId]);
         if (enrolled.rows.length === 0) return res.json({ resume: null });
