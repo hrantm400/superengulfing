@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface RichTextEditorProps {
     value: string;
@@ -37,10 +38,10 @@ export function RichTextEditor({ value, onChange, placeholder, className = '', m
     if (!editor) {
         return (
             <div
-                className={`bg-background border border-border rounded-lg font-mono text-sm ${className}`}
+                className={`bg-background border border-border rounded-lg font-mono text-sm flex items-center justify-center min-h-[120px] ${className}`}
                 style={{ minHeight }}
             >
-                <div className="p-3 text-muted">Loading editor…</div>
+                <LoadingSpinner />
             </div>
         );
     }

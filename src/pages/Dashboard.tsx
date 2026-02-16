@@ -6,6 +6,7 @@ import { ProfileSection } from '../components/dashboard/ProfileSection';
 import { CertificateSection } from '../components/dashboard/CertificateSection';
 import { MagicCertificate } from '../components/cinematic/MagicCertificate';
 import AnimatedSection from '../components/ui/AnimatedSection';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { authFetch } from '../lib/api';
 import { useTranslation } from '../locales';
 import { User, ChevronDown, TestTube } from 'lucide-react';
@@ -119,7 +120,7 @@ const Dashboard: React.FC = () => {
     return (
       <div className="flex flex-col min-h-screen relative items-center justify-center">
         <div className="fixed inset-0 grid-bg pointer-events-none z-0" />
-        <p className="text-muted relative z-10">{t('dashboard.loading')}</p>
+        <LoadingSpinner fullPage />
       </div>
     );
   }

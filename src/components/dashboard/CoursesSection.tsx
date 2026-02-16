@@ -4,6 +4,7 @@ import { BookOpen, ChevronRight, Search, Play } from 'lucide-react';
 import { authFetch, getApiUrl } from '../../lib/api';
 import { useLocale } from '../../contexts/LocaleContext';
 import { useTranslation } from '../../locales';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
 export interface MyCourse {
   id: number;
@@ -164,24 +165,8 @@ export const CoursesSection: React.FC<CoursesSectionProps> = ({ embedded = false
 
   if (loading) {
     return (
-      <div className={`${space} animate-fade-in-up opacity-0 [animation-fill-mode:forwards]`} style={{ animationDelay: '0.15s' }}>
-        <div className={embedded ? 'flex items-center justify-between gap-3' : ''}>
-          <div>
-            <h2 className={`${titleSize} font-bold text-foreground mb-0.5`}>Courses</h2>
-            <p className={`${subTitleClass} text-muted`}>Your courses and progress</p>
-          </div>
-        </div>
-        <div className={`grid ${gridCols} ${gap}`}>
-          {[1, 2].slice(0, embedded ? 2 : 3).map((i) => (
-            <div key={i} className={`${cardRound} border border-border bg-surface/60 overflow-hidden animate-pulse`}>
-              <div className={`${thumbAspect} bg-surfaceElevated`} />
-              <div className={`${cardPadding} space-y-2`}>
-                <div className="h-4 w-3/4 bg-surfaceElevated rounded" />
-                <div className="h-3 w-full bg-surfaceElevated rounded" />
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className={`${space} animate-fade-in-up opacity-0 [animation-fill-mode:forwards] flex flex-col items-center justify-center min-h-[200px]`} style={{ animationDelay: '0.15s' }}>
+        <LoadingSpinner />
       </div>
     );
   }

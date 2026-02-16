@@ -7,6 +7,7 @@ import {
   IconX,
   IconInstagram,
 } from './SocialIcons';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
 
 const iconMap: Record<string, React.FC> = {
@@ -159,8 +160,8 @@ export const CertificateSection: React.FC<CertificateSectionProps> = ({
                   className="relative w-full h-auto block rounded-lg"
                 />
               ) : (
-                <div className="aspect-[600/800] max-h-[320px] flex items-center justify-center rounded-lg bg-surfaceElevated/80 text-muted text-sm">
-                  {t('dashboard.loading')}
+                <div className="aspect-[600/800] max-h-[320px] flex items-center justify-center rounded-lg bg-surfaceElevated/80">
+                  <LoadingSpinner />
                 </div>
               )}
             </div>

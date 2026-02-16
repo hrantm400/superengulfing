@@ -4,6 +4,7 @@ import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { AdminCourses } from '../components/admin/AdminCourses';
 import { RichTextEditor } from '../components/admin/RichTextEditor';
 import { getApiUrl } from '../lib/api';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface Subscriber {
     id: number;
@@ -966,6 +967,14 @@ const Admin: React.FC = () => {
             {label}
         </button>
     );
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+                <LoadingSpinner fullPage />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-background text-foreground flex pt-24 md:pt-28">
@@ -2054,7 +2063,9 @@ const Admin: React.FC = () => {
                                 </div>
                             </>
                         ) : (
-                            <p className="text-muted">Loading analytics...</p>
+                            <div className="flex justify-center py-8">
+                                <LoadingSpinner />
+                            </div>
                         )}
                     </div>
                 )}

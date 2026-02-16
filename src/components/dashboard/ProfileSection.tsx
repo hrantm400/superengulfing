@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Lock, Save } from 'lucide-react';
 import { authFetch } from '../../lib/api';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface Profile {
   id: number;
@@ -93,10 +94,8 @@ export const ProfileSection: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-surface rounded-card border border-border shadow-card p-8 animate-pulse">
-        <div className="h-6 bg-surfaceElevated rounded w-1/3 mb-6" />
-        <div className="h-4 bg-surfaceElevated rounded w-2/3 mb-4" />
-        <div className="h-10 bg-surfaceElevated rounded w-full" />
+      <div className="bg-surface rounded-card border border-border shadow-card p-8 flex items-center justify-center min-h-[200px]">
+        <LoadingSpinner />
       </div>
     );
   }

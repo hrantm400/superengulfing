@@ -253,10 +253,12 @@ const SiteNavbar: React.FC = () => {
                   href={telegramUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/5 text-xs font-semibold text-foreground hover:border-[#0088cc]/50 hover:bg-[#0088cc]/10 hover:text-[#0088cc] dark:hover:border-[#0088cc]/50 dark:hover:bg-[#0088cc]/10 transition-all duration-300 active:scale-[0.98]"
+                  className="tg-btn text-xs font-semibold"
                 >
-                  <TelegramIcon size={16} className="shrink-0" />
-                  {t('nav.ourCommunity')}
+                  <span className="svg-wrapper flex items-center">
+                    <TelegramIcon size={18} className="shrink-0" />
+                  </span>
+                  <span>Telegram</span>
                 </a>
               )}
               <button
@@ -371,10 +373,12 @@ const SiteNavbar: React.FC = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center justify-center gap-2 p-4 rounded-xl border border-neutral-200 dark:border-white/10 bg-[#0088cc]/5 text-[#0088cc] font-semibold hover:bg-[#0088cc]/10 transition-all active:scale-95"
+                    className="tg-btn w-full justify-center text-sm font-semibold"
                   >
-                    <TelegramIcon size={20} />
-                    {t('nav.ourCommunity')}
+                    <span className="svg-wrapper flex items-center">
+                      <TelegramIcon size={20} />
+                    </span>
+                    <span>Telegram</span>
                   </a>
                 )}
                 {isAuthenticated ? (

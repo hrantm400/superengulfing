@@ -4,6 +4,7 @@ import { PlayCircle, ChevronRight } from 'lucide-react';
 import { authFetch } from '../../lib/api';
 import { VideoEmbed } from '../VideoEmbed';
 import type { VideoType } from '../VideoEmbed';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface ResumeData {
   course_id: number;
@@ -37,8 +38,7 @@ export const NextVideoPanel: React.FC = () => {
   if (loading) {
     return (
       <div className="w-full lg:w-64 xl:w-72 shrink-0 border-t lg:border-t-0 lg:border-l border-border flex flex-col items-center justify-center p-5 bg-gradient-to-b from-surfaceElevated/80 to-surface/60 min-h-[200px]">
-        <div className="w-10 h-10 rounded-lg bg-surfaceElevated animate-pulse mb-3" />
-        <div className="h-3 w-20 bg-surfaceElevated rounded animate-pulse" />
+        <LoadingSpinner />
       </div>
     );
   }

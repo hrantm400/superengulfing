@@ -5,6 +5,7 @@ import { useTranslation } from '../locales';
 import { BookOpen, Check, Play, ChevronLeft, ChevronRight, CheckCircle, PlayCircle } from 'lucide-react';
 import { authFetch, getApiUrl } from '../lib/api';
 import { VideoEmbed } from '../components/VideoEmbed';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface Course {
   id: number;
@@ -142,7 +143,7 @@ const CoursePage: React.FC = () => {
       <div className="flex flex-col min-h-screen relative">
         <div className="fixed inset-0 grid-bg pointer-events-none z-0" />
         <div className="flex-1 relative z-10 pt-20 md:pt-24 px-4 md:px-6 lg:px-8 pb-4 md:pb-6 lg:pb-8 flex items-center justify-center">
-          <p className="text-muted">{t('course.loadingCourse')}</p>
+          <LoadingSpinner />
         </div>
       </div>
     );

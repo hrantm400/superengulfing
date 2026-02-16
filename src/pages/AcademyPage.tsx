@@ -4,6 +4,7 @@ import { useLocale } from '../contexts/LocaleContext';
 import { useTranslation } from '../locales';
 import { Search, Play, Filter, BookOpen, ChevronRight, Timer, Flame } from 'lucide-react';
 import { authFetch, getApiUrl } from '../lib/api';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface MyCourse {
   id: number;
@@ -158,7 +159,9 @@ const AcademyPage: React.FC = () => {
               </div>
 
               {loading ? (
-                <div className="glass-panel rounded-card p-8 text-center text-muted">{t('course.loadingCourse')}</div>
+                <div className="glass-panel rounded-card p-8 flex items-center justify-center min-h-[200px]">
+                  <LoadingSpinner />
+                </div>
               ) : (
                 <div className="space-y-6">
                   {/* Enrolled courses */}
