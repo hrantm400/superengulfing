@@ -1085,19 +1085,16 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
     const payCurrency = req.body && req.body.pay_currency;
     const customerEmail = (req.body && (req.body.customer_email || req.body.order_description)) || '';
 
-    // Only interested in our LS3MONTHOFF promo for now
-    const isLs3MonthOff = String(orderId || '').toUpperCase().includes('LS3MONTHOFF');
-
     const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
     if (!notifyTo) {
         console.warn('[nowpayments-ipn] NOWPAY_NOTIFY_EMAIL / SMTP_USER not set, skipping email notification');
     }
 
     try {
-        if (notifyTo && isLs3MonthOff) {
+        if (notifyTo) {
             const subjectBase = status === 'finished'
-                ? '✅ NOWPayments: LS3MONTHOFF payment finished'
-                : `ℹ️ NOWPayments: LS3MONTHOFF status = ${status || 'unknown'}`;
+                ? '✅ NOWPayments: payment finished'
+                : `ℹ️ NOWPayments: status = ${status || 'unknown'}`;
 
             const textLines = [
                 `NOWPayments IPN received for LS3MONTHOFF.`,
