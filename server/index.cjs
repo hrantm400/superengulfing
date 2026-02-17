@@ -18,6 +18,20 @@ const speakeasy = require('speakeasy');
 // Generate confirmation token
 const generateToken = () => crypto.randomBytes(32).toString('hex');
 
+// Small helper for structured login logging (no passwords!)
+function logLoginEvent(type, payload) {
+    try {
+        const base = typeof payload === 'object' && payload !== null ? payload : {};
+        const safe = {
+            ...base,
+            email: base.email ? String(base.email).toLowerCase() : undefined,
+        };
+        console.log(`[auth/login] ${type}`, safe);
+    } catch {
+        // ignore logging errors
+    }
+}
+
 // ==================== DISPOSABLE / BLOCKED EMAIL DOMAINS ====================
 // External blocklist file (updated by cron): server/data/disposable_email_blocklist.conf
 const DISPOSABLE_BLOCKLIST_PATH = path.join(__dirname, 'data', 'disposable_email_blocklist.conf');
@@ -251,6 +265,46 @@ app.delete('/api/blocked-email-domains/:domain', requireAdminAuth, async (req, r
         if (e && e.message && /blocked_email_domains/i.test(e.message)) {
             return res.status(500).json({ error: 'Run DB migration for blocked_email_domains' });
         }
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// Admin diagnostic: lookup dashboard user by email (no passwords returned)
+app.get('/api/admin/users/by-email', requireAdminAuth, async (req, res) => {
+    const rawEmail = req.query && req.query.email;
+    if (!rawEmail || typeof rawEmail !== 'string' || !rawEmail.trim()) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+    const email = rawEmail.trim().toLowerCase();
+    try {
+        const result = await pool.query(
+            `
+            SELECT
+              id,
+              email,
+              COALESCE(locale, 'en') AS locale,
+              password_hash IS NOT NULL AS has_password,
+              created_at,
+              updated_at
+            FROM dashboard_users
+            WHERE email = $1
+            `,
+            [email]
+        );
+        if (result.rows.length === 0) {
+            return res.json({ found: false });
+        }
+        const user = result.rows[0];
+        return res.json({
+            found: true,
+            id: user.id,
+            email: user.email,
+            locale: user.locale === 'am' ? 'am' : 'en',
+            has_password: user.has_password === true,
+            created_at: user.created_at || null,
+            updated_at: user.updated_at || null,
+        });
+    } catch (e) {
         return res.status(500).json({ error: e.message });
     }
 });
@@ -1629,21 +1683,28 @@ app.post('/api/dev-login', authLimiter, async (req, res) => {
 
 // POST /api/login - Login with email/password, return JWT
 app.post('/api/login', authLimiter, async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
     if (!email || !password) {
+        logLoginEvent('failure', { reason: 'missing_credentials', email });
         return res.status(400).json({ success: false, message: 'Email and password required' });
     }
+    const normalizedEmail = String(email).trim().toLowerCase();
     try {
-        const result = await pool.query('SELECT * FROM dashboard_users WHERE email = $1', [email.toLowerCase()]);
+        const result = await pool.query('SELECT * FROM dashboard_users WHERE email = $1', [normalizedEmail]);
         if (result.rows.length === 0) {
+            logLoginEvent('failure', { reason: 'user_not_found', email: normalizedEmail });
             return res.status(401).json({ success: false, message: 'Invalid email or password' });
         }
         const user = result.rows[0];
         if (!user.password_hash) {
+            logLoginEvent('failure', { reason: 'missing_password_hash', email: normalizedEmail, user_id: user.id });
             return res.status(401).json({ success: false, message: 'Invalid email or password' });
         }
         const valid = await bcrypt.compare(password, user.password_hash);
-        if (!valid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+        if (!valid) {
+            logLoginEvent('failure', { reason: 'wrong_password', email: normalizedEmail, user_id: user.id });
+            return res.status(401).json({ success: false, message: 'Invalid email or password' });
+        }
         const secret = process.env.JWT_SECRET || 'superengulfing-dashboard-secret';
         const token = jwt.sign(
             { email: user.email, sub: user.id },
@@ -1651,8 +1712,10 @@ app.post('/api/login', authLimiter, async (req, res) => {
             { expiresIn: '7d' }
         );
         const locale = (user.locale === 'am') ? 'am' : 'en';
+        logLoginEvent('success', { email: normalizedEmail, user_id: user.id, locale });
         res.json({ success: true, token, locale });
     } catch (error) {
+        logLoginEvent('error', { email: normalizedEmail, message: error.message });
         res.status(500).json({ success: false, message: error.message });
     }
 });

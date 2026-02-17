@@ -37,6 +37,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await authFetch('/api/me');
       if (res.status === 401) {
+        // JWT expired or invalid – clear token and mark session as expired for UX
+        if (typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.setItem('session_expired', '1');
+          } catch {
+            // ignore
+          }
+        }
         localStorage.removeItem('auth_token');
         setProfile(null);
         return;

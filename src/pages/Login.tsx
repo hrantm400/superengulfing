@@ -24,6 +24,20 @@ const Login: React.FC = () => {
         }
     }, [profile, navigate]);
 
+    // If session expired (JWT), show a clear message on the login screen.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            const expired = window.sessionStorage.getItem('session_expired');
+            if (expired === '1') {
+                window.sessionStorage.removeItem('session_expired');
+                setMessage('login.sessionExpired');
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email.trim() || !password) {

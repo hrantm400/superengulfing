@@ -337,6 +337,18 @@ const Admin: React.FC = () => {
     const [blockedEmailDomains, setBlockedEmailDomains] = useState<string[]>([]);
     const [blockedDomainInput, setBlockedDomainInput] = useState('');
     const [blockedDomainsBusy, setBlockedDomainsBusy] = useState(false);
+    // Debug: lookup dashboard user by email (password presence, locale, timestamps)
+    const [debugUserEmail, setDebugUserEmail] = useState('');
+    const [debugUserResult, setDebugUserResult] = useState<{
+        found: boolean;
+        id?: number;
+        email?: string;
+        locale?: string;
+        has_password?: boolean;
+        created_at?: string | null;
+        updated_at?: string | null;
+    } | null>(null);
+    const [debugUserLoading, setDebugUserLoading] = useState(false);
     const broadcastFileInputRef = useRef<HTMLInputElement>(null);
     const sequenceEmailFileInputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
@@ -2298,6 +2310,83 @@ const Admin: React.FC = () => {
                                         Save Affiliate Link
                                     </button>
                                 </div>
+                            </div>
+
+                            <div className="bg-surface rounded-xl p-6 border border-border">
+                                <h3 className="font-semibold mb-2">Debug user by email</h3>
+                                <p className="text-muted text-sm mb-4">
+                                    Quickly check if a dashboard user exists and whether a password is set. Helpful when users say their password &quot;stopped working&quot;.
+                                </p>
+                                <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                                    <input
+                                        type="email"
+                                        value={debugUserEmail}
+                                        onChange={(e) => setDebugUserEmail(e.target.value)}
+                                        placeholder="user@example.com"
+                                        className="flex-1 bg-background border border-border rounded-lg px-4 py-2"
+                                    />
+                                    <button
+                                        type="button"
+                                        disabled={debugUserLoading || !debugUserEmail.trim()}
+                                        onClick={async () => {
+                                            const email = debugUserEmail.trim();
+                                            if (!email) return;
+                                            setDebugUserLoading(true);
+                                            setDebugUserResult(null);
+                                            try {
+                                                const res = await fetchWithAdminAuth(
+                                                    `${getApiUrl()}/api/admin/users/by-email?email=${encodeURIComponent(email)}`
+                                                );
+                                                const data = await res.json().catch(() => ({}));
+                                                if (!res.ok) {
+                                                    setMessage(data.error || 'Failed to debug user');
+                                                    return;
+                                                }
+                                                setDebugUserResult(data);
+                                            } catch (e) {
+                                                setMessage('Failed to debug user');
+                                            } finally {
+                                                setDebugUserLoading(false);
+                                            }
+                                        }}
+                                        className="px-6 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm disabled:opacity-50"
+                                    >
+                                        {debugUserLoading ? 'Checking...' : 'Check'}
+                                    </button>
+                                </div>
+                                {debugUserResult && (
+                                    <div className="text-sm mt-2">
+                                        {!debugUserResult.found ? (
+                                            <p className="text-amber-400">User not found in dashboard_users.</p>
+                                        ) : (
+                                            <div className="space-y-1">
+                                                <p><span className="text-muted">ID:</span> {debugUserResult.id}</p>
+                                                <p><span className="text-muted">Email:</span> {debugUserResult.email}</p>
+                                                <p><span className="text-muted">Locale:</span> {debugUserResult.locale}</p>
+                                                <p>
+                                                    <span className="text-muted">Has password:</span>{' '}
+                                                    {debugUserResult.has_password ? (
+                                                        <span className="text-emerald-400 font-medium">YES</span>
+                                                    ) : (
+                                                        <span className="text-amber-400 font-medium">NO</span>
+                                                    )}
+                                                </p>
+                                                {debugUserResult.created_at && (
+                                                    <p>
+                                                        <span className="text-muted">Created:</span>{' '}
+                                                        {new Date(debugUserResult.created_at).toLocaleString()}
+                                                    </p>
+                                                )}
+                                                {debugUserResult.updated_at && (
+                                                    <p>
+                                                        <span className="text-muted">Updated:</span>{' '}
+                                                        {new Date(debugUserResult.updated_at).toLocaleString()}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="bg-surface rounded-xl p-6 border border-border">
