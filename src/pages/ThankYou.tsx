@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from '@remix-run/react';
 import { useLocale } from '../contexts/LocaleContext';
-import { getApiUrl } from '../lib/api';
 import { useTranslation } from '../locales';
 import AnimatedSection from '../components/ui/AnimatedSection';
 
@@ -15,9 +14,9 @@ const ThankYou: React.FC<{ localeFromLoader?: 'en' | 'am' | null }> = ({ localeF
     const pdfLink = media.welcomePdfUrl;
 
     useEffect(() => {
-        const apiUrl = getApiUrl();
-        if (!apiUrl || !locale) return;
-        fetch(`${apiUrl}/api/site-media?locale=${locale}`)
+        if (!locale) return;
+        // Use same-origin /api to avoid issues with API_URL misconfig or missing ENV on client.
+        fetch(`/api/site-media?locale=${locale}`)
             .then(res => (res.ok ? res.json() : null))
             .then((data: { welcomePdfUrl?: string; welcomeVideoUrl?: string } | null) => {
                 if (data?.welcomePdfUrl || data?.welcomeVideoUrl) {
