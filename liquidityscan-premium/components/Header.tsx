@@ -3,7 +3,7 @@ import { CandlestickChart } from 'lucide-react';
 
 export const Header: React.FC = () => {
   return (
-    <header className="w-full border-b border-white/5 bg-background-dark/90 backdrop-blur-xl shrink-0 z-50 sticky top-0">
+    <header className="w-full border-b border-white/5 bg-background-dark/90 backdrop-blur-xl shrink-0 z-10">
       <div className="flex items-center justify-between px-6 py-4 lg:px-12 max-w-[1600px] mx-auto w-full">
         {/* Logo Section */}
         <div className="flex items-center gap-3">

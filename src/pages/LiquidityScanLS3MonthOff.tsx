@@ -6,7 +6,7 @@ import { PricingCard } from '../../liquidityscan-premium/components/PricingCard'
 
 const LiquidityScanLS3MonthOff: React.FC = () => {
   return (
-    <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-primary selection:text-black">
+    <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-primary selection:text-black bg-[#050509] text-slate-100 pt-6 md:pt-8">
       {/* Background Layers */}
       <Background />
 
@@ -14,7 +14,7 @@ const LiquidityScanLS3MonthOff: React.FC = () => {
       <div className="relative z-10 flex flex-col h-full flex-grow">
         <Header />
 
-        <main className="flex-grow flex items-center justify-center py-12 lg:py-0">
+        <main className="flex-grow flex items-center justify-center py-10 lg:py-12">
           <div className="w-full max-w-[1400px] px-6 lg:px-12 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
             {/* Left Column: Text & Features */}
             <div className="order-2 lg:order-1">
