@@ -409,7 +409,7 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Description</label>
                 <p className="text-xs text-muted mb-1">Markdown supported (headings, lists, links, **bold**).</p>
-                <textarea value={courseForm.description} onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })} placeholder="Optional description" rows={3} className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none" />
+                <textarea value={courseForm.description} onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })} placeholder="Optional description (Markdown supported)" rows={10} className="w-full min-h-[220px] bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Image URL</label>
@@ -437,7 +437,7 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Description</label>
                 <p className="text-xs text-muted mb-1">Markdown supported.</p>
-                <textarea value={lessonForm.description} onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })} placeholder="Optional" rows={2} className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none" />
+                <textarea value={lessonForm.description} onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })} placeholder="Optional (Markdown supported)" rows={6} className="w-full min-h-[120px] bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Position</label>
