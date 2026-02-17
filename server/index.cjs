@@ -1042,6 +1042,118 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+// ==================== NOWPAYMENTS IPN WEBHOOK (LS3MONTHOFF) ====================
+// Verify HMAC signature from NOWPayments using IPN secret key
+function verifyNowPaymentsSignature(req) {
+    const secret = (process.env.NOWPAY_IPN_SECRET || '').trim();
+    if (!secret) return false;
+    const headerSig = (req.headers['x-nowpayments-sig'] || req.headers['x-nowpayments-signature'] || '').toString().trim();
+    if (!headerSig) return false;
+    const payload = JSON.stringify(req.body || {});
+    const computed = crypto.createHmac('sha512', secret).update(payload).digest('hex');
+    if (computed.length !== headerSig.length) return false;
+    try {
+        return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(headerSig, 'hex'));
+    } catch {
+        return false;
+    }
+}
+
+// IPN endpoint: NOWPayments will POST here on payment status changes
+app.post('/api/nowpayments-ipn', async (req, res) => {
+    // Basic logging for diagnostics (no secrets)
+    const safeLog = {
+        payment_id: req.body && req.body.payment_id,
+        order_id: req.body && req.body.order_id,
+        payment_status: req.body && req.body.payment_status,
+        pay_currency: req.body && req.body.pay_currency,
+        pay_amount: req.body && req.body.pay_amount,
+    };
+    console.log('[nowpayments-ipn] incoming', safeLog);
+
+    if (!verifyNowPaymentsSignature(req)) {
+        console.warn('[nowpayments-ipn] invalid signature, ignoring');
+        return res.status(401).json({ ok: false });
+    }
+
+    const status = (req.body && req.body.payment_status) || '';
+    const orderId = (req.body && req.body.order_id) || '';
+    const paymentId = (req.body && req.body.payment_id) || '';
+    const priceAmount = req.body && req.body.price_amount;
+    const priceCurrency = req.body && req.body.price_currency;
+    const payAmount = req.body && req.body.pay_amount;
+    const payCurrency = req.body && req.body.pay_currency;
+    const customerEmail = (req.body && (req.body.customer_email || req.body.order_description)) || '';
+
+    // Only interested in our LS3MONTHOFF promo for now
+    const isLs3MonthOff = String(orderId || '').toUpperCase().includes('LS3MONTHOFF');
+
+    const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
+    if (!notifyTo) {
+        console.warn('[nowpayments-ipn] NOWPAY_NOTIFY_EMAIL / SMTP_USER not set, skipping email notification');
+    }
+
+    try {
+        if (notifyTo && isLs3MonthOff) {
+            const subjectBase = status === 'finished'
+                ? '✅ NOWPayments: LS3MONTHOFF payment finished'
+                : `ℹ️ NOWPayments: LS3MONTHOFF status = ${status || 'unknown'}`;
+
+            const textLines = [
+                `NOWPayments IPN received for LS3MONTHOFF.`,
+                ``,
+                `Status: ${status}`,
+                `Order ID: ${orderId}`,
+                `Payment ID: ${paymentId}`,
+                ``,
+                `Price: ${priceAmount} ${priceCurrency}`,
+                `Paid: ${payAmount} ${payCurrency}`,
+                customerEmail ? `Customer email / note: ${customerEmail}` : '',
+                ``,
+                `Raw payload:`,
+                JSON.stringify(safeLog, null, 2),
+            ].filter(Boolean);
+
+            // 1) Уведомление админу
+            await transporter.sendMail({
+                from: process.env.MAIL_FROM || process.env.SMTP_USER,
+                to: notifyTo,
+                subject: subjectBase,
+                text: textLines.join('\n'),
+            });
+
+            // 2) Письмо пользователю (если есть email и платеж завершён)
+            const cleanedCustomerEmail = (customerEmail || '').toString().trim();
+            if (status === 'finished' && cleanedCustomerEmail && cleanedCustomerEmail.includes('@')) {
+                await transporter.sendMail({
+                    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+                    to: cleanedCustomerEmail,
+                    subject: 'Your LiquidityScan Premium access payment was received',
+                    text: [
+                        'Hi,',
+                        '',
+                        'Your payment for LiquidityScan Premium (LS3MONTHOFF offer) was received successfully.',
+                        '',
+                        `Payment ID: ${paymentId}`,
+                        `Order ID: ${orderId}`,
+                        `Amount: ${payAmount} ${payCurrency}`,
+                        '',
+                        'You will receive your access details as soon as the platform is ready.',
+                        '',
+                        '– SuperEngulfing',
+                    ].join('\n'),
+                });
+            }
+        }
+    } catch (err) {
+        console.error('[nowpayments-ipn] email notify error:', err && err.message);
+        // Do not fail webhook because of email issues
+    }
+
+    // Always respond 200 so NOWPayments treats webhook as delivered
+    return res.json({ ok: true });
+});
+
 // ==================== ADMIN TWO-STEP AUTH (TOTP / Google Authenticator) ====================
 // POST /api/admin-auth/request-code — password is one of the admin emails; return setupRequired + otpauthUrl if first time
 app.post('/api/admin-auth/request-code', async (req, res) => {

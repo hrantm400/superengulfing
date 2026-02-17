@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { Lock, X } from 'lucide-react';
 
-export const PricingCard: React.FC = () => {
+interface PricingCardProps {
+  customerEmail?: string;
+  orderId?: string;
+}
+
+export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId }) => {
   const [showWidget, setShowWidget] = useState(false);
   const btnText = "CLAIM MY 3 MONTHS";
 
@@ -222,17 +227,23 @@ export const PricingCard: React.FC = () => {
                 <X size={20} />
             </button>
             <div className="w-full flex justify-center bg-white h-[696px]">
-               <iframe 
-                  src="https://nowpayments.io/embeds/payment-widget?iid=5062386707" 
-                  width="410" 
-                  height="696" 
-                  frameBorder="0" 
-                  scrolling="no" 
-                  style={{ overflowY: 'hidden', maxWidth: '100%' }}
-                  title="Payment Widget"
-               >
-                  Can't load widget
-               </iframe>
+              <iframe
+                src={(() => {
+                  const base = 'https://nowpayments.io/embeds/payment-widget';
+                  const params = new URLSearchParams({ iid: '5062386707' });
+                  if (customerEmail) params.set('customer_email', customerEmail);
+                  if (orderId) params.set('order_id', orderId);
+                  return `${base}?${params.toString()}`;
+                })()}
+                width="410"
+                height="696"
+                frameBorder="0"
+                scrolling="no"
+                style={{ overflowY: 'hidden', maxWidth: '100%' }}
+                title="Payment Widget"
+              >
+                Can't load widget
+              </iframe>
             </div>
           </div>
         </div>

@@ -3,8 +3,13 @@ import { Background } from '../../liquidityscan-premium/components/Background';
 import { Header } from '../../liquidityscan-premium/components/Header';
 import { HeroContent } from '../../liquidityscan-premium/components/HeroContent';
 import { PricingCard } from '../../liquidityscan-premium/components/PricingCard';
+import { useUser } from '../contexts/UserContext';
 
 const LiquidityScanLS3MonthOff: React.FC = () => {
+  const { profile } = useUser();
+  const customerEmail = profile?.email || undefined;
+  const orderId = profile ? `LS3MONTHOFF_USER_${profile.id}` : 'LS3MONTHOFF_GUEST';
+
   return (
     <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-primary selection:text-black bg-[#050509] text-slate-100 pt-16 md:pt-20">
       {/* Background Layers */}
@@ -23,7 +28,7 @@ const LiquidityScanLS3MonthOff: React.FC = () => {
 
             {/* Right Column: Pricing & CTA */}
             <div className="order-1 lg:order-2 flex justify-center lg:justify-end w-full">
-              <PricingCard />
+              <PricingCard customerEmail={customerEmail} orderId={orderId} />
             </div>
           </div>
         </main>
