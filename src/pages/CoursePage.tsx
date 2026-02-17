@@ -6,7 +6,7 @@ import { BookOpen, Check, Play, ChevronLeft, ChevronRight, CheckCircle, PlayCirc
 import { authFetch, getApiUrl } from '../lib/api';
 import { VideoEmbed } from '../components/VideoEmbed';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import MarkdownContent from '../components/ui/MarkdownContent';
+import { DescriptionContent } from '../components/ui/HtmlContent';
 
 interface Course {
   id: number;
@@ -188,7 +188,7 @@ const CoursePage: React.FC = () => {
                 </div>
               </div>
               <div className="p-6 md:p-8">
-                <div className="mb-6">{course.description ? <MarkdownContent content={course.description} /> : <span className="text-muted">—</span>}</div>
+                <div className="mb-6">{course.description ? <DescriptionContent content={course.description} /> : <span className="text-muted">—</span>}</div>
                 <button
                   onClick={handleEnroll}
                   disabled={enrolling}
@@ -274,7 +274,7 @@ const CoursePage: React.FC = () => {
                       <span className="flex items-center gap-1 text-accent">Intermediate</span>
                     </div>
                     <div className="text-muted leading-relaxed text-sm md:text-base">
-                      {currentLesson.description ? <MarkdownContent content={currentLesson.description} /> : <span>{t('course.noDescription')}</span>}
+                      {currentLesson.description ? <DescriptionContent content={currentLesson.description} /> : <span>{t('course.noDescription')}</span>}
                     </div>
                     {!(progress[currentLesson.id]?.completed) && (
                       <button

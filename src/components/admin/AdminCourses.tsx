@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Plus, Pencil, Trash2, ListVideo, X } from 'lucide-react';
 import { getApiUrl } from '../../lib/api';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { RichTextEditor } from './RichTextEditor';
 
 const API_URL = getApiUrl();
 
@@ -408,8 +409,13 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Description</label>
-                <p className="text-xs text-muted mb-1">Markdown: <code className="bg-white/10 px-1 rounded">##</code> heading, <code className="bg-white/10 px-1 rounded">-</code> or <code className="bg-white/10 px-1 rounded">*</code> bullet, <code className="bg-white/10 px-1 rounded">**bold**</code>. Paste text and add these for nice layout.</p>
-                <textarea value={courseForm.description} onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })} placeholder="Optional description (Markdown supported)" rows={10} className="w-full min-h-[220px] bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y" />
+                <RichTextEditor
+                  value={courseForm.description}
+                  onChange={(html) => setCourseForm({ ...courseForm, description: html })}
+                  placeholder="Optional description. Paste from Google Docs — formatting is preserved."
+                  minHeight="220px"
+                  className="rounded-xl"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Image URL</label>
@@ -436,8 +442,13 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Description</label>
-                <p className="text-xs text-muted mb-1">Markdown: <code className="bg-white/10 px-1 rounded">##</code> heading, <code className="bg-white/10 px-1 rounded">-</code> bullet, <code className="bg-white/10 px-1 rounded">**bold**</code>.</p>
-                <textarea value={lessonForm.description} onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })} placeholder="Optional (Markdown supported)" rows={6} className="w-full min-h-[120px] bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y" />
+                <RichTextEditor
+                  value={lessonForm.description}
+                  onChange={(html) => setLessonForm({ ...lessonForm, description: html })}
+                  placeholder="Optional description. Paste from Google Docs — formatting is preserved."
+                  minHeight="140px"
+                  className="rounded-xl"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Position</label>
