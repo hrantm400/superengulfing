@@ -230,7 +230,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId
               <iframe
                 src={(() => {
                   const base = 'https://nowpayments.io/embeds/payment-widget';
-                  const params = new URLSearchParams({ iid: '5062386707' });
+                  const params = new URLSearchParams({ iid: '6123204707' });
                   if (customerEmail) params.set('customer_email', customerEmail);
                   if (orderId) params.set('order_id', orderId);
                   return `${base}?${params.toString()}`;
