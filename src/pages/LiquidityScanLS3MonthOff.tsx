@@ -6,7 +6,7 @@ import { PricingCard } from '../../liquidityscan-premium/components/PricingCard'
 
 const LiquidityScanLS3MonthOff: React.FC = () => {
   return (
-    <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-primary selection:text-black bg-[#050509] text-slate-100 pt-6 md:pt-8">
+    <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-primary selection:text-black bg-[#050509] text-slate-100 pt-16 md:pt-20">
       {/* Background Layers */}
       <Background />
 
