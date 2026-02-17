@@ -275,7 +275,7 @@ const IndicatorAccessCard: React.FC<IndicatorAccessCardProps> = ({
       </div>
 
       {/* Decorative BG — fixed width for symmetrical rectangle */}
-      <div className="h-40 sm:h-full sm:w-[38%] sm:min-w-[220px] sm:max-w-[320px] bg-cover bg-center relative border-t sm:border-t-0 sm:border-l border-border shrink-0 overflow-hidden" style={{ backgroundImage: 'url("/photo_2026-02-05_13-54-25.webp")', backgroundSize: '92%' }} />
+      <div className="h-40 sm:h-full sm:w-[38%] sm:min-w-[220px] sm:max-w-[320px] bg-cover bg-center relative border-t sm:border-t-0 sm:border-l border-border shrink-0 overflow-hidden" style={{ backgroundImage: 'url("/photo_2026-02-17_13-07-44.jpg")', backgroundSize: '92%' }} />
     </div>
   );
 };
