@@ -5,6 +5,7 @@ import { authFetch, getApiUrl } from '../../lib/api';
 import { useLocale } from '../../contexts/LocaleContext';
 import { useTranslation } from '../../locales';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import MarkdownContent from '../ui/MarkdownContent';
 
 export interface MyCourse {
   id: number;
@@ -359,7 +360,7 @@ export const CoursesSection: React.FC<CoursesSectionProps> = ({ embedded = false
                     </div>
                   </div>
                   <div className={`${cardPadding} border-t border-border`}>
-                    {!embedded && <p className="text-sm text-muted line-clamp-2 mb-3 min-h-[2.5rem]">{course.description || '—'}</p>}
+                    {!embedded && <div className="text-sm text-muted line-clamp-2 mb-3 min-h-[2.5rem]">{course.description ? <MarkdownContent content={course.description} /> : '—'}</div>}
                     <button
                       onClick={() => handleEnroll(course.id)}
                       disabled={enrollingId === course.id}

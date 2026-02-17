@@ -5,6 +5,7 @@ import { useTranslation } from '../locales';
 import { Search, Play, Filter, BookOpen, ChevronRight, Timer, Flame } from 'lucide-react';
 import { authFetch, getApiUrl } from '../lib/api';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import MarkdownContent from '../components/ui/MarkdownContent';
 
 interface MyCourse {
   id: number;
@@ -201,7 +202,7 @@ const AcademyPage: React.FC = () => {
                               {course.progress_percent >= 100 ? t('academy.done') : t('academy.level1')}
                             </span>
                           </div>
-                          <p className="text-muted text-sm line-clamp-2 mb-4">{course.description || 'No description.'}</p>
+                          <div className="text-muted text-sm line-clamp-2 mb-4">{course.description ? <MarkdownContent content={course.description} /> : 'No description.'}</div>
                         </div>
                         <div className="space-y-4">
                           <div className="flex items-center gap-6 text-xs text-muted font-mono">
@@ -256,7 +257,7 @@ const AcademyPage: React.FC = () => {
                               Level 1
                             </span>
                           </div>
-                          <p className="text-muted text-sm line-clamp-2 mb-4">{course.description || 'No description.'}</p>
+                          <div className="text-muted text-sm line-clamp-2 mb-4">{course.description ? <MarkdownContent content={course.description} /> : 'No description.'}</div>
                         </div>
                         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                           <div className="flex items-center gap-6 text-xs text-muted font-mono">

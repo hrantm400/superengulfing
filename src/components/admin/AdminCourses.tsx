@@ -408,6 +408,7 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Description</label>
+                <p className="text-xs text-muted mb-1">Markdown supported (headings, lists, links, **bold**).</p>
                 <textarea value={courseForm.description} onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })} placeholder="Optional description" rows={3} className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none" />
               </div>
               <div>
@@ -435,7 +436,8 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Description</label>
-                <input type="text" value={lessonForm.description} onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })} placeholder="Optional" className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+                <p className="text-xs text-muted mb-1">Markdown supported.</p>
+                <textarea value={lessonForm.description} onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })} placeholder="Optional" rows={2} className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Position</label>
