@@ -334,6 +334,9 @@ const Admin: React.FC = () => {
     const [message, setMessage] = useState('');
     const [affiliateLabel, setAffiliateLabel] = useState('');
     const [affiliateUrl, setAffiliateUrl] = useState('');
+    const [blockedEmailDomains, setBlockedEmailDomains] = useState<string[]>([]);
+    const [blockedDomainInput, setBlockedDomainInput] = useState('');
+    const [blockedDomainsBusy, setBlockedDomainsBusy] = useState(false);
     const broadcastFileInputRef = useRef<HTMLInputElement>(null);
     const sequenceEmailFileInputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
@@ -405,6 +408,14 @@ const Admin: React.FC = () => {
                     setAffiliateUrl(data.affiliate_url || '');
                 })
                 .catch(() => {});
+
+            fetchWithAdminAuth(`${getApiUrl()}/api/blocked-email-domains`)
+                .then(res => res.json())
+                .then(data => {
+                    const list = Array.isArray(data?.domains) ? data.domains : [];
+                    setBlockedEmailDomains(list.map((x: any) => String(x.domain || '')).filter(Boolean));
+                })
+                .catch(() => setBlockedEmailDomains([]));
         }
     }, [activeTab, adminAudienceLocale]);
 
@@ -2287,6 +2298,94 @@ const Admin: React.FC = () => {
                                         Save Affiliate Link
                                     </button>
                                 </div>
+                            </div>
+
+                            <div className="bg-surface rounded-xl p-6 border border-border">
+                                <h3 className="font-semibold mb-2">Blocked email domains</h3>
+                                <p className="text-muted text-sm mb-4">
+                                    Blocks disposable/temporary email domains for <span className="text-foreground font-medium">PDF subscribe</span> and <span className="text-foreground font-medium">Access request</span>.
+                                    Example: <code className="text-primary">tempmail.com</code>. This is global (works for both EN and AM).
+                                </p>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <input
+                                        type="text"
+                                        value={blockedDomainInput}
+                                        onChange={(e) => setBlockedDomainInput(e.target.value)}
+                                        placeholder="tempmail.com"
+                                        className="flex-1 bg-background border border-border rounded-lg px-4 py-2"
+                                    />
+                                    <button
+                                        type="button"
+                                        disabled={blockedDomainsBusy || !blockedDomainInput.trim()}
+                                        onClick={async () => {
+                                            const raw = blockedDomainInput.trim().toLowerCase();
+                                            if (!raw) return;
+                                            setBlockedDomainsBusy(true);
+                                            try {
+                                                const res = await fetchWithAdminAuth(`${getApiUrl()}/api/blocked-email-domains`, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ domain: raw }),
+                                                });
+                                                const data = await res.json().catch(() => ({}));
+                                                if (!res.ok) {
+                                                    setMessage(data.error || 'Failed to add domain');
+                                                    return;
+                                                }
+                                                setBlockedDomainInput('');
+                                                setBlockedEmailDomains((prev) => Array.from(new Set([...prev, raw])).sort());
+                                                setMessage('Blocked domain added');
+                                            } catch {
+                                                setMessage('Failed to add domain');
+                                            } finally {
+                                                setBlockedDomainsBusy(false);
+                                            }
+                                        }}
+                                        className="px-6 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm disabled:opacity-50"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+
+                                {blockedEmailDomains.length === 0 ? (
+                                    <p className="text-muted text-sm mt-4">No blocked domains yet.</p>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2 mt-4">
+                                        {blockedEmailDomains.map((d) => (
+                                            <span key={d} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surfaceElevated border border-border text-sm text-foreground">
+                                                <span className="font-mono text-xs">{d}</span>
+                                                <button
+                                                    type="button"
+                                                    disabled={blockedDomainsBusy}
+                                                    onClick={async () => {
+                                                        setBlockedDomainsBusy(true);
+                                                        try {
+                                                            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/blocked-email-domains/${encodeURIComponent(d)}`, {
+                                                                method: 'DELETE',
+                                                            });
+                                                            const data = await res.json().catch(() => ({}));
+                                                            if (!res.ok) {
+                                                                setMessage(data.error || 'Failed to remove domain');
+                                                                return;
+                                                            }
+                                                            setBlockedEmailDomains((prev) => prev.filter((x) => x !== d));
+                                                            setMessage('Blocked domain removed');
+                                                        } catch {
+                                                            setMessage('Failed to remove domain');
+                                                        } finally {
+                                                            setBlockedDomainsBusy(false);
+                                                        }
+                                                    }}
+                                                    className="text-muted hover:text-red-400 transition-colors"
+                                                    aria-label={`Remove ${d}`}
+                                                    title="Remove"
+                                                >
+                                                    ×
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="bg-surface rounded-xl p-6 border border-border">

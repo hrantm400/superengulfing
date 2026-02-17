@@ -18,6 +18,83 @@ const speakeasy = require('speakeasy');
 // Generate confirmation token
 const generateToken = () => crypto.randomBytes(32).toString('hex');
 
+// ==================== DISPOSABLE / BLOCKED EMAIL DOMAINS ====================
+// External blocklist file (updated by cron): server/data/disposable_email_blocklist.conf
+const DISPOSABLE_BLOCKLIST_PATH = path.join(__dirname, 'data', 'disposable_email_blocklist.conf');
+let disposableBlocklistCache = { mtimeMs: 0, set: new Set() };
+
+function loadDisposableBlocklist() {
+    try {
+        const st = fs.statSync(DISPOSABLE_BLOCKLIST_PATH);
+        if (st.mtimeMs === disposableBlocklistCache.mtimeMs && disposableBlocklistCache.set.size > 0) {
+            return disposableBlocklistCache.set;
+        }
+        const raw = fs.readFileSync(DISPOSABLE_BLOCKLIST_PATH, 'utf8');
+        const next = new Set();
+        for (const line of raw.split(/\r?\n/)) {
+            const t = line.trim().toLowerCase();
+            if (!t || t.startsWith('#')) continue;
+            // no '@' expected, but tolerate it
+            next.add(t.replace(/^@/, ''));
+        }
+        disposableBlocklistCache = { mtimeMs: st.mtimeMs, set: next };
+        return next;
+    } catch (_) {
+        // Missing file or unreadable: treat as empty list (cron may not be set up yet)
+        return disposableBlocklistCache.set || new Set();
+    }
+}
+
+function normalizeEmailDomain(email) {
+    try {
+        const s = String(email || '').trim().toLowerCase();
+        const at = s.lastIndexOf('@');
+        if (at < 0) return '';
+        return s.slice(at + 1).trim().replace(/^\.+|\.+$/g, '');
+    } catch {
+        return '';
+    }
+}
+
+function domainCandidates(domain) {
+    const parts = String(domain || '')
+        .trim()
+        .toLowerCase()
+        .split('.')
+        .map((p) => p.trim())
+        .filter(Boolean);
+    if (parts.length < 2) return [];
+    const out = [];
+    for (let i = 0; i < parts.length - 1; i++) {
+        out.push(parts.slice(i).join('.'));
+    }
+    return out;
+}
+
+async function isBlockedEmail(email) {
+    const domain = normalizeEmailDomain(email);
+    if (!domain) return false;
+    const candidates = domainCandidates(domain);
+    if (candidates.length === 0) return false;
+
+    const external = loadDisposableBlocklist();
+    for (const d of candidates) {
+        if (external.has(d)) return true;
+    }
+
+    // Internal admin-managed blocklist in DB (best-effort: don't break if table missing)
+    try {
+        const r = await pool.query('SELECT 1 FROM blocked_email_domains WHERE domain = ANY($1::text[]) LIMIT 1', [candidates]);
+        return r.rows.length > 0;
+    } catch (e) {
+        if (e && e.message && /blocked_email_domains/i.test(e.message)) {
+            // likely migration not applied yet
+            return false;
+        }
+        throw e;
+    }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -112,6 +189,71 @@ const requireAdminAuth = (req, res, next) => {
         return res.status(401).json({ error: 'Invalid or expired admin token' });
     }
 };
+
+// ==================== BLOCKED EMAIL DOMAINS (ADMIN) ====================
+// Internal blocklist managed from the Admin UI. Supplements the external disposable blocklist file.
+function normalizeDomainInput(raw) {
+    const s = String(raw || '').trim().toLowerCase();
+    if (!s) return '';
+    const withoutAt = s.includes('@') ? s.split('@').pop() : s;
+    return String(withoutAt || '').trim().replace(/^\.+|\.+$/g, '');
+}
+
+function isValidDomain(domain) {
+    if (!domain) return false;
+    if (domain.length > 255) return false;
+    if (!domain.includes('.')) return false;
+    if (/[\/\s]/.test(domain)) return false;
+    if (!/^[a-z0-9.-]+$/.test(domain)) return false;
+    return true;
+}
+
+app.get('/api/blocked-email-domains', requireAdminAuth, async (req, res) => {
+    try {
+        const r = await pool.query('SELECT domain, created_at FROM blocked_email_domains ORDER BY domain ASC');
+        return res.json({ domains: r.rows });
+    } catch (e) {
+        if (e && e.message && /blocked_email_domains/i.test(e.message)) {
+            return res.json({ domains: [], warning: 'Run DB migration for blocked_email_domains' });
+        }
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/blocked-email-domains', requireAdminAuth, async (req, res) => {
+    const domain = normalizeDomainInput(req.body && req.body.domain);
+    if (!isValidDomain(domain)) {
+        return res.status(400).json({ error: 'Invalid domain' });
+    }
+    try {
+        await pool.query(
+            'INSERT INTO blocked_email_domains (domain) VALUES ($1) ON CONFLICT (domain) DO NOTHING',
+            [domain]
+        );
+        return res.json({ success: true, domain });
+    } catch (e) {
+        if (e && e.message && /blocked_email_domains/i.test(e.message)) {
+            return res.status(500).json({ error: 'Run DB migration for blocked_email_domains' });
+        }
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/blocked-email-domains/:domain', requireAdminAuth, async (req, res) => {
+    const domain = normalizeDomainInput(req.params.domain);
+    if (!isValidDomain(domain)) {
+        return res.status(400).json({ error: 'Invalid domain' });
+    }
+    try {
+        await pool.query('DELETE FROM blocked_email_domains WHERE domain = $1', [domain]);
+        return res.json({ success: true, domain });
+    } catch (e) {
+        if (e && e.message && /blocked_email_domains/i.test(e.message)) {
+            return res.status(500).json({ error: 'Run DB migration for blocked_email_domains' });
+        }
+        return res.status(500).json({ error: e.message });
+    }
+});
 
 // Email attachments upload (admin): images and documents for broadcasts/sequences
 const storage = multer.diskStorage({
@@ -961,10 +1103,21 @@ app.post('/api/subscribe', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
     }
     const locale = (reqLocale === 'am' ? 'am' : 'en');
+    const emailNorm = String(email).toLowerCase().trim();
 
     try {
+        // Block disposable / temp mail domains
+        if (await isBlockedEmail(emailNorm)) {
+            return res.status(400).json({
+                success: false,
+                message: locale === 'am'
+                    ? 'Խնդրում ենք օգտագործել մշտական email (ժամանակավոր email-ները արգելված են):'
+                    : 'Please use a permanent email address (temporary emails are not allowed).',
+            });
+        }
+
         // Check if exists
-        const existing = await pool.query('SELECT id, confirmed_at FROM subscribers WHERE email = $1', [email.toLowerCase()]);
+        const existing = await pool.query('SELECT id, confirmed_at FROM subscribers WHERE email = $1', [emailNorm]);
 
         if (existing.rows.length > 0) {
             if (existing.rows[0].confirmed_at) {
@@ -980,7 +1133,7 @@ app.post('/api/subscribe', async (req, res) => {
         // Insert new subscriber with pending status
         const result = await pool.query(
             'INSERT INTO subscribers (email, first_name, source, status, confirmation_token, locale) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [email.toLowerCase(), first_name || null, source || 'website', 'pending', token, locale]
+            [emailNorm, first_name || null, source || 'website', 'pending', token, locale]
         );
 
         // Send confirmation email
@@ -1188,6 +1341,16 @@ app.post('/api/access-requests', async (req, res) => {
     const emailNorm = email.toLowerCase().trim();
     const locale = (reqLocale === 'am' ? 'am' : 'en');
     try {
+        // Block disposable / temp mail domains
+        if (await isBlockedEmail(emailNorm)) {
+            return res.status(400).json({
+                success: false,
+                message: locale === 'am'
+                    ? 'Խնդրում ենք օգտագործել մշտական email (ժամանակավոր email-ները արգելված են):'
+                    : 'Please use a permanent email address (temporary emails are not allowed).',
+            });
+        }
+
         const existingRequest = await pool.query(
             'SELECT id FROM access_requests WHERE LOWER(email) = $1 LIMIT 1',
             [emailNorm]
