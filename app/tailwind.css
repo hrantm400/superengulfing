@@ -163,6 +163,73 @@ body {
   line-height: 1.65;
 }
 
+/* Reddit-style markdown: clear blocks, no overlap, consistent spacing */
+.markdown-prose {
+  color: var(--muted);
+  line-height: 1.65;
+  word-wrap: break-word;
+}
+.markdown-prose > *:first-child { margin-top: 0 !important; }
+.markdown-prose > *:last-child { margin-bottom: 0 !important; }
+.markdown-prose p {
+  margin-top: 0;
+  margin-bottom: 0.85em;
+}
+.markdown-prose p:last-child { margin-bottom: 0; }
+.markdown-prose h1, .markdown-prose h2, .markdown-prose h3 {
+  color: var(--foreground);
+  font-weight: 700;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+.markdown-prose h1 { font-size: 1.25rem; }
+.markdown-prose h2 { font-size: 1.1rem; }
+.markdown-prose h3 { font-size: 1rem; }
+.markdown-prose ul, .markdown-prose ol {
+  margin-top: 0.6em;
+  margin-bottom: 0.85em;
+  padding-left: 1.5rem;
+}
+.markdown-prose ul { list-style-type: disc; }
+.markdown-prose ol { list-style-type: decimal; }
+.markdown-prose li {
+  margin-bottom: 0.35em;
+  line-height: 1.5;
+}
+.markdown-prose li:last-child { margin-bottom: 0; }
+.markdown-prose strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.markdown-prose a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+.markdown-prose a:hover { opacity: 0.9; }
+.markdown-prose code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.15em 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+}
+.markdown-prose pre {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 0.85em 0;
+}
+.markdown-prose pre code { background: none; padding: 0; }
+.markdown-prose blockquote {
+  border-left: 3px solid var(--primary);
+  opacity: 0.85;
+  padding-left: 1rem;
+  margin: 0.85em 0;
+  font-style: italic;
+  color: var(--muted);
+}
+
 .grid-bg {
   background-size: 40px 40px;
   background-image:
