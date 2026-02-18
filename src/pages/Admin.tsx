@@ -379,6 +379,7 @@ const Admin: React.FC = () => {
     // Live monitoring metrics (server / DB / users / traffic)
     const [liveMetrics, setLiveMetrics] = useState<AdminMetrics | null>(null);
     const [liveMetricsStatus, setLiveMetricsStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+    const [liveMetricsLastUpdated, setLiveMetricsLastUpdated] = useState<Date | null>(null);
     const liveMetricsTimerRef = useRef<number | null>(null);
 
     // Reject modal (reason required for Access and Indicator reject)
@@ -408,7 +409,7 @@ const Admin: React.FC = () => {
         }
     }, [activeTab]);
 
-    // Live monitoring: poll /api/admin/metrics while Monitoring таб активен
+    // Live monitoring: poll /api/admin/metrics every 2s while Monitoring tab is open
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
@@ -424,6 +425,7 @@ const Admin: React.FC = () => {
                     return;
                 }
                 setLiveMetrics(data as AdminMetrics);
+                setLiveMetricsLastUpdated(new Date());
                 setLiveMetricsStatus('idle');
             } catch {
                 setLiveMetricsStatus('error');
@@ -432,7 +434,7 @@ const Admin: React.FC = () => {
 
         if (activeTab === 'monitoring') {
             fetchMetrics();
-            const id = window.setInterval(fetchMetrics, 5000);
+            const id = window.setInterval(fetchMetrics, 2000);
             liveMetricsTimerRef.current = id;
             return () => {
                 if (liveMetricsTimerRef.current != null) {
@@ -442,7 +444,6 @@ const Admin: React.FC = () => {
             };
         }
 
-        // Cleanup when выходим с вкладки
         if (liveMetricsTimerRef.current != null) {
             window.clearInterval(liveMetricsTimerRef.current);
             liveMetricsTimerRef.current = null;
@@ -1216,9 +1217,16 @@ const Admin: React.FC = () => {
                 {activeTab === 'monitoring' && (
                     <div>
                         <h1 className="text-3xl font-bold mb-2">Live Monitoring</h1>
-                        <p className="text-muted text-sm mb-6">
-                            Approximate real-time view of active users, server load, and database connections. Updates every 5 seconds while this tab is open.
-                        </p>
+                        <div className="flex flex-wrap items-center gap-3 mb-6">
+                            <p className="text-muted text-sm">
+                                Real-time view of active users, server load, and database connections. Updates every 2 seconds while this tab is open.
+                            </p>
+                            {liveMetricsLastUpdated && (
+                                <span className="text-muted text-xs font-mono">
+                                    Last updated: {liveMetricsLastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+                                </span>
+                            )}
+                        </div>
 
                         {liveMetricsStatus === 'loading' && !liveMetrics && (
                             <div className="mb-4 text-sm text-muted">Loading metrics…</div>
@@ -1308,12 +1316,19 @@ const Admin: React.FC = () => {
                                 </div>
 
                                 <div className="bg-surface rounded-card p-6 border border-border shadow-card">
-                                    <h2 className="text-lg font-semibold mb-4">Notes</h2>
-                                    <ul className="list-disc list-inside text-sm text-muted space-y-1">
-                                        <li>Active users считаются по активности запросов за последние 5 и 15 минут.</li>
-                                        <li>CPU load — средняя нагрузка за 1 минуту по системе.</li>
-                                        <li>Requests/min и DB connections помогут понять, когда сайт подходит к пределам сервера.</li>
-                                    </ul>
+                                    <h2 className="text-lg font-semibold mb-4">What each metric means</h2>
+                                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                                        <div><dt className="font-medium text-foreground mb-0.5">Active users (5m / 15m)</dt><dd className="text-muted">Users who sent a request to the API in the last 5 or 15 minutes (logged-in activity).</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Requests/min</dt><dd className="text-muted">Number of HTTP requests to the API in the last minute.</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Total requests</dt><dd className="text-muted">Total requests since the API process was last restarted.</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Server load (CPU)</dt><dd className="text-muted">System load average over 1 minute (higher = busier CPU).</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Uptime</dt><dd className="text-muted">How long the API process has been running without restart.</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">DB connections (active / total)</dt><dd className="text-muted">Active = queries in progress; Total = all connections to PostgreSQL (including idle).</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Total system RAM</dt><dd className="text-muted">Total RAM on the server.</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Free system RAM</dt><dd className="text-muted">RAM not in use by any process.</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Node RSS</dt><dd className="text-muted">Total memory used by the API process (RSS).</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Node heap used</dt><dd className="text-muted">JavaScript heap memory used by the API process.</dd></div>
+                                    </dl>
                                 </div>
                             </div>
                         )}
