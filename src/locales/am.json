@@ -91,6 +91,8 @@
   "login.serverError": "ինչ-որ բան այն չէ: Խնդրում ենք փորձել կրկին:",
   "login.invalidResponse": "Սերվերի սխալ պատասխան:",
   "login.serverUnreachable": "Սերվերն անհասանելի է: Արդյո՞ք Backend-ը միացված է ճիշտ պորտին:",
+  "login.sessionExpired": "Ձեր աշխատաշրջանը ավարտվել է: Խնդրում ենք կրկին մուտք գործել:",
+  "login.tooManyAttempts": "Չափից շատ մուտքերի փորձ: Խնդրում ենք կրկին փորձել 15 րոպեից:",
   "setPassword.title": "Սահմանել գաղտնաբառ",
   "setPassword.subtitle": "Մուտքագրեք նոր գաղտնաբառ: Հղումը վավեր է 24 ժամ:",
   "setPassword.requestAccess": "Մուտքի հայտ",

@@ -91,6 +91,8 @@
   "login.serverError": "Something went wrong. Please try again.",
   "login.invalidResponse": "Invalid response from server.",
   "login.serverUnreachable": "Server unreachable. Is the backend running on the correct port?",
+  "login.sessionExpired": "Your session expired. Please log in again.",
+  "login.tooManyAttempts": "Too many login attempts. Please try again in 15 minutes.",
   "setPassword.title": "Set your password",
   "setPassword.subtitle": "Enter a new password. Link is valid for 24 hours.",
   "setPassword.requestAccess": "Request access",
