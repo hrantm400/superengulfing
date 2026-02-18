@@ -3737,24 +3737,24 @@ function wrapEmailTemplate(body, logId = null) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SuperEngulfing</title>
   <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f1f5f9; color: #0f172a; padding: 32px 16px; line-height: 1.6; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #ffffff; color: #000000; padding: 32px 16px; line-height: 1.6; }
     .wrapper { max-width: 560px; margin: 0 auto; }
     .card { background: #ffffff; border-radius: 16px; padding: 40px 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
     .header { text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #e2e8f0; }
     .logo { color: #059669; font-size: 22px; font-weight: 700; letter-spacing: 0.02em; }
-    .tagline { color: #64748b; font-size: 12px; margin-top: 4px; }
-    .content { color: #334155; font-size: 15px; }
-    .content h1 { color: #0f172a; font-size: 20px; font-weight: 600; margin: 0 0 16px 0; }
+    .tagline { color: #4b5563; font-size: 12px; margin-top: 4px; }
+    .content { color: #000000; font-size: 15px; }
+    .content h1 { color: #000000; font-size: 20px; font-weight: 600; margin: 0 0 16px 0; }
     .content p { margin: 0 0 14px 0; }
     .content ul { margin: 12px 0; padding-left: 20px; }
     .content li { margin-bottom: 6px; }
     .content a { color: #059669; text-decoration: none; }
     .content a:hover { text-decoration: underline; }
     .btn { display: inline-block; background: #059669; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px; margin: 8px 0; }
-    .footer { margin-top: 32px; text-align: center; color: #64748b; font-size: 12px; }
-    .footer a { color: #64748b; }
-    .muted { color: #64748b; font-size: 13px; }
-    .divider { height: 1px; background: #e2e8f0; margin: 24px 0; }
+    .footer { margin-top: 32px; text-align: center; color: #4b5563; font-size: 12px; }
+    .footer a { color: #4b5563; }
+    .muted { color: #4b5563; font-size: 13px; }
+    .divider { height: 1px; background: #e5e7eb; margin: 24px 0; }
   </style>
 </head>
 <body>

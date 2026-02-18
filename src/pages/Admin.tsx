@@ -750,6 +750,28 @@ const Admin: React.FC = () => {
         }
     };
 
+    const handleExportCsv = async () => {
+        try {
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/export`);
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setMessage(data.error || `Export failed (${res.status})`);
+                return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'subscribers.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            setMessage('Export failed');
+        }
+    };
+
     const fetchAll = async (localeOverride?: 'en' | 'am') => {
         const locale = localeOverride ?? adminAudienceLocale;
         setLoading(true);
@@ -1367,7 +1389,13 @@ const Admin: React.FC = () => {
                                     Import CSV
                                 </label>
                                 <button onClick={fetchAll} className="px-4 py-2 bg-surfaceElevated hover:bg-surface/80 rounded-lg">Refresh</button>
-                                <a href={`${getApiUrl()}/api/export`} className="px-4 py-2 bg-primary/20 text-primary rounded-lg">Export CSV</a>
+                                <button
+                                    type="button"
+                                    onClick={handleExportCsv}
+                                    className="px-4 py-2 bg-primary/20 text-primary rounded-lg"
+                                >
+                                    Export CSV
+                                </button>
                             </div>
                         </div>
 
