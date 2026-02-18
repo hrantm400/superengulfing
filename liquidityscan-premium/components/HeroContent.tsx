@@ -23,10 +23,16 @@ export const HeroContent: React.FC = () => {
       </div>
 
       {/* Headline */}
-      <h1 className="text-white text-5xl md:text-6xl lg:text-7xl font-black leading-[0.9] tracking-tighter mb-6 uppercase">
-        Stop Hunting <br/>
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-text-muted">Liquidity.</span> <br/>
-        <span className="text-primary drop-shadow-[0_0_20px_rgba(57,255,20,0.25)]">Let It Find You.</span>
+      <h1 className="text-5xl md:text-6xl lg:text-7xl font-black leading-[0.9] tracking-tight mb-6 uppercase">
+        <span className="block text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)]">
+          Stop Hunting
+        </span>
+        <span className="block text-primary drop-shadow-[0_0_28px_rgba(57,255,20,0.45)]">
+          Liquidity.
+        </span>
+        <span className="block text-[#facc15] drop-shadow-[0_0_28px_rgba(250,204,21,0.55)]">
+          Let It Find You.
+        </span>
       </h1>
 
       {/* Subhead */}

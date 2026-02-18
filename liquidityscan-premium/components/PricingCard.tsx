@@ -182,17 +182,29 @@ export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId
 
             {/* What Happens Next */}
             <div className="bg-white/[0.03] rounded-lg p-5 border border-white/5 mt-2">
-                <h4 className="text-white text-[10px] font-black uppercase tracking-widest mb-4 text-center border-b border-white/5 pb-2">What Happens Next:</h4>
-                <ul className="space-y-2.5">
+                <h4 className="text-white text-[10px] font-black uppercase tracking-widest mb-4 text-center border-b border-white/5 pb-2">
+                  What Happens Next:
+                </h4>
+                <ul className="space-y-3">
                     {[
                         "Complete payment ($49)",
                         "You're added to the early access list",
                         "Platform launches → Instant access",
                         "3 full months of Premium starts"
                     ].map((step, i) => (
-                        <li key={i} className="flex items-start gap-3 text-xs text-text-muted">
-                            <span className="text-black bg-primary size-4 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">{i + 1}</span>
-                            <span className="leading-snug">{step}</span>
+                        <li 
+                          key={i} 
+                          className="flex items-start gap-3 text-xs text-text-muted group"
+                        >
+                            <span className="relative shrink-0 mt-0.5">
+                              <span className="absolute inset-0 rounded-full bg-[#facc15]/20 blur-[6px] opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <span className="relative inline-flex items-center justify-center size-5 rounded-full bg-gradient-to-br from-[#facc15] to-[#f97316] text-black font-extrabold text-[9px] shadow-[0_0_12px_rgba(250,204,21,0.75)]">
+                                {i + 1}
+                              </span>
+                            </span>
+                            <span className="leading-snug group-hover:text-white transition-colors">
+                              {step}
+                            </span>
                         </li>
                     ))}
                 </ul>

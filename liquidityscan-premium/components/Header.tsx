@@ -19,8 +19,8 @@ export const Header: React.FC = () => {
         {/* Right Actions */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-text-muted bg-white/5 px-3 py-1.5 rounded-full border border-white/5">
-            <span className="block size-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_#39ff14]"></span>
-            <span>14 Spots Left</span>
+            <span className="block size-2 rounded-full bg-[#facc15] animate-pulse shadow-[0_0_10px_rgba(250,204,21,0.9)]"></span>
+            <span>16 Spots Left</span>
           </div>
         </div>
       </div>
