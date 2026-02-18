@@ -9,6 +9,7 @@ const { Pool } = require('pg');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const multer = require('multer');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -115,6 +116,64 @@ const PORT = process.env.PORT || 3001;
 // Trust proxy (Nginx etc. sets X-Forwarded-For); required for express-rate-limit behind reverse proxy
 app.set('trust proxy', 1);
 
+// ========== Lightweight in-memory request & user activity metrics ==========
+const requestMetrics = {
+    totalRequests: 0,
+    perMinuteTimestamps: []
+};
+
+const lastSeenByUserId = new Map();
+
+function recordRequestForMetrics() {
+    const now = Date.now();
+    requestMetrics.totalRequests += 1;
+    requestMetrics.perMinuteTimestamps.push(now);
+    const cutoff = now - 60 * 1000;
+    while (requestMetrics.perMinuteTimestamps.length && requestMetrics.perMinuteTimestamps[0] < cutoff) {
+        requestMetrics.perMinuteTimestamps.shift();
+    }
+}
+
+function getTrafficMetrics() {
+    const now = Date.now();
+    const cutoff = now - 60 * 1000;
+    requestMetrics.perMinuteTimestamps = requestMetrics.perMinuteTimestamps.filter((ts) => ts >= cutoff);
+    return {
+        totalRequests: requestMetrics.totalRequests,
+        requestsLastMinute: requestMetrics.perMinuteTimestamps.length
+    };
+}
+
+function markUserActive(userId) {
+    if (!userId) return;
+    try {
+        lastSeenByUserId.set(String(userId), Date.now());
+    } catch {
+        // ignore
+    }
+}
+
+function getActiveUsersCounts() {
+    const now = Date.now();
+    const windows = [5 * 60 * 1000, 15 * 60 * 1000];
+    const counts = [0, 0];
+    for (const ts of lastSeenByUserId.values()) {
+        const diff = now - ts;
+        if (diff <= windows[0]) counts[0] += 1;
+        if (diff <= windows[1]) counts[1] += 1;
+    }
+    return {
+        active5m: counts[0],
+        active15m: counts[1]
+    };
+}
+
+// Global middleware to count requests (cheap, no DB)
+app.use((req, res, next) => {
+    recordRequestForMetrics();
+    next();
+});
+
 // Middleware (20MB limit so certificate PNG base64 fits)
 const isProduction = process.env.NODE_ENV === 'production';
 app.use(cors(isProduction ? { origin: process.env.CORS_ORIGIN || 'https://your-domain.com' } : undefined));
@@ -172,6 +231,8 @@ const requireAuth = (req, res, next) => {
     try {
         const decoded = jwt.verify(token, jwtSecret);
         req.user = { id: decoded.sub, email: decoded.email };
+        // track activity for realtime metrics
+        markUserActive(decoded.sub);
         next();
     } catch (err) {
         return res.status(401).json({ error: 'Invalid or expired token' });
@@ -1032,6 +1093,80 @@ const pool = new Pool({
     database: process.env.DB_NAME || 'superengulfing_email',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'Hrant1996...'
+});
+
+// ==================== INTERNAL METRICS HELPERS (SERVER / DB / USERS) ====================
+function getSystemMetrics() {
+    const mem = process.memoryUsage();
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const load = os.loadavg ? os.loadavg()[0] || 0 : 0;
+    return {
+        uptimeSeconds: Math.floor(process.uptime()),
+        cpuLoad1m: Number(load.toFixed(2)),
+        totalMemBytes: totalMem,
+        freeMemBytes: freeMem,
+        processRssBytes: mem.rss,
+        processHeapUsedBytes: mem.heapUsed
+    };
+}
+
+let lastDbMetrics = null;
+let lastDbMetricsFetchedAt = 0;
+const DB_METRICS_TTL_MS = 5 * 1000;
+
+async function getDbMetrics() {
+    const now = Date.now();
+    if (lastDbMetrics && now - lastDbMetricsFetchedAt < DB_METRICS_TTL_MS) {
+        return lastDbMetrics;
+    }
+    try {
+        const q = await pool.query(
+            "SELECT count(*) FILTER (WHERE state = 'active') AS active, count(*) AS total FROM pg_stat_activity"
+        );
+        const row = q.rows[0] || {};
+        lastDbMetrics = {
+            activeConnections: parseInt(row.active, 10) || 0,
+            totalConnections: parseInt(row.total, 10) || 0
+        };
+        lastDbMetricsFetchedAt = now;
+        return lastDbMetrics;
+    } catch (e) {
+        console.error('[/api/admin/metrics] DB metrics error:', e.message || e);
+        lastDbMetrics = {
+            activeConnections: null,
+            totalConnections: null
+        };
+        lastDbMetricsFetchedAt = now;
+        return lastDbMetrics;
+    }
+}
+
+const metricsLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+app.get('/api/admin/metrics', requireAdminAuth, metricsLimiter, async (req, res) => {
+    try {
+        const [db, users, traffic] = await Promise.all([
+            getDbMetrics(),
+            Promise.resolve(getActiveUsersCounts()),
+            Promise.resolve(getTrafficMetrics())
+        ]);
+        const serverMetrics = getSystemMetrics();
+        return res.json({
+            server: serverMetrics,
+            db,
+            users,
+            traffic
+        });
+    } catch (e) {
+        console.error('[/api/admin/metrics] error:', e);
+        return res.status(500).json({ error: 'Failed to load metrics' });
+    }
 });
 
 // Email transporter setup

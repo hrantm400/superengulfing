@@ -120,6 +120,29 @@ interface IndicatorAccessRequest {
     indicator_requested_at: string | null;
 }
 
+interface AdminMetrics {
+    server: {
+        uptimeSeconds: number;
+        cpuLoad1m: number;
+        totalMemBytes: number;
+        freeMemBytes: number;
+        processRssBytes: number;
+        processHeapUsedBytes: number;
+    };
+    db: {
+        activeConnections: number | null;
+        totalConnections: number | null;
+    };
+    users: {
+        active5m: number;
+        active15m: number;
+    };
+    traffic: {
+        totalRequests: number;
+        requestsLastMinute: number;
+    };
+}
+
 const REJECT_REASON_TEMPLATES: { id: string; label: string; text: string }[] = [
     { id: 'verify', label: 'Could not verify (WEEX/account)', text: 'We could not verify your account / UID.' },
     { id: 'criteria', label: 'Does not meet criteria', text: 'Your application does not meet our current criteria.' },
@@ -257,7 +280,7 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
     const { fetchWithAdminAuth } = useAdminAuth();
     const urlAudienceAm = location.pathname.startsWith('/am') || new URLSearchParams(location.search).get('audience') === 'am';
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'settings' | 'courses'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'monitoring' | 'settings' | 'courses'>('dashboard');
     const [adminAudienceLocale, setAdminAudienceLocale] = useState<'en' | 'am'>(() => (urlAudienceAm ? 'am' : 'en'));
     const [stats, setStats] = useState<Stats>({ total: 0, today: 0, thisWeek: 0, emailsSent: 0 });
     const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -353,6 +376,11 @@ const Admin: React.FC = () => {
     const sequenceEmailFileInputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
 
+    // Live monitoring metrics (server / DB / users / traffic)
+    const [liveMetrics, setLiveMetrics] = useState<AdminMetrics | null>(null);
+    const [liveMetricsStatus, setLiveMetricsStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+    const liveMetricsTimerRef = useRef<number | null>(null);
+
     // Reject modal (reason required for Access and Indicator reject)
     const [rejectModal, setRejectModal] = useState<{ type: 'access'; id: number } | { type: 'indicator'; userId: number } | null>(null);
     const [rejectReason, setRejectReason] = useState<string>('');
@@ -379,6 +407,47 @@ const Admin: React.FC = () => {
             fetchAnalytics();
         }
     }, [activeTab]);
+
+    // Live monitoring: poll /api/admin/metrics while Monitoring таб активен
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const fetchMetrics = async () => {
+            try {
+                if (!liveMetrics) {
+                    setLiveMetricsStatus('loading');
+                }
+                const res = await fetchWithAdminAuth(`${getApiUrl()}/api/admin/metrics`);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    setLiveMetricsStatus('error');
+                    return;
+                }
+                setLiveMetrics(data as AdminMetrics);
+                setLiveMetricsStatus('idle');
+            } catch {
+                setLiveMetricsStatus('error');
+            }
+        };
+
+        if (activeTab === 'monitoring') {
+            fetchMetrics();
+            const id = window.setInterval(fetchMetrics, 5000);
+            liveMetricsTimerRef.current = id;
+            return () => {
+                if (liveMetricsTimerRef.current != null) {
+                    window.clearInterval(liveMetricsTimerRef.current);
+                    liveMetricsTimerRef.current = null;
+                }
+            };
+        }
+
+        // Cleanup when выходим с вкладки
+        if (liveMetricsTimerRef.current != null) {
+            window.clearInterval(liveMetricsTimerRef.current);
+            liveMetricsTimerRef.current = null;
+        }
+    }, [activeTab, fetchWithAdminAuth]);
 
     useEffect(() => {
         if (activeTab === 'accessRequests') {
@@ -974,6 +1043,25 @@ const Admin: React.FC = () => {
 
     const formatDate = (d: string) => new Date(d).toLocaleString();
 
+    const formatBytes = (bytes: number | null | undefined) => {
+        if (bytes == null) return '—';
+        const mb = bytes / (1024 * 1024);
+        if (mb < 1024) return `${mb.toFixed(1)} MB`;
+        const gb = mb / 1024;
+        return `${gb.toFixed(1)} GB`;
+    };
+
+    const formatUptime = (seconds: number | null | undefined) => {
+        if (!seconds && seconds !== 0) return '—';
+        const s = Math.floor(seconds);
+        const days = Math.floor(s / 86400);
+        const hours = Math.floor((s % 86400) / 3600);
+        const mins = Math.floor((s % 3600) / 60);
+        if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${mins}m`;
+        return `${mins}m`;
+    };
+
     /** Convert ISO date string to datetime-local input value (local time) */
     const toDatetimeLocal = (iso: string): string => {
         const d = new Date(iso);
@@ -1015,6 +1103,7 @@ const Admin: React.FC = () => {
                 <TabButton tab="broadcasts" icon="campaign" label="Broadcasts" />
                 <TabButton tab="sequences" icon="sync" label="Sequences" />
                 <TabButton tab="analytics" icon="analytics" label="Analytics" />
+                <TabButton tab="monitoring" icon="monitor_heart" label="Live Monitoring" />
                 <TabButton tab="accessRequests" icon="person_add" label="Access Requests" />
                 <TabButton tab="indicatorRequests" icon="trending_up" label="Indicator requests" />
                 <TabButton tab="courses" icon="school" label="Courses" />
@@ -1120,6 +1209,114 @@ const Admin: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* Live Monitoring */}
+                {activeTab === 'monitoring' && (
+                    <div>
+                        <h1 className="text-3xl font-bold mb-2">Live Monitoring</h1>
+                        <p className="text-muted text-sm mb-6">
+                            Approximate real-time view of active users, server load, and database connections. Updates every 5 seconds while this tab is open.
+                        </p>
+
+                        {liveMetricsStatus === 'loading' && !liveMetrics && (
+                            <div className="mb-4 text-sm text-muted">Loading metrics…</div>
+                        )}
+                        {liveMetricsStatus === 'error' && (
+                            <div className="mb-4 text-sm text-amber-400">
+                                Failed to load metrics. Check if you are logged in as admin and the API is reachable.
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-surface rounded-card p-5 border border-border shadow-card">
+                                <p className="text-xs uppercase tracking-wide text-muted mb-1">Active users (last 5 / 15 min)</p>
+                                <p className="text-3xl font-bold text-primary mb-1">
+                                    {liveMetrics ? liveMetrics.users.active5m : '—'}
+                                </p>
+                                <p className="text-xs text-muted">
+                                    15 min:{' '}
+                                    <span className="font-semibold text-foreground">
+                                        {liveMetrics ? liveMetrics.users.active15m : '—'}
+                                    </span>
+                                </p>
+                            </div>
+
+                            <div className="bg-surface rounded-card p-5 border border-border shadow-card">
+                                <p className="text-xs uppercase tracking-wide text-muted mb-1">Requests</p>
+                                <p className="text-3xl font-bold text-emerald-400 mb-1">
+                                    {liveMetrics ? liveMetrics.traffic.requestsLastMinute : '—'}/min
+                                </p>
+                                <p className="text-xs text-muted">
+                                    Total since restart:{' '}
+                                    <span className="font-semibold text-foreground">
+                                        {liveMetrics ? liveMetrics.traffic.totalRequests : '—'}
+                                    </span>
+                                </p>
+                            </div>
+
+                            <div className="bg-surface rounded-card p-5 border border-border shadow-card">
+                                <p className="text-xs uppercase tracking-wide text-muted mb-1">Server load</p>
+                                <p className="text-3xl font-bold text-amber-400 mb-1">
+                                    {liveMetrics ? liveMetrics.server.cpuLoad1m.toFixed(2) : '—'}
+                                </p>
+                                <p className="text-xs text-muted">
+                                    Uptime:{' '}
+                                    <span className="font-semibold text-foreground">
+                                        {liveMetrics ? formatUptime(liveMetrics.server.uptimeSeconds) : '—'}
+                                    </span>
+                                </p>
+                            </div>
+
+                            <div className="bg-surface rounded-card p-5 border border-border shadow-card">
+                                <p className="text-xs uppercase tracking-wide text-muted mb-1">DB connections</p>
+                                <p className="text-3xl font-bold text-cyan-400 mb-1">
+                                    {liveMetrics && liveMetrics.db.activeConnections != null ? liveMetrics.db.activeConnections : '—'}
+                                </p>
+                                <p className="text-xs text-muted">
+                                    Total:{' '}
+                                    <span className="font-semibold text-foreground">
+                                        {liveMetrics && liveMetrics.db.totalConnections != null ? liveMetrics.db.totalConnections : '—'}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+
+                        {liveMetrics && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-surface rounded-card p-6 border border-border shadow-card">
+                                    <h2 className="text-lg font-semibold mb-4">Memory</h2>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span>Total system RAM:</span>
+                                            <span className="font-mono">{formatBytes(liveMetrics.server.totalMemBytes)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Free system RAM:</span>
+                                            <span className="font-mono">{formatBytes(liveMetrics.server.freeMemBytes)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Node RSS:</span>
+                                            <span className="font-mono">{formatBytes(liveMetrics.server.processRssBytes)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Node heap used:</span>
+                                            <span className="font-mono">{formatBytes(liveMetrics.server.processHeapUsedBytes)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-surface rounded-card p-6 border border-border shadow-card">
+                                    <h2 className="text-lg font-semibold mb-4">Notes</h2>
+                                    <ul className="list-disc list-inside text-sm text-muted space-y-1">
+                                        <li>Active users считаются по активности запросов за последние 5 и 15 минут.</li>
+                                        <li>CPU load — средняя нагрузка за 1 минуту по системе.</li>
+                                        <li>Requests/min и DB connections помогут понять, когда сайт подходит к пределам сервера.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
