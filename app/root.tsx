@@ -13,6 +13,7 @@ import { UserProvider } from "../src/contexts/UserContext";
 import { LocaleProvider } from "../src/contexts/LocaleContext";
 import SetDocumentLang from "../src/components/SetDocumentLang";
 import ScrollToTop from "../src/components/ScrollToTop";
+import VisitorHeartbeat from "../src/components/VisitorHeartbeat";
 
 import tailwindStyles from "./tailwind.css?url";
 
@@ -130,6 +131,7 @@ export default function App() {
             <LocaleProvider>
               <SetDocumentLang />
               <ScrollToTop />
+              <VisitorHeartbeat />
               <Outlet />
             </LocaleProvider>
           </UserProvider>

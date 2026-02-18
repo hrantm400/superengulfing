@@ -141,6 +141,11 @@ interface AdminMetrics {
         totalRequests: number;
         requestsLastMinute: number;
     };
+    visitors?: {
+        online30s: number;
+        active5mAll: number;
+        active15mAll: number;
+    };
 }
 
 const REJECT_REASON_TEMPLATES: { id: string; label: string; text: string }[] = [
@@ -1237,9 +1242,18 @@ const Admin: React.FC = () => {
                             </div>
                         )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6">
                             <div className="bg-surface rounded-card p-5 border border-border shadow-card">
-                                <p className="text-xs uppercase tracking-wide text-muted mb-1">Active users (last 5 / 15 min)</p>
+                                <p className="text-xs uppercase tracking-wide text-muted mb-1">Online visitors (last 30s)</p>
+                                <p className="text-3xl font-bold text-emerald-400 mb-1">
+                                    {liveMetrics?.visitors ? liveMetrics.visitors.online30s : '—'}
+                                </p>
+                                <p className="text-xs text-muted">
+                                    All visitors (guests + logged-in) pinging the site.
+                                </p>
+                            </div>
+                            <div className="bg-surface rounded-card p-5 border border-border shadow-card">
+                                <p className="text-xs uppercase tracking-wide text-muted mb-1">Active logged-in users (5m / 15m)</p>
                                 <p className="text-3xl font-bold text-primary mb-1">
                                     {liveMetrics ? liveMetrics.users.active5m : '—'}
                                 </p>
@@ -1318,7 +1332,8 @@ const Admin: React.FC = () => {
                                 <div className="bg-surface rounded-card p-6 border border-border shadow-card">
                                     <h2 className="text-lg font-semibold mb-4">What each metric means</h2>
                                     <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                                        <div><dt className="font-medium text-foreground mb-0.5">Active users (5m / 15m)</dt><dd className="text-muted">Users who sent a request to the API in the last 5 or 15 minutes (logged-in activity).</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Online visitors (30s)</dt><dd className="text-muted">Unique visitors who pinged the site in the last 30 seconds (guests + logged-in).</dd></div>
+                                        <div><dt className="font-medium text-foreground mb-0.5">Active logged-in users (5m / 15m)</dt><dd className="text-muted">Users who sent a request to the API in the last 5 or 15 minutes (logged-in activity).</dd></div>
                                         <div><dt className="font-medium text-foreground mb-0.5">Requests/min</dt><dd className="text-muted">Number of HTTP requests to the API in the last minute.</dd></div>
                                         <div><dt className="font-medium text-foreground mb-0.5">Total requests</dt><dd className="text-muted">Total requests since the API process was last restarted.</dd></div>
                                         <div><dt className="font-medium text-foreground mb-0.5">Server load (CPU)</dt><dd className="text-muted">System load average over 1 minute (higher = busier CPU).</dd></div>

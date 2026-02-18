@@ -123,6 +123,10 @@ const requestMetrics = {
 };
 
 const lastSeenByUserId = new Map();
+const lastSeenByVisitorId = new Map();
+const VISITOR_ID_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h cleanup
+let lastVisitorCountsAt = 0;
+let cachedVisitorCounts = { online30s: 0, active5mAll: 0, active15mAll: 0 };
 
 function recordRequestForMetrics() {
     const now = Date.now();
@@ -168,6 +172,45 @@ function getActiveUsersCounts() {
     };
 }
 
+function markVisitorActive(visitorId) {
+    if (!visitorId || typeof visitorId !== 'string') return;
+    try {
+        lastSeenByVisitorId.set(String(visitorId).slice(0, 64), Date.now());
+    } catch {
+        // ignore
+    }
+}
+
+function getOnlineVisitorsCounts() {
+    const now = Date.now();
+    if (now - lastVisitorCountsAt < 1500) return cachedVisitorCounts;
+    lastVisitorCountsAt = now;
+    const w30s = 30 * 1000;
+    const w5m = 5 * 60 * 1000;
+    const w15m = 15 * 60 * 1000;
+    let online30s = 0, active5mAll = 0, active15mAll = 0;
+    for (const ts of lastSeenByVisitorId.values()) {
+        const diff = now - ts;
+        if (diff <= w30s) online30s += 1;
+        if (diff <= w5m) active5mAll += 1;
+        if (diff <= w15m) active15mAll += 1;
+    }
+    cachedVisitorCounts = { online30s, active5mAll, active15mAll };
+    return cachedVisitorCounts;
+}
+
+// Periodically prune old visitor entries so map does not grow unbounded
+setInterval(() => {
+    try {
+        const cutoff = Date.now() - VISITOR_ID_MAX_AGE_MS;
+        for (const [id, ts] of lastSeenByVisitorId.entries()) {
+            if (ts < cutoff) lastSeenByVisitorId.delete(id);
+        }
+    } catch {
+        // ignore
+    }
+}, 5 * 60 * 1000); // every 5 minutes
+
 // Global middleware to count requests (cheap, no DB)
 app.use((req, res, next) => {
     recordRequestForMetrics();
@@ -190,6 +233,22 @@ app.use('/uploads', express.static(uploadsDir));
 
 // Test: GET /api/ping returns 200 if this server is running (use to verify port 3001 is this app)
 app.get('/api/ping', (req, res) => res.json({ ok: true, message: 'Dashboard API' }));
+
+// POST /api/metrics/visitor-heartbeat - Anonymous visitor ping for online count (no auth)
+const visitorHeartbeatLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.post('/api/metrics/visitor-heartbeat', visitorHeartbeatLimiter, (req, res) => {
+    const visitorId = req.body && typeof req.body.visitorId === 'string' ? req.body.visitorId.trim() : '';
+    if (!visitorId || visitorId.length > 64 || !/^[a-z0-9-]+$/i.test(visitorId)) {
+        return res.status(400).json({ ok: false });
+    }
+    markVisitorActive(visitorId);
+    res.json({ ok: true });
+});
 
 // GET /api/site-media - Public: PDF and welcome video URLs per locale (for thank-you page)
 // Two different Wistia videos: EN and AM (aligned with src/contentMedia.ts)
@@ -1151,17 +1210,19 @@ const metricsLimiter = rateLimit({
 
 app.get('/api/admin/metrics', requireAdminAuth, metricsLimiter, async (req, res) => {
     try {
-        const [db, users, traffic] = await Promise.all([
+        const [db, users, traffic, visitors] = await Promise.all([
             getDbMetrics(),
             Promise.resolve(getActiveUsersCounts()),
-            Promise.resolve(getTrafficMetrics())
+            Promise.resolve(getTrafficMetrics()),
+            Promise.resolve(getOnlineVisitorsCounts())
         ]);
         const serverMetrics = getSystemMetrics();
         return res.json({
             server: serverMetrics,
             db,
             users,
-            traffic
+            traffic,
+            visitors
         });
     } catch (e) {
         console.error('[/api/admin/metrics] error:', e);
@@ -1652,12 +1713,13 @@ app.post('/api/access-requests', async (req, res) => {
             });
         }
 
+        // Block only if this email has a request still pending (rejected/accepted can re-apply)
         const existingRequest = await pool.query(
-            'SELECT id FROM access_requests WHERE LOWER(email) = $1 LIMIT 1',
+            'SELECT id, status FROM access_requests WHERE LOWER(email) = $1 ORDER BY created_at DESC LIMIT 1',
             [emailNorm]
         );
-        if (existingRequest.rows.length > 0) {
-            return res.status(409).json({ success: false, code: 'already_exists', message: 'This email already has an access request.' });
+        if (existingRequest.rows.length > 0 && existingRequest.rows[0].status === 'pending') {
+            return res.status(409).json({ success: false, code: 'already_exists', message: 'You already have a pending request.' });
         }
         const existingUser = await pool.query(
             'SELECT id FROM dashboard_users WHERE LOWER(email) = $1 LIMIT 1',
