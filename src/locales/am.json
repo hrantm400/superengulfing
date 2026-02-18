@@ -82,7 +82,7 @@
   "login.placeholderPassword": "Գաղտնաբառ",
   "login.button": "Մուտք գործել",
   "login.needAccess": "Մուտքի իրավունք չունե՞ք",
-  "login.accessPage": "Մուտքի ստացման էի",
+  "login.accessPage": "Գրանցվել հիմա",
   "login.errorRequired": "Խնդրում ենք մուտքագրել էլ. հասցեն և գաղտնաբառը:",
   "login.errorInvalid": "Սխալ էլ. հասցե կամ գաղտնաբառ:",
   "login.loggingIn": "Մուտք համակարգ...",
