@@ -133,16 +133,19 @@ app.use('/uploads', express.static(uploadsDir));
 app.get('/api/ping', (req, res) => res.json({ ok: true, message: 'Dashboard API' }));
 
 // GET /api/site-media - Public: PDF and welcome video URLs per locale (for thank-you page)
-const DEFAULT_WELCOME_VIDEO = 'https://fast.wistia.net/embed/iframe/bb9a8qt24g?videoFoam=true';
+// Two different Wistia videos: EN and AM (aligned with src/contentMedia.ts)
+const DEFAULT_WELCOME_VIDEO_EN = 'https://fast.wistia.net/embed/iframe/itbz1tz9q3?videoFoam=true';
+const DEFAULT_WELCOME_VIDEO_AM = 'https://fast.wistia.net/embed/iframe/xerm5log0a?videoFoam=true';
 const DEFAULT_PDF_LINK_EN = 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing'; // English: original Liquidity Sweep Cheatsheet
 const DEFAULT_PDF_LINK_AM = 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing';   // Armenian: set PDF_LINK_AM in server/.env for Armenian PDF
 app.get('/api/site-media', (req, res) => {
     const locale = (req.query.locale === 'am' ? 'am' : 'en');
     const pdfEnv = locale === 'am' ? (process.env.PDF_LINK_AM || process.env.PDF_LINK) : (process.env.PDF_LINK_EN || process.env.PDF_LINK);
     const videoEnv = locale === 'am' ? process.env.WELCOME_VIDEO_AM : process.env.WELCOME_VIDEO_EN;
+    const defaultVideo = locale === 'am' ? DEFAULT_WELCOME_VIDEO_AM : DEFAULT_WELCOME_VIDEO_EN;
     res.json({
         welcomePdfUrl: pdfEnv || (locale === 'am' ? DEFAULT_PDF_LINK_AM : DEFAULT_PDF_LINK_EN),
-        welcomeVideoUrl: videoEnv || DEFAULT_WELCOME_VIDEO
+        welcomeVideoUrl: videoEnv || defaultVideo
     });
 });
 
