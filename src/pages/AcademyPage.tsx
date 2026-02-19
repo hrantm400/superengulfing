@@ -25,6 +25,8 @@ interface CatalogCourse {
   image_url: string | null;
   created_at: string;
   lesson_count: string;
+  is_paid?: boolean;
+  price_display?: string | null;
 }
 
 type FilterPill = 'all' | 'in_progress' | 'completed' | 'available';
@@ -169,7 +171,7 @@ const AcademyPage: React.FC = () => {
                   {filteredEnrolled.map((course) => (
                     <Link
                       key={course.id}
-                      to={`/dashboard/courses/${course.id}`}
+                      to={localizePath(`/dashboard/courses/${course.id}`)}
                       className="glass-card-tech rounded-card p-6 flex flex-col md:flex-row gap-6 group relative overflow-hidden block"
                     >
                       <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-tech-blue to-transparent opacity-50" />
@@ -262,16 +264,29 @@ const AcademyPage: React.FC = () => {
                         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                           <div className="flex items-center gap-6 text-xs text-muted font-mono">
                             <span>{course.lesson_count || 0} Lessons</span>
+                            {course.is_paid && course.price_display && (
+                              <span className="text-primary font-medium">{course.price_display}</span>
+                            )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleEnrollAndGo(course.id)}
-                            disabled={enrollingId === course.id}
-                            className="px-6 py-2 rounded-btn bg-white/5 hover:bg-tech-blue/10 border border-border hover:border-tech-blue/50 text-foreground font-medium text-sm transition-all flex items-center gap-2 w-fit disabled:opacity-50"
-                          >
-                            {enrollingId === course.id ? t('dashboard.enrolling') : t('academy.enroll')}
-                            <ChevronRight className="w-4 h-4 text-tech-blue" />
-                          </button>
+                          {course.is_paid ? (
+                            <Link
+                              to={localizePath(`/dashboard/pay-course/${course.id}`)}
+                              className="px-6 py-2 rounded-btn bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary font-medium text-sm transition-all flex items-center gap-2 w-fit"
+                            >
+                              {t('dashboard.payAndGetAccess')}
+                              <ChevronRight className="w-4 h-4 text-primary" />
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleEnrollAndGo(course.id)}
+                              disabled={enrollingId === course.id}
+                              className="px-6 py-2 rounded-btn bg-white/5 hover:bg-tech-blue/10 border border-border hover:border-tech-blue/50 text-foreground font-medium text-sm transition-all flex items-center gap-2 w-fit disabled:opacity-50"
+                            >
+                              {enrollingId === course.id ? t('dashboard.enrolling') : t('academy.enroll')}
+                              <ChevronRight className="w-4 h-4 text-tech-blue" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
