@@ -112,7 +112,7 @@ const PayCoursePage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-[520px] mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-4 flex flex-col gap-2">
         <h1 className="text-2xl font-bold text-foreground">{t('dashboard.payForCourse')}</h1>
         <p className="text-muted">{course.title}</p>
