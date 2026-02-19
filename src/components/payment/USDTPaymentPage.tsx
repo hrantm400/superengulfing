@@ -374,6 +374,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
           </div>
         </div>
       </div>
+    </div>
   );
 };
 
