@@ -21,6 +21,7 @@ const PayCoursePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [widgetUrl, setWidgetUrl] = useState<string>('');
 
   useEffect(() => {
     if (!courseId) {
@@ -34,6 +35,14 @@ const PayCoursePage: React.FC = () => {
       .catch(() => setError('Course not found'))
       .finally(() => setLoading(false));
   }, [courseId]);
+
+  useEffect(() => {
+    if (!courseId || !course?.is_paid) return;
+    authFetch(`/api/course-payment-widget-url?course_id=${encodeURIComponent(courseId)}`)
+      .then((r) => r.json())
+      .then((data) => data.url && setWidgetUrl(data.url))
+      .catch(() => setWidgetUrl('https://nowpayments.io/embeds/payment-widget?iid=6065193944'));
+  }, [courseId, course?.is_paid]);
 
   const handleConfirmPayment = async () => {
     if (!courseId || !course) return;
@@ -88,16 +97,30 @@ const PayCoursePage: React.FC = () => {
     );
   }
 
+  const iframeSrc = widgetUrl || 'https://nowpayments.io/embeds/payment-widget?iid=6065193944';
+
   return (
-    <div className="max-w-lg mx-auto px-4 py-8">
+    <div className="max-w-[480px] mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-foreground mb-2">{t('dashboard.payForCourse')}</h1>
-      <p className="text-muted mb-6">{course.title}</p>
+      <p className="text-muted mb-4">{course.title}</p>
       {course.price_display && (
-        <p className="text-lg font-semibold text-foreground mb-6">
+        <p className="text-lg font-semibold text-foreground mb-4">
           {t('dashboard.price')}: {course.price_display}
         </p>
       )}
-      <p className="text-sm text-muted mb-6">
+
+      <div className="w-full max-w-[410px] mx-auto rounded-2xl overflow-hidden border border-border bg-surfaceElevated shadow-lg mb-6">
+        <iframe
+          src={iframeSrc}
+          title="Payment"
+          width="410"
+          height="696"
+          className="border-0 w-full max-w-[410px] h-[696px]"
+          style={{ overflowY: 'hidden' }}
+        />
+      </div>
+
+      <p className="text-sm text-muted mb-4">
         {t('dashboard.completePaymentThenConfirm')}
       </p>
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}

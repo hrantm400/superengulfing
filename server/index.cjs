@@ -1308,6 +1308,66 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
     const customerEmail = (req.body && (req.body.customer_email || req.body.order_description)) || '';
 
     const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
+    const fromAddr = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER;
+
+    // ——— Paid course: order_id format COURSE_<courseId>_USER_<userId> ———
+    const courseOrderMatch = orderId.match(/^COURSE_(\d+)_USER_(\d+)$/);
+    if (status === 'finished' && courseOrderMatch) {
+        const courseId = parseInt(courseOrderMatch[1], 10);
+        const userId = parseInt(courseOrderMatch[2], 10);
+        try {
+            const courseResult = await pool.query(
+                'SELECT id, title, is_paid FROM courses WHERE id = $1',
+                [courseId]
+            );
+            if (courseResult.rows.length > 0 && courseResult.rows[0].is_paid) {
+                const course = courseResult.rows[0];
+                await pool.query(
+                    `INSERT INTO course_payments (user_id, course_id, payment_id, status)
+                     VALUES ($1, $2, $3, 'completed')
+                     ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
+                    [userId, courseId, (paymentId && String(paymentId).trim()) || null]
+                );
+                await pool.query(
+                    'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
+                    [userId, courseId]
+                );
+                const userRow = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [userId]);
+                const userEmail = userRow.rows[0] && userRow.rows[0].email;
+                const courseTitle = course.title || 'Course';
+                if (userEmail) {
+                    await transporter.sendMail({
+                        from: fromAddr,
+                        to: userEmail,
+                        subject: `You have access to: ${courseTitle}`,
+                        text: `Your payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
+                    }).catch((err) => console.warn('[nowpayments-ipn] course user email failed:', err.message));
+                }
+                if (notifyTo) {
+                    await transporter.sendMail({
+                        from: fromAddr,
+                        to: notifyTo,
+                        subject: `Course payment (IPN): ${userEmail || userId} enrolled in "${courseTitle}"`,
+                        text: `NOWPayments IPN: User ${userEmail || userId} (id ${userId}) paid and was auto-enrolled in course "${courseTitle}" (id ${courseId}). Payment ID: ${paymentId}`,
+                    }).catch((err) => console.warn('[nowpayments-ipn] course admin email failed:', err.message));
+                }
+                console.log('[nowpayments-ipn] course auto-enrolled', { courseId, userId, orderId });
+            }
+        } catch (courseErr) {
+            console.error('[nowpayments-ipn] course enrollment error:', courseErr && courseErr.message);
+            if (notifyTo) {
+                await transporter.sendMail({
+                    from: fromAddr,
+                    to: notifyTo,
+                    subject: 'NOWPayments IPN: course enrollment failed',
+                    text: `order_id=${orderId} courseId=${courseOrderMatch[1]} userId=${courseOrderMatch[2]}\n\n${courseErr && courseErr.message}`,
+                }).catch(() => {});
+            }
+        }
+        return res.json({ ok: true });
+    }
+
+    // ——— LS3MONTHOFF (and other non-course orders): admin + optional user email ———
     if (!notifyTo) {
         console.warn('[nowpayments-ipn] NOWPAY_NOTIFY_EMAIL / SMTP_USER not set, skipping email notification');
     }
@@ -1333,19 +1393,17 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
                 JSON.stringify(safeLog, null, 2),
             ].filter(Boolean);
 
-            // 1) Уведомление админу
             await transporter.sendMail({
-                from: process.env.MAIL_FROM || process.env.SMTP_USER,
+                from: fromAddr,
                 to: notifyTo,
                 subject: subjectBase,
                 text: textLines.join('\n'),
             });
 
-            // 2) Письмо пользователю (если есть email и платеж завершён)
             const cleanedCustomerEmail = (customerEmail || '').toString().trim();
             if (status === 'finished' && cleanedCustomerEmail && cleanedCustomerEmail.includes('@')) {
                 await transporter.sendMail({
-                    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+                    from: fromAddr,
                     to: cleanedCustomerEmail,
                     subject: 'Your LiquidityScan Premium access payment was received',
                     text: [
@@ -1366,10 +1424,8 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
         }
     } catch (err) {
         console.error('[nowpayments-ipn] email notify error:', err && err.message);
-        // Do not fail webhook because of email issues
     }
 
-    // Always respond 200 so NOWPayments treats webhook as delivered
     return res.json({ ok: true });
 });
 
@@ -2258,6 +2314,32 @@ app.post('/api/enrollments', requireAuth, async (req, res) => {
             return res.json({ success: true });
         }
         res.status(500).json({ error: error.message });
+    }
+});
+
+// GET /api/course-payment-widget-url - Returns NOWPayments embed URL with order_id for webhook auto-enrollment (JWT).
+const NOWPAYMENTS_COURSE_WIDGET_IID = process.env.NOWPAYMENTS_COURSE_WIDGET_IID || '6065193944';
+app.get('/api/course-payment-widget-url', requireAuth, async (req, res) => {
+    const courseId = req.query.course_id;
+    if (!courseId) return res.status(400).json({ error: 'course_id required' });
+    const userId = req.user.id;
+    try {
+        const courseResult = await pool.query(
+            'SELECT id, title, is_paid FROM courses WHERE id = $1',
+            [courseId]
+        );
+        if (courseResult.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
+        if (!courseResult.rows[0].is_paid) return res.status(400).json({ error: 'Course is not paid' });
+        const orderId = `COURSE_${courseId}_USER_${userId}`;
+        const params = new URLSearchParams({ iid: NOWPAYMENTS_COURSE_WIDGET_IID, order_id: orderId });
+        const userRow = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [userId]);
+        const email = userRow.rows[0] && userRow.rows[0].email;
+        if (email) params.set('customer_email', email);
+        const url = `https://nowpayments.io/embeds/payment-widget?${params.toString()}`;
+        return res.json({ url });
+    } catch (e) {
+        console.error('[/api/course-payment-widget-url]', e);
+        return res.status(500).json({ error: e.message });
     }
 });
 
