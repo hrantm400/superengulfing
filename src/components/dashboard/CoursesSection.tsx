@@ -355,15 +355,15 @@ export const CoursesSection: React.FC<CoursesSectionProps> = ({ embedded = false
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                     <div className={`absolute bottom-0 left-0 right-0 ${embedded ? 'p-2' : 'p-4'}`}>
                       <span className={`inline-block px-2 py-0.5 rounded ${embedded ? 'text-[9px]' : 'text-[10px]'} font-bold uppercase tracking-wider bg-muted/30 text-muted border border-border`}>
-                        {locale === 'en' && course.is_paid ? t('dashboard.paid') : t('dashboard.available')}
+                        {course.is_paid ? t('dashboard.paid') : t('dashboard.available')}
                       </span>
                       <h3 className={`text-white mt-1 line-clamp-2 drop-shadow ${embedded ? 'text-sm font-semibold' : 'text-lg font-bold'}`}>{course.title}</h3>
-                      <p className="text-white/80 text-xs mt-0.5">{course.lesson_count || 0} {t('dashboard.lessons')}{locale === 'en' && course.is_paid && course.price_display ? ` · ${course.price_display}` : ''}</p>
+                      <p className="text-white/80 text-xs mt-0.5">{course.lesson_count || 0} {t('dashboard.lessons')}{course.is_paid && course.price_display ? ` · ${course.price_display}` : ''}</p>
                     </div>
                   </div>
                   <div className={`${cardPadding} border-t border-border`}>
                     {!embedded && <div className="text-sm text-muted line-clamp-2 mb-3 min-h-[2.5rem]">{course.description ? <DescriptionContent content={course.description} /> : '—'}</div>}
-                    {locale === 'en' && course.is_paid ? (
+                    {course.is_paid ? (
                       <Link
                         to={localizePath(`/dashboard/pay-course/${course.id}`)}
                         className={`w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow transition-colors ${embedded ? 'py-2 text-xs' : 'px-4 py-3 text-sm'}`}
