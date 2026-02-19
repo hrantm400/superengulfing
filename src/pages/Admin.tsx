@@ -2646,9 +2646,12 @@ const Admin: React.FC = () => {
 
                             <div className="bg-surface rounded-xl p-6 border border-border">
                                 <h3 className="font-semibold mb-2">Blocked email domains</h3>
-                                <p className="text-muted text-sm mb-4">
+                                <p className="text-muted text-sm mb-2">
                                     Blocks disposable/temporary email domains for <span className="text-foreground font-medium">PDF subscribe</span> and <span className="text-foreground font-medium">Access request</span>.
                                     Example: <code className="text-primary">tempmail.com</code>. This is global (works for both EN and AM).
+                                </p>
+                                <p className="text-muted text-xs mb-4">
+                                    If the blocklist has not been updated, run manually on the server: <code className="text-primary">./server/scripts/update_disposable_email_domains.sh</code>
                                 </p>
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <input

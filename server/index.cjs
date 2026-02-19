@@ -53,9 +53,13 @@ function loadDisposableBlocklist() {
             next.add(t.replace(/^@/, ''));
         }
         disposableBlocklistCache = { mtimeMs: st.mtimeMs, set: next };
+        console.log(`[blocklist] loaded ${next.size} disposable domains from ${DISPOSABLE_BLOCKLIST_PATH}`);
         return next;
     } catch (_) {
         // Missing file or unreadable: treat as empty list (cron may not be set up yet)
+        if (disposableBlocklistCache.set.size === 0) {
+            console.warn(`[blocklist] file not found or unreadable: ${DISPOSABLE_BLOCKLIST_PATH} (run scripts/update_disposable_email_domains.sh on server)`);
+        }
         return disposableBlocklistCache.set || new Set();
     }
 }
@@ -255,7 +259,7 @@ app.post('/api/metrics/visitor-heartbeat', visitorHeartbeatLimiter, (req, res) =
 const DEFAULT_WELCOME_VIDEO_EN = 'https://fast.wistia.net/embed/iframe/itbz1tz9q3?videoFoam=true';
 const DEFAULT_WELCOME_VIDEO_AM = 'https://fast.wistia.net/embed/iframe/xerm5log0a?videoFoam=true';
 const DEFAULT_PDF_LINK_EN = 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing'; // English: original Liquidity Sweep Cheatsheet
-const DEFAULT_PDF_LINK_AM = 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing';   // Armenian: set PDF_LINK_AM in server/.env for Armenian PDF
+const DEFAULT_PDF_LINK_AM = 'https://drive.google.com/file/d/1Y4yz845u2n7y8la2t9oaaieCUfnnq0A0/view?usp=sharing';   // Armenian PDF
 app.get('/api/site-media', (req, res) => {
     const locale = (req.query.locale === 'am' ? 'am' : 'en');
     const pdfEnv = locale === 'am' ? (process.env.PDF_LINK_AM || process.env.PDF_LINK) : (process.env.PDF_LINK_EN || process.env.PDF_LINK);
@@ -1040,6 +1044,25 @@ app.get('/share/c/:token', async (req, res) => {
 
 app.post('/api/me/send-certificate', requireAuth, async (req, res) => {
     try {
+        // Idempotency: if onboarding already completed, do not send certificate again (e.g. after F5 + clicking Done again)
+        let alreadyCompleted = false;
+        try {
+            const completedResult = await pool.query(
+                'SELECT onboarding_completed FROM dashboard_users WHERE id = $1',
+                [req.user.id]
+            );
+            if (completedResult.rows.length > 0 && completedResult.rows[0].onboarding_completed === true) {
+                alreadyCompleted = true;
+            }
+        } catch (e) {
+            if (e.message && /column "onboarding_completed" does not exist/i.test(e.message)) {
+                // migration not run yet, proceed as before
+            } else throw e;
+        }
+        if (alreadyCompleted) {
+            return res.json({ success: true });
+        }
+
         let email, firstName, locale;
         try {
             const userResult = await pool.query(
@@ -1470,6 +1493,8 @@ app.post('/api/subscribe', async (req, res) => {
     try {
         // Block disposable / temp mail domains
         if (await isBlockedEmail(emailNorm)) {
+            const domain = normalizeEmailDomain(emailNorm);
+            console.log(`[blocked-email] subscribe domain=${domain || emailNorm}`);
             return res.status(400).json({
                 success: false,
                 message: locale === 'am'
@@ -1705,6 +1730,8 @@ app.post('/api/access-requests', async (req, res) => {
     try {
         // Block disposable / temp mail domains
         if (await isBlockedEmail(emailNorm)) {
+            const domain = normalizeEmailDomain(emailNorm);
+            console.log(`[blocked-email] access-request domain=${domain || emailNorm}`);
             return res.status(400).json({
                 success: false,
                 message: locale === 'am'
@@ -2056,13 +2083,29 @@ app.get('/api/courses', async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT c.id, c.title, c.description, c.image_url, c.created_at,
+                   COALESCE(c.is_paid, false) AS is_paid,
+                   c.price_display,
                    (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count
             FROM courses c
             ${whereClause}
             ORDER BY c.created_at DESC
         `, params);
-        res.json({ courses: result.rows });
+        const rows = result.rows.map(r => ({
+            ...r,
+            is_paid: r.is_paid === true,
+            price_display: r.price_display || null
+        }));
+        res.json({ courses: rows });
     } catch (error) {
+        if (error.message && /column "is_paid" does not exist/i.test(error.message)) {
+            const result = await pool.query(`
+                SELECT c.id, c.title, c.description, c.image_url, c.created_at,
+                       (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count
+                FROM courses c ${whereClause} ORDER BY c.created_at DESC
+            `, params);
+            res.json({ courses: result.rows.map(r => ({ ...r, is_paid: false, price_display: null })) });
+            return;
+        }
         res.status(500).json({ error: error.message });
     }
 });
@@ -2165,28 +2208,114 @@ app.get('/api/courses/resume', requireAuth, async (req, res) => {
 app.get('/api/courses/:id', async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT id, title, description, image_url, created_at FROM courses WHERE id = $1',
+            'SELECT id, title, description, image_url, created_at, COALESCE(is_paid, false) AS is_paid, price_display FROM courses WHERE id = $1',
             [req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
-        res.json(result.rows[0]);
+        const row = result.rows[0];
+        res.json({ ...row, is_paid: row.is_paid === true, price_display: row.price_display || null });
     } catch (error) {
+        if (error.message && /column "is_paid" does not exist/i.test(error.message)) {
+            const result = await pool.query('SELECT id, title, description, image_url, created_at FROM courses WHERE id = $1', [req.params.id]);
+            if (result.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
+            res.json({ ...result.rows[0], is_paid: false, price_display: null });
+            return;
+        }
         res.status(500).json({ error: error.message });
     }
 });
 
-// POST /api/enrollments - Enroll in course (JWT)
+// POST /api/enrollments - Enroll in course (JWT). Paid courses require payment first (use POST /api/course-payment-complete after payment).
 app.post('/api/enrollments', requireAuth, async (req, res) => {
     const { course_id } = req.body;
     if (!course_id) return res.status(400).json({ error: 'course_id required' });
     try {
         const userId = req.user.id;
+        let coursePaid = false;
+        try {
+            const courseRow = await pool.query('SELECT is_paid FROM courses WHERE id = $1', [course_id]);
+            if (courseRow.rows.length > 0 && courseRow.rows[0].is_paid === true) coursePaid = true;
+        } catch (e) {
+            if (!e.message || !/column "is_paid" does not exist/i.test(e.message)) throw e;
+        }
+        if (coursePaid) {
+            const paid = await pool.query('SELECT 1 FROM course_payments WHERE user_id = $1 AND course_id = $2 LIMIT 1', [userId, course_id]);
+            if (paid.rows.length === 0) {
+                return res.status(403).json({ error: 'Pay first', code: 'paid_course' });
+            }
+        }
         await pool.query(
             'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
             [userId, course_id]
         );
         res.json({ success: true });
     } catch (error) {
+        if (error.message && /relation "course_payments" does not exist/i.test(error.message)) {
+            await pool.query(
+                'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
+                [req.user.id, course_id]
+            );
+            return res.json({ success: true });
+        }
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/course-payment-complete - After successful payment for a paid course (JWT). Enrolls user and sends emails.
+app.post('/api/course-payment-complete', requireAuth, async (req, res) => {
+    const { course_id, payment_id } = req.body;
+    if (!course_id) return res.status(400).json({ error: 'course_id required' });
+    const userId = req.user.id;
+    try {
+        const courseResult = await pool.query(
+            'SELECT id, title, is_paid FROM courses WHERE id = $1',
+            [course_id]
+        );
+        if (courseResult.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
+        const course = courseResult.rows[0];
+        const isPaid = course.is_paid === true;
+        if (!isPaid) return res.status(400).json({ error: 'Course is not paid' });
+
+        await pool.query(
+            `INSERT INTO course_payments (user_id, course_id, payment_id, status)
+             VALUES ($1, $2, $3, 'completed')
+             ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
+            [userId, course_id, (payment_id && String(payment_id).trim()) || null]
+        );
+        await pool.query(
+            'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
+            [userId, course_id]
+        );
+
+        const userRow = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [userId]);
+        const userEmail = userRow.rows[0] && userRow.rows[0].email;
+        const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
+        const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
+        const courseTitle = course.title || 'Course';
+
+        if (userEmail) {
+            await transporter.sendMail({
+                from: fromAddr,
+                to: userEmail,
+                subject: `You have access to: ${courseTitle}`,
+                text: `Your payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
+            }).catch((err) => console.warn('[course-payment-complete] user email failed:', err.message));
+        }
+        if (notifyTo) {
+            await transporter.sendMail({
+                from: fromAddr,
+                to: notifyTo,
+                subject: `Course payment: ${userEmail || userId} enrolled in "${courseTitle}"`,
+                text: `User ${userEmail || userId} (id ${userId}) completed payment and was enrolled in course "${courseTitle}" (id ${course_id}).`,
+            }).catch((err) => console.warn('[course-payment-complete] admin email failed:', err.message));
+        }
+
+        res.json({ success: true, enrolled: true });
+    } catch (error) {
+        if (error.message && /relation "course_payments" does not exist/i.test(error.message)) {
+            return res.status(500).json({ error: 'Run migration 028_paid_courses.sql' });
+        }
+        console.error('[/api/course-payment-complete]', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -2213,16 +2342,28 @@ app.put('/api/progress', requireAuth, async (req, res) => {
 
 // POST /api/courses - Create course (admin)
 app.post('/api/courses', requireAdminAuth, async (req, res) => {
-    const { title, description, image_url, locale: reqLocale } = req.body;
+    const { title, description, image_url, locale: reqLocale, is_paid, price_display } = req.body;
     const locale = (reqLocale === 'am' || reqLocale === 'en') ? reqLocale : 'en';
     if (!title || !title.trim()) return res.status(400).json({ error: 'title required' });
     try {
         const result = await pool.query(
-            'INSERT INTO courses (title, description, image_url, updated_at, locale) VALUES ($1, $2, $3, NOW(), $4) RETURNING *',
-            [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null, locale]
+            `INSERT INTO courses (title, description, image_url, updated_at, locale, is_paid, price_display)
+             VALUES ($1, $2, $3, NOW(), $4, COALESCE($5, false), $6) RETURNING *`,
+            [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null, locale, is_paid === true, (price_display != null && String(price_display).trim()) || null]
         );
-        res.status(201).json(result.rows[0]);
+        const row = result.rows[0];
+        if (row && (typeof row.is_paid === 'undefined')) row.is_paid = false;
+        if (row && (typeof row.price_display === 'undefined')) row.price_display = null;
+        res.status(201).json(row);
     } catch (error) {
+        if (error.message && /column "is_paid" does not exist/i.test(error.message)) {
+            const result = await pool.query(
+                'INSERT INTO courses (title, description, image_url, updated_at, locale) VALUES ($1, $2, $3, NOW(), $4) RETURNING *',
+                [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null, locale]
+            );
+            res.status(201).json({ ...result.rows[0], is_paid: false, price_display: null });
+            return;
+        }
         res.status(500).json({ error: error.message });
     }
 });
@@ -2230,7 +2371,7 @@ app.post('/api/courses', requireAdminAuth, async (req, res) => {
 // PUT /api/courses/:id - Update course (admin)
 app.put('/api/courses/:id', requireAdminAuth, async (req, res) => {
     const id = req.params.id;
-    const { title, description, image_url, locale: reqLocale } = req.body;
+    const { title, description, image_url, locale: reqLocale, is_paid, price_display } = req.body;
     if (!title || !title.trim()) return res.status(400).json({ error: 'title required' });
     try {
         const updates = ['title = $1', 'description = $2', 'image_url = $3', 'updated_at = NOW()'];
@@ -2239,14 +2380,27 @@ app.put('/api/courses/:id', requireAdminAuth, async (req, res) => {
             params.push(reqLocale);
             updates.push(`locale = $${params.length}`);
         }
+        params.push(is_paid === true, (price_display != null && String(price_display).trim()) || null);
+        updates.push(`is_paid = $${params.length}`, `price_display = $${params.length + 1}`);
         params.push(id);
         const result = await pool.query(
             `UPDATE courses SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *`,
             params
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
-        res.json(result.rows[0]);
+        const row = result.rows[0];
+        res.json({ ...row, is_paid: row.is_paid === true, price_display: row.price_display || null });
     } catch (error) {
+        if (error.message && /column "is_paid" does not exist/i.test(error.message)) {
+            const updates = ['title = $1', 'description = $2', 'image_url = $3', 'updated_at = NOW()'];
+            const params = [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null];
+            if (reqLocale === 'am' || reqLocale === 'en') { params.push(reqLocale); updates.push(`locale = $${params.length}`); }
+            params.push(id);
+            const result = await pool.query(`UPDATE courses SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+            if (result.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
+            res.json({ ...result.rows[0], is_paid: false, price_display: null });
+            return;
+        }
         res.status(500).json({ error: error.message });
     }
 });

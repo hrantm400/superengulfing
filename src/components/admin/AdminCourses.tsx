@@ -13,6 +13,8 @@ interface CourseRow {
   image_url: string | null;
   created_at: string;
   lesson_count: string;
+  is_paid?: boolean;
+  price_display?: string | null;
 }
 
 interface LessonRow {
@@ -40,7 +42,7 @@ interface AdminCoursesProps {
 export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAudienceLocale }) => {
   const { fetchWithAdminAuth } = useAdminAuth();
   const [courses, setCourses] = useState<CourseRow[]>([]);
-  const [courseForm, setCourseForm] = useState({ title: '', description: '', image_url: '' });
+  const [courseForm, setCourseForm] = useState({ title: '', description: '', image_url: '', is_paid: false, price_display: '' });
   const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [lessonsForCourseId, setLessonsForCourseId] = useState<number | null>(null);
@@ -90,13 +92,19 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
   const totalLessons = courses.reduce((acc, c) => acc + parseInt(c.lesson_count || '0', 10), 0);
 
   const openAddCourse = () => {
-    setCourseForm({ title: '', description: '', image_url: '' });
+    setCourseForm({ title: '', description: '', image_url: '', is_paid: false, price_display: '' });
     setEditingCourseId(null);
     setShowCourseModal(true);
   };
 
   const openEditCourse = (c: CourseRow) => {
-    setCourseForm({ title: c.title, description: c.description || '', image_url: c.image_url || '' });
+    setCourseForm({
+      title: c.title,
+      description: c.description || '',
+      image_url: c.image_url || '',
+      is_paid: c.is_paid === true,
+      price_display: c.price_display || '',
+    });
     setEditingCourseId(c.id);
     setShowCourseModal(true);
   };
@@ -115,6 +123,8 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
             title: courseForm.title.trim(),
             description: courseForm.description.trim() || null,
             image_url: courseForm.image_url.trim() || null,
+            is_paid: courseForm.is_paid,
+            price_display: courseForm.price_display.trim() || null,
           }),
         });
         setMessage('Course updated');
@@ -127,6 +137,8 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
             description: courseForm.description.trim() || null,
             image_url: courseForm.image_url.trim() || null,
             locale: adminAudienceLocale,
+            is_paid: courseForm.is_paid,
+            price_display: courseForm.price_display.trim() || null,
           }),
         });
         setMessage('Course created');
@@ -421,6 +433,16 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
                 <label className="block text-sm font-medium text-muted mb-1">Image URL</label>
                 <input type="text" value={courseForm.image_url} onChange={(e) => setCourseForm({ ...courseForm, image_url: e.target.value })} placeholder="https://..." className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
               </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="course-is-paid" checked={courseForm.is_paid} onChange={(e) => setCourseForm({ ...courseForm, is_paid: e.target.checked })} className="rounded border-border bg-background text-primary focus:ring-primary" />
+                <label htmlFor="course-is-paid" className="text-sm font-medium text-foreground">Paid course</label>
+              </div>
+              {courseForm.is_paid && (
+                <div>
+                  <label className="block text-sm font-medium text-muted mb-1">Price (display, e.g. 49 or $49)</label>
+                  <input type="text" value={courseForm.price_display} onChange={(e) => setCourseForm({ ...courseForm, price_display: e.target.value })} placeholder="49" className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button onClick={saveCourse} className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow transition-colors">Save</button>
                 <button onClick={() => setShowCourseModal(false)} className="px-4 py-2.5 rounded-xl bg-surfaceElevated hover:bg-surface/80 text-foreground font-medium transition-colors">Cancel</button>

@@ -8,10 +8,11 @@ interface FeatureMeta {
   imageUrl?: string;
 }
 
+// Thematic images per section: SE Pattern (candlestick/charts), RSI (analytics), ICT Bias (market structure)
 const featureMeta: FeatureMeta[] = [
-  { id: 'pattern', icon: 'psychology', spotlightNumber: '01', imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC_hpis_j7FIniv8-ZRESYecPgpLqftazrzBd5ppUauppsu6Wxra4EqnxaxwUPeMyeQ_em9tWb82plunauTRIpr6IKeTkooZ7M0SkNvxVLifGUu40KrdcuXuSs2d1Pztzb8-2vq48qhS0wTH1bCO5ynXntkvBOrwlWVYdqMywMYuSlWYwX_n8QXNE41RJWFrkV-BBDSyX5HbhrTbpNUtUY3a_aZ3H_py7DZ_OyBbPzvYY7XVnIYCAOTrKzWWHfDYeduiOXKHdbEhS8' },
-  { id: 'rsi', icon: 'analytics', spotlightNumber: '02', imageUrl: 'https://picsum.photos/800/600?grayscale' },
-  { id: 'ict', icon: 'query_stats', spotlightNumber: '03', imageUrl: 'https://picsum.photos/800/601?grayscale' },
+  { id: 'pattern', icon: 'psychology', spotlightNumber: '01', imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80' },
+  { id: 'rsi', icon: 'analytics', spotlightNumber: '02', imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80' },
+  { id: 'ict', icon: 'query_stats', spotlightNumber: '03', imageUrl: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80' },
 ];
 
 const LiqScanFeatureSpotlight: React.FC = () => {

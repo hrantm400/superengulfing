@@ -12,7 +12,7 @@ const en: ContentMedia = {
 
 const am: ContentMedia = {
   welcomeVideoUrl: 'https://fast.wistia.net/embed/iframe/xerm5log0a?videoFoam=true',
-  welcomePdfUrl: 'https://drive.google.com/file/d/1DEP8ABq-vjZfK1TWTYQkhJEAcSasqZn5/view?usp=sharing',
+  welcomePdfUrl: 'https://drive.google.com/file/d/1Y4yz845u2n7y8la2t9oaaieCUfnnq0A0/view?usp=sharing',
 };
 
 const contentMedia: Record<Locale, ContentMedia> = { en, am };
