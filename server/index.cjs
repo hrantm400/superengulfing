@@ -15,6 +15,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
 const speakeasy = require('speakeasy');
+const TronWeb = require('tronweb');
 
 // Generate confirmation token
 const generateToken = () => crypto.randomBytes(32).toString('hex');
@@ -431,6 +432,31 @@ app.get('/api/admin/users/by-email', requireAdminAuth, async (req, res) => {
             created_at: user.created_at || null,
             updated_at: user.updated_at || null,
         });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/admin/usdt/sweep-all', requireAdminAuth, async (req, res) => {
+    try {
+        const ordersRes = await pool.query(
+            `SELECT id, order_id, amount_usdt, deposit_address_id, swept_to_main
+             FROM usdt_orders
+             WHERE status = 'completed'
+               AND deposit_address_id IS NOT NULL
+               AND swept_to_main IS NOT TRUE`
+        );
+        const orders = ordersRes.rows;
+        const results = [];
+        for (const o of orders) {
+            try {
+                await sweepOrderToMainWallet(o, o.tx_hash || null);
+                results.push({ order_id: o.order_id, status: 'ok' });
+            } catch (e) {
+                results.push({ order_id: o.order_id, status: 'error', message: e.message || String(e) });
+            }
+        }
+        return res.json({ count: orders.length, results });
     } catch (e) {
         return res.status(500).json({ error: e.message });
     }
@@ -2345,10 +2371,81 @@ app.get('/api/course-payment-widget-url', requireAuth, async (req, res) => {
 
 // ==================== USDT TRC20 PAYMENT (self-hosted) ====================
 const USDT_TRC20_WALLET = process.env.USDT_TRC20_WALLET_ADDRESS || 'TRXj2ShUse4vpYxQhqaJz8dM7WscUzhARB';
+const USDT_MAIN_WALLET = USDT_TRC20_WALLET;
 const USDT_TRC20_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 const USDT_DECIMALS = 6;
 const LIQUIDITYSCAN_BASE_USD = 43.01;
 const COURSE_BASE_USD = 59.01;
+const TRON_FULLNODE_URL = process.env.TRON_FULLNODE_URL || 'https://api.trongrid.io';
+const TRONGRID_API_KEY = process.env.TRONGRID_API_KEY || '';
+
+function createTronWebForPrivateKey(privateKey) {
+    if (!privateKey) {
+        throw new Error('Missing private key for TronWeb client');
+    }
+    const opts = {
+        fullHost: TRON_FULLNODE_URL,
+        privateKey,
+    };
+    if (TRONGRID_API_KEY) {
+        opts.headers = { 'TRON-PRO-API-KEY': TRONGRID_API_KEY };
+    }
+    return new TronWeb(opts);
+}
+
+async function createDepositAddressRecord(client) {
+    const account = await TronWeb.createAccount();
+    const address = (account.address && (account.address.base58 || account.address)) || account.addressBase58 || account.addressHex || '';
+    const privateKey = account.privateKey;
+    if (!address || !privateKey) {
+        throw new Error('Failed to generate USDT deposit address');
+    }
+    const insert = await client.query(
+        `INSERT INTO usdt_deposit_addresses (address, private_key, status)
+         VALUES ($1, pgp_sym_encrypt($2, current_setting('app.usdt_key', true)), 'free')
+         ON CONFLICT (address) DO UPDATE SET address = EXCLUDED.address
+         RETURNING id, address`,
+        [address, privateKey]
+    );
+    return insert.rows[0];
+}
+
+async function allocateDepositAddressForOrder(orderDbId) {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        let addr = await client.query(
+            `SELECT id, address FROM usdt_deposit_addresses
+             WHERE status = 'free'
+             ORDER BY id
+             LIMIT 1
+             FOR UPDATE SKIP LOCKED`
+        );
+        let row = addr.rows[0];
+        if (!row) {
+            row = await createDepositAddressRecord(client);
+        }
+        await client.query(
+            `UPDATE usdt_deposit_addresses
+             SET status = 'assigned', assigned_at = NOW(), last_used_at = NOW()
+             WHERE id = $1`,
+            [row.id]
+        );
+        await client.query(
+            `UPDATE usdt_orders
+             SET deposit_address_id = $1
+             WHERE id = $2`,
+            [row.id, orderDbId]
+        );
+        await client.query('COMMIT');
+        return row.address;
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+}
 
 // Optional auth: set req.user if valid token, otherwise req.user = null
 const optionalAuth = (req, res, next) => {
@@ -2399,12 +2496,15 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
     const centsOffset = isTest ? 0 : (simpleHash(orderId) % 99) * 0.01;
     const amountUsdt = Math.round((baseAmount + centsOffset) * 100) / 100;
 
+    let orderDbId = null;
     try {
-        await pool.query(
+        const insert = await pool.query(
             `INSERT INTO usdt_orders (order_id, product_type, product_id, user_id, email, amount_usdt, status)
-             VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
+             VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+             RETURNING id`,
             [orderId, product_type, product_id || null, userId, userEmail || null, amountUsdt]
         );
+        orderDbId = insert.rows[0] && insert.rows[0].id;
     } catch (e) {
         if (e.message && /usdt_orders/i.test(e.message)) {
             return res.status(500).json({ error: 'USDT orders table not ready. Run: npm run migrate:usdt' });
@@ -2412,12 +2512,22 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
         throw e;
     }
 
-    const qrAddress = USDT_TRC20_WALLET;
-    const qrPayment = `tron:${USDT_TRC20_WALLET}?amount=${amountUsdt}&token=USDT`;
+    let depositAddress = null;
+    try {
+        if (orderDbId != null) {
+            depositAddress = await allocateDepositAddressForOrder(orderDbId);
+        }
+    } catch (e) {
+        console.warn('[usdt] failed to allocate deposit address, falling back to main wallet:', e.message);
+    }
+
+    const addressForPayment = depositAddress || USDT_TRC20_WALLET;
+    const qrAddress = addressForPayment;
+    const qrPayment = `tron:${addressForPayment}?amount=${amountUsdt}&token=USDT`;
 
     return res.json({
         order_id: orderId,
-        address: USDT_TRC20_WALLET,
+        address: addressForPayment,
         amount: amountUsdt,
         amount_display: amountUsdt.toFixed(2),
         qr_address: qrAddress,
@@ -2447,96 +2557,163 @@ app.get('/api/usdt/orders/:orderId/status', async (req, res) => {
     }
 });
 
-// TronGrid polling: fetch USDT TRC20 incoming txs, match to pending orders, grant access
-async function processUsdtPayments() {
-    if (!USDT_TRC20_WALLET) return;
+async function sweepOrderToMainWallet(match, txHash) {
+    if (!match || !match.deposit_address_id) return;
     try {
-        const url = `https://api.trongrid.io/v1/accounts/${encodeURIComponent(USDT_TRC20_WALLET)}/transactions/trc20?only_confirmed=true&limit=50&contract_address=${USDT_TRC20_CONTRACT}&only_to=true&order_by=block_timestamp,desc`;
-        const resp = await fetch(url);
-        if (!resp.ok) return;
-        const data = await resp.json();
-        const txs = (data.data || []).filter((t) => (t.token_info || {}).address === USDT_TRC20_CONTRACT && (t.type || '') === 'Transfer');
-        const pending = await pool.query('SELECT id, order_id, product_type, product_id, user_id, email, amount_usdt FROM usdt_orders WHERE status = $1', ['pending']);
+        const dep = await pool.query(
+            `SELECT id, address, pgp_sym_decrypt(private_key::bytea, current_setting('app.usdt_key', true)) AS private_key
+             FROM usdt_deposit_addresses
+             WHERE id = $1`,
+            [match.deposit_address_id]
+        );
+        if (dep.rows.length === 0) return;
+        const row = dep.rows[0];
+        const tron = createTronWebForPrivateKey(row.private_key);
+        const contract = await tron.contract().at(USDT_TRC20_CONTRACT);
+        const amountRaw = BigInt(Math.round(Number(match.amount_usdt) * Math.pow(10, USDT_DECIMALS)));
+        await contract.transfer(USDT_MAIN_WALLET, amountRaw.toString()).send();
+        await pool.query(
+            'UPDATE usdt_orders SET swept_to_main = true, sweep_tx_hash = COALESCE(sweep_tx_hash, $2) WHERE id = $1',
+            [match.id, txHash || null]
+        );
+    } catch (e) {
+        console.warn('[usdt] sweep to main wallet failed:', e.message || e);
+    }
+}
+
+// TronGrid polling: fetch USDT TRC20 incoming txs per deposit address, match to pending orders, grant access and sweep
+async function processUsdtPayments() {
+    try {
+        const pendingRes = await pool.query(
+            `SELECT
+                o.id,
+                o.order_id,
+                o.product_type,
+                o.product_id,
+                o.user_id,
+                o.email,
+                o.amount_usdt,
+                o.deposit_address_id,
+                o.swept_to_main,
+                a.address AS deposit_address
+             FROM usdt_orders o
+             LEFT JOIN usdt_deposit_addresses a ON a.id = o.deposit_address_id
+             WHERE o.status = $1`,
+            ['pending']
+        );
+        const pending = pendingRes.rows;
+        if (pending.length === 0) return;
+
         const fromAddr = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER;
         const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
 
+        const ordersByAddress = new Map();
+        for (const row of pending) {
+            const key = row.deposit_address || 'LEGACY';
+            if (!ordersByAddress.has(key)) ordersByAddress.set(key, []);
+            ordersByAddress.get(key).push(row);
+        }
+
         const processedOrderIds = new Set();
-        for (const tx of txs) {
-            const rawVal = parseInt(tx.value || '0', 10);
-            const amountUsdt = rawVal / Math.pow(10, USDT_DECIMALS);
-            const match = pending.rows.find((o) => !processedOrderIds.has(o.order_id) && Math.abs(Number(o.amount_usdt) - amountUsdt) < 0.02);
-            if (!match) continue;
-            processedOrderIds.add(match.order_id);
-            const txHash = tx.transaction_id || tx.txID || '';
-            await pool.query(
-                'UPDATE usdt_orders SET status = $1, tx_hash = $2 WHERE id = $3',
-                ['completed', txHash || null, match.id]
+
+        for (const [addressKey, orders] of ordersByAddress.entries()) {
+            const scanAddress = addressKey === 'LEGACY' ? USDT_TRC20_WALLET : addressKey;
+            if (!scanAddress) continue;
+
+            const url = `https://api.trongrid.io/v1/accounts/${encodeURIComponent(scanAddress)}/transactions/trc20?only_confirmed=true&limit=50&contract_address=${USDT_TRC20_CONTRACT}&only_to=true&order_by=block_timestamp,desc`;
+            const resp = await fetch(url);
+            if (!resp.ok) continue;
+            const data = await resp.json();
+            const txs = (data.data || []).filter(
+                (t) => (t.token_info || {}).address === USDT_TRC20_CONTRACT && (t.type || '') === 'Transfer'
             );
 
-            if (match.product_type === 'course' && match.user_id && match.product_id) {
-                await pool.query(
-                    `INSERT INTO course_payments (user_id, course_id, payment_id, status)
-                     VALUES ($1, $2, $3, 'completed')
-                     ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
-                    [match.user_id, match.product_id, `USDT_${txHash}`]
+            for (const tx of txs) {
+                const rawVal = parseInt(tx.value || '0', 10);
+                const amountUsdt = rawVal / Math.pow(10, USDT_DECIMALS);
+                const match = orders.find(
+                    (o) =>
+                        !processedOrderIds.has(o.order_id) &&
+                        Math.abs(Number(o.amount_usdt) - amountUsdt) < 0.02
                 );
-                await pool.query(
-                    'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
-                    [match.user_id, match.product_id]
-                );
-                const courseRes = await pool.query('SELECT title FROM courses WHERE id = $1', [match.product_id]);
-                const courseTitle = (courseRes.rows[0] && courseRes.rows[0].title) || 'Course';
-                const userRes = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
-                const userEmail = userRes.rows[0] && userRes.rows[0].email;
-                if (userEmail && transporter) {
-                    await transporter.sendMail({
-                        from: fromAddr,
-                        to: userEmail,
-                        subject: `You have access to: ${courseTitle}`,
-                        text: `Your USDT payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
-                    }).catch((err) => console.warn('[usdt] course email failed:', err.message));
-                }
-                if (notifyTo) {
-                    await transporter.sendMail({
-                        from: fromAddr,
-                        to: notifyTo,
-                        subject: `USDT payment: ${userEmail || match.user_id} enrolled in "${courseTitle}"`,
-                        text: `USDT TRC20 payment detected. User ${userEmail || match.user_id} enrolled in course "${courseTitle}". TX: ${txHash}`,
-                    }).catch((err) => console.warn('[usdt] admin email failed:', err.message));
-                }
-            }
+                if (!match) continue;
+                processedOrderIds.add(match.order_id);
+                const txHash = tx.transaction_id || tx.txID || '';
 
-            if (match.product_type === 'liquidityscan_pro') {
-                let recipientEmail = match.email;
-                if (!recipientEmail && match.user_id) {
-                    const u = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
-                    recipientEmail = u.rows[0] && u.rows[0].email;
+                await pool.query(
+                    'UPDATE usdt_orders SET status = $1, tx_hash = $2 WHERE id = $3',
+                    ['completed', txHash || null, match.id]
+                );
+
+                if (match.product_type === 'course' && match.user_id && match.product_id) {
+                    await pool.query(
+                        `INSERT INTO course_payments (user_id, course_id, payment_id, status)
+                         VALUES ($1, $2, $3, 'completed')
+                         ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
+                        [match.user_id, match.product_id, `USDT_${txHash}`]
+                    );
+                    await pool.query(
+                        'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
+                        [match.user_id, match.product_id]
+                    );
+                    const courseRes = await pool.query('SELECT title FROM courses WHERE id = $1', [match.product_id]);
+                    const courseTitle = (courseRes.rows[0] && courseRes.rows[0].title) || 'Course';
+                    const userRes = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
+                    const userEmail = userRes.rows[0] && userRes.rows[0].email;
+                    if (userEmail && transporter) {
+                        await transporter.sendMail({
+                            from: fromAddr,
+                            to: userEmail,
+                            subject: `You have access to: ${courseTitle}`,
+                            text: `Your USDT payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
+                        }).catch((err) => console.warn('[usdt] course email failed:', err.message));
+                    }
+                    if (notifyTo) {
+                        await transporter.sendMail({
+                            from: fromAddr,
+                            to: notifyTo,
+                            subject: `USDT payment: ${userEmail || match.user_id} enrolled in "${courseTitle}"`,
+                            text: `USDT TRC20 payment detected. User ${userEmail || match.user_id} enrolled in course "${courseTitle}". TX: ${txHash}`,
+                        }).catch((err) => console.warn('[usdt] admin email failed:', err.message));
+                    }
                 }
-                if (recipientEmail && recipientEmail.includes('@')) {
-                    await transporter.sendMail({
-                        from: fromAddr,
-                        to: recipientEmail,
-                        subject: 'Your LiquidityScan PRO payment was received',
-                        text: [
-                            'Hi,',
-                            '',
-                            'Your USDT payment for LiquidityScan PRO was received successfully.',
-                            '',
-                            `Transaction: ${txHash}`,
-                            '',
-                            'Access LiquidityScan PRO at: https://liquidityscan.io',
-                            '',
-                            '– SuperEngulfing',
-                        ].join('\n'),
-                    }).catch((err) => console.warn('[usdt] LS PRO email failed:', err.message));
+
+                if (match.product_type === 'liquidityscan_pro') {
+                    let recipientEmail = match.email;
+                    if (!recipientEmail && match.user_id) {
+                        const u = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
+                        recipientEmail = u.rows[0] && u.rows[0].email;
+                    }
+                    if (recipientEmail && recipientEmail.includes('@')) {
+                        await transporter.sendMail({
+                            from: fromAddr,
+                            to: recipientEmail,
+                            subject: 'Your LiquidityScan PRO payment was received',
+                            text: [
+                                'Hi,',
+                                '',
+                                'Your USDT payment for LiquidityScan PRO was received successfully.',
+                                '',
+                                `Transaction: ${txHash}`,
+                                '',
+                                'Access LiquidityScan PRO at: https://liquidityscan.io',
+                                '',
+                                '– SuperEngulfing',
+                            ].join('\n'),
+                        }).catch((err) => console.warn('[usdt] LS PRO email failed:', err.message));
+                    }
+                    if (notifyTo) {
+                        await transporter.sendMail({
+                            from: fromAddr,
+                            to: notifyTo,
+                            subject: 'USDT LiquidityScan PRO payment received',
+                            text: `USDT TRC20 payment for LiquidityScan PRO. Email: ${match.email || 'N/A'}. TX: ${txHash}`,
+                        }).catch((err) => console.warn('[usdt] admin LS email failed:', err.message));
+                    }
                 }
-                if (notifyTo) {
-                    await transporter.sendMail({
-                        from: fromAddr,
-                        to: notifyTo,
-                        subject: 'USDT LiquidityScan PRO payment received',
-                        text: `USDT TRC20 payment for LiquidityScan PRO. Email: ${match.email || 'N/A'}. TX: ${txHash}`,
-                    }).catch((err) => console.warn('[usdt] admin LS email failed:', err.message));
+
+                if (match.deposit_address_id) {
+                    await sweepOrderToMainWallet(match, txHash);
                 }
             }
         }

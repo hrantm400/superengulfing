@@ -13,11 +13,18 @@ const pool = new Pool({
 
 async function run() {
     try {
-        const sqlPath = path.join(__dirname, 'migrations', '029_usdt_orders.sql');
-        const sql = fs.readFileSync(sqlPath, 'utf8');
-        console.log('Running migration 029 (usdt_orders)...');
-        await pool.query(sql);
-        console.log('Migration 029 success');
+        const migrations = [
+            { file: '029_usdt_orders.sql', label: '029 (usdt_orders)' },
+            { file: '030_usdt_deposit_addresses.sql', label: '030 (usdt_deposit_addresses)' },
+        ];
+
+        for (const m of migrations) {
+            const sqlPath = path.join(__dirname, 'migrations', m.file);
+            const sql = fs.readFileSync(sqlPath, 'utf8');
+            console.log(`Running migration ${m.label}...`);
+            await pool.query(sql);
+            console.log(`Migration ${m.label} success`);
+        }
     } catch (e) {
         console.error('Migration failed:', e.message);
         process.exit(1);

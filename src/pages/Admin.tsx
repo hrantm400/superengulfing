@@ -2568,6 +2568,38 @@ const Admin: React.FC = () => {
                             </div>
 
                             <div className="bg-surface rounded-xl p-6 border border-border">
+                                <h3 className="font-semibold mb-2">USDT TRC20 payouts</h3>
+                                <p className="text-muted text-sm mb-4">
+                                    Collect any remaining USDT balances from per-order deposit addresses to the main wallet{' '}
+                                    <code className="text-primary">USDT_TRC20_WALLET_ADDRESS</code>. Use if some payments were confirmed but funds did not auto-sweep.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        try {
+                                            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/admin/usdt/sweep-all`, {
+                                                method: 'POST',
+                                            });
+                                            const data = await res.json().catch(() => ({}));
+                                            if (!res.ok) {
+                                                setMessage(data.error || 'Failed to sweep USDT balances');
+                                                return;
+                                            }
+                                            const okCount = Array.isArray(data.results)
+                                                ? data.results.filter((r: any) => r.status === 'ok').length
+                                                : 0;
+                                            setMessage(`USDT sweep finished. Processed ${data.count ?? 0} orders, successful: ${okCount}.`);
+                                        } catch (e) {
+                                            setMessage('Failed to sweep USDT balances');
+                                        }
+                                    }}
+                                    className="px-6 py-2 bg-primary/20 text-primary rounded-lg"
+                                >
+                                    Sweep USDT to main wallet
+                                </button>
+                            </div>
+
+                            <div className="bg-surface rounded-xl p-6 border border-border">
                                 <h3 className="font-semibold mb-2">Debug user by email</h3>
                                 <p className="text-muted text-sm mb-4">
                                     Quickly check if a dashboard user exists and whether a password is set. Helpful when users say their password &quot;stopped working&quot;.
