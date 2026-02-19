@@ -44,10 +44,23 @@ const PayCoursePage: React.FC = () => {
 
   useEffect(() => {
     if (!courseId || !course?.is_paid) return;
+    // Create default full-price order on first load
+    createOrder(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId, course?.is_paid]);
+
+  const createOrder = (isTest: boolean) => {
+    if (!courseId) return;
+    setError(null);
+    setOrder(null);
     authFetch('/api/usdt/create-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product_type: 'course', product_id: parseInt(courseId, 10) }),
+      body: JSON.stringify({
+        product_type: 'course',
+        product_id: parseInt(courseId, 10),
+        test: isTest,
+      }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -58,7 +71,7 @@ const PayCoursePage: React.FC = () => {
         }
       })
       .catch((e) => setError(e.message || 'Network error'));
-  }, [courseId, course?.is_paid]);
+  };
 
   if (loading) {
     return (
@@ -99,15 +112,44 @@ const PayCoursePage: React.FC = () => {
   }
 
   return (
-    <USDTPaymentPage
-      orderId={order.order_id}
-      address={order.address}
-      amount={order.amount}
-      amountDisplay={order.amount_display}
-      productName={course.title}
-      productType="course"
-      onSuccessRedirect={localizePath('/dashboard')}
-    />
+    <div className="max-w-[520px] mx-auto px-4 py-8">
+      <div className="mb-4 flex flex-col gap-2">
+        <h1 className="text-2xl font-bold text-foreground">{t('dashboard.payForCourse')}</h1>
+        <p className="text-muted">{course.title}</p>
+        {course.price_display && (
+          <p className="text-sm text-foreground">
+            <span className="font-semibold">{t('dashboard.price')}:</span> {course.price_display}
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => createOrder(false)}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-[#020617] hover:bg-primary/90 transition-colors"
+          >
+            Pay full price
+          </button>
+          <button
+            type="button"
+            onClick={() => createOrder(true)}
+            className="px-4 py-2 rounded-xl text-xs font-semibold border border-primary/60 text-primary hover:bg-primary/10 transition-colors"
+          >
+            Test pay $1 USDT
+          </button>
+        </div>
+        {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+      </div>
+
+      <USDTPaymentPage
+        orderId={order.order_id}
+        address={order.address}
+        amount={order.amount}
+        amountDisplay={order.amount_display}
+        productName={order.amount <= 1.01 ? `${course.title} — Test $1` : course.title}
+        productType="course"
+        onSuccessRedirect={localizePath('/dashboard')}
+      />
+    </div>
   );
 };
 

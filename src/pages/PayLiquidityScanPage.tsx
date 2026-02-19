@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from '@remix-run/react';
 import { getApiUrl } from '../lib/api';
 import { useLocale } from '../contexts/LocaleContext';
 import USDTPaymentPage from '../components/payment/USDTPaymentPage';
@@ -8,6 +9,8 @@ import { useTranslation } from '../locales';
 const PayLiquidityScanPage: React.FC = () => {
   const { t } = useTranslation();
   const { localizePath } = useLocale();
+  const [searchParams] = useSearchParams();
+  const isTest = searchParams.get('test') === '1';
   const [order, setOrder] = useState<{
     order_id: string;
     address: string;
@@ -23,7 +26,7 @@ const PayLiquidityScanPage: React.FC = () => {
     fetch(`${getApiUrl()}/api/usdt/create-order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product_type: 'liquidityscan_pro' }),
+      body: JSON.stringify({ product_type: 'liquidityscan_pro', test: isTest }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -62,7 +65,7 @@ const PayLiquidityScanPage: React.FC = () => {
       address={order.address}
       amount={order.amount}
       amountDisplay={order.amount_display}
-      productName="LiquidityScan PRO"
+      productName={isTest ? 'LiquidityScan PRO — Test $1' : 'LiquidityScan PRO'}
       productType="liquidityscan_pro"
     />
   );

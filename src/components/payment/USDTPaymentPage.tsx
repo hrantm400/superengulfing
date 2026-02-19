@@ -110,9 +110,21 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
   }
 
   return (
-    <div className="max-w-[480px] mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-foreground mb-2">{productName}</h1>
-      <p className="text-muted mb-6">{t('usdt.payAmount')} <span className="font-semibold text-foreground">{amountDisplay} USDT</span> (TRC20)</p>
+    <div className="max-w-[560px] mx-auto px-4 py-8">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="mb-6 text-center"
+      >
+        <p className="text-xs uppercase tracking-[0.2em] text-primary mb-2">USDT TRC20 Checkout</p>
+        <h1 className="text-2xl md:text-3xl font-extrabold text-foreground mb-2">{productName}</h1>
+        <p className="text-sm text-muted">
+          {t('usdt.payAmount')}{' '}
+          <span className="font-semibold text-foreground">{amountDisplay} USDT</span>
+          {' '}· TRC20 on Tron
+        </p>
+      </motion.div>
 
       <div className="space-y-6">
         {/* Section 1: Address only */}

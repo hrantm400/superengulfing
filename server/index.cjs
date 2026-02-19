@@ -2376,12 +2376,13 @@ function simpleHash(s) {
 
 // POST /api/usdt/create-order - Create USDT TRC20 order (optional JWT for course)
 app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
-    const { product_type, product_id, email } = req.body || {};
+    const { product_type, product_id, email, test } = req.body || {};
     if (!product_type || !['liquidityscan_pro', 'course'].includes(product_type)) {
         return res.status(400).json({ error: 'product_type must be liquidityscan_pro or course' });
     }
     const userId = req.user ? req.user.id : null;
     const userEmail = (req.user && req.user.email) || (email && String(email).trim()) || null;
+    const isTest = test === true;
 
     if (product_type === 'course') {
         if (!req.user) return res.status(401).json({ error: 'Login required to pay for course' });
@@ -2394,8 +2395,8 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
     }
 
     const orderId = `USDT_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-    const baseAmount = product_type === 'liquidityscan_pro' ? LIQUIDITYSCAN_BASE_USD : COURSE_BASE_USD;
-    const centsOffset = (simpleHash(orderId) % 99) * 0.01;
+    const baseAmount = isTest ? 1.0 : (product_type === 'liquidityscan_pro' ? LIQUIDITYSCAN_BASE_USD : COURSE_BASE_USD);
+    const centsOffset = isTest ? 0 : (simpleHash(orderId) % 99) * 0.01;
     const amountUsdt = Math.round((baseAmount + centsOffset) * 100) / 100;
 
     try {
