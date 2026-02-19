@@ -2343,6 +2343,217 @@ app.get('/api/course-payment-widget-url', requireAuth, async (req, res) => {
     }
 });
 
+// ==================== USDT TRC20 PAYMENT (self-hosted) ====================
+const USDT_TRC20_WALLET = process.env.USDT_TRC20_WALLET_ADDRESS || 'TRXj2ShUse4vpYxQhqaJz8dM7WscUzhARB';
+const USDT_TRC20_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+const USDT_DECIMALS = 6;
+const LIQUIDITYSCAN_BASE_USD = 43.01;
+const COURSE_BASE_USD = 59.01;
+
+// Optional auth: set req.user if valid token, otherwise req.user = null
+const optionalAuth = (req, res, next) => {
+    req.user = null;
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return next();
+    const token = authHeader.slice(7);
+    try {
+        const decoded = jwt.verify(token, jwtSecret);
+        req.user = { id: decoded.sub, email: decoded.email };
+        next();
+    } catch {
+        next();
+    }
+};
+
+function simpleHash(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+        h = ((h << 5) - h) + s.charCodeAt(i);
+        h = h & h;
+    }
+    return Math.abs(h);
+}
+
+// POST /api/usdt/create-order - Create USDT TRC20 order (optional JWT for course)
+app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
+    const { product_type, product_id, email } = req.body || {};
+    if (!product_type || !['liquidityscan_pro', 'course'].includes(product_type)) {
+        return res.status(400).json({ error: 'product_type must be liquidityscan_pro or course' });
+    }
+    const userId = req.user ? req.user.id : null;
+    const userEmail = (req.user && req.user.email) || (email && String(email).trim()) || null;
+
+    if (product_type === 'course') {
+        if (!req.user) return res.status(401).json({ error: 'Login required to pay for course' });
+        if (!product_id) return res.status(400).json({ error: 'product_id (course_id) required for course' });
+        const courseRes = await pool.query('SELECT id, title, is_paid FROM courses WHERE id = $1', [product_id]);
+        if (courseRes.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
+        if (!courseRes.rows[0].is_paid) return res.status(400).json({ error: 'Course is not paid' });
+        const existing = await pool.query('SELECT 1 FROM course_payments WHERE user_id = $1 AND course_id = $2', [userId, product_id]);
+        if (existing.rows.length > 0) return res.status(400).json({ error: 'Already purchased' });
+    }
+
+    const orderId = `USDT_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+    const baseAmount = product_type === 'liquidityscan_pro' ? LIQUIDITYSCAN_BASE_USD : COURSE_BASE_USD;
+    const centsOffset = (simpleHash(orderId) % 99) * 0.01;
+    const amountUsdt = Math.round((baseAmount + centsOffset) * 100) / 100;
+
+    try {
+        await pool.query(
+            `INSERT INTO usdt_orders (order_id, product_type, product_id, user_id, email, amount_usdt, status)
+             VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
+            [orderId, product_type, product_id || null, userId, userEmail || null, amountUsdt]
+        );
+    } catch (e) {
+        if (e.message && /usdt_orders/i.test(e.message)) {
+            return res.status(500).json({ error: 'USDT orders table not ready. Run: npm run migrate:usdt' });
+        }
+        throw e;
+    }
+
+    const qrAddress = USDT_TRC20_WALLET;
+    const qrPayment = `tron:${USDT_TRC20_WALLET}?amount=${amountUsdt}&token=USDT`;
+
+    return res.json({
+        order_id: orderId,
+        address: USDT_TRC20_WALLET,
+        amount: amountUsdt,
+        amount_display: amountUsdt.toFixed(2),
+        qr_address: qrAddress,
+        qr_payment: qrPayment,
+    });
+});
+
+// GET /api/usdt/orders/:orderId/status - Poll order status (no auth). Triggers lazy payment check.
+app.get('/api/usdt/orders/:orderId/status', async (req, res) => {
+    const orderId = req.params.orderId;
+    if (!orderId) return res.status(400).json({ error: 'order_id required' });
+    try {
+        const r = await pool.query(
+            'SELECT status FROM usdt_orders WHERE order_id = $1',
+            [orderId]
+        );
+        if (r.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
+        if (r.rows[0].status === 'pending') {
+            processUsdtPayments().catch((e) => console.warn('[usdt] lazy check error:', e.message));
+        }
+        return res.json({ status: r.rows[0].status });
+    } catch (e) {
+        if (e.message && /usdt_orders/i.test(e.message)) {
+            return res.status(500).json({ error: 'USDT orders table not ready. Run: npm run migrate:usdt' });
+        }
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// TronGrid polling: fetch USDT TRC20 incoming txs, match to pending orders, grant access
+async function processUsdtPayments() {
+    if (!USDT_TRC20_WALLET) return;
+    try {
+        const url = `https://api.trongrid.io/v1/accounts/${encodeURIComponent(USDT_TRC20_WALLET)}/transactions/trc20?only_confirmed=true&limit=50&contract_address=${USDT_TRC20_CONTRACT}&only_to=true&order_by=block_timestamp,desc`;
+        const resp = await fetch(url);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const txs = (data.data || []).filter((t) => (t.token_info || {}).address === USDT_TRC20_CONTRACT && (t.type || '') === 'Transfer');
+        const pending = await pool.query('SELECT id, order_id, product_type, product_id, user_id, email, amount_usdt FROM usdt_orders WHERE status = $1', ['pending']);
+        const fromAddr = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER;
+        const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
+
+        const processedOrderIds = new Set();
+        for (const tx of txs) {
+            const rawVal = parseInt(tx.value || '0', 10);
+            const amountUsdt = rawVal / Math.pow(10, USDT_DECIMALS);
+            const match = pending.rows.find((o) => !processedOrderIds.has(o.order_id) && Math.abs(Number(o.amount_usdt) - amountUsdt) < 0.02);
+            if (!match) continue;
+            processedOrderIds.add(match.order_id);
+            const txHash = tx.transaction_id || tx.txID || '';
+            await pool.query(
+                'UPDATE usdt_orders SET status = $1, tx_hash = $2 WHERE id = $3',
+                ['completed', txHash || null, match.id]
+            );
+
+            if (match.product_type === 'course' && match.user_id && match.product_id) {
+                await pool.query(
+                    `INSERT INTO course_payments (user_id, course_id, payment_id, status)
+                     VALUES ($1, $2, $3, 'completed')
+                     ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
+                    [match.user_id, match.product_id, `USDT_${txHash}`]
+                );
+                await pool.query(
+                    'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
+                    [match.user_id, match.product_id]
+                );
+                const courseRes = await pool.query('SELECT title FROM courses WHERE id = $1', [match.product_id]);
+                const courseTitle = (courseRes.rows[0] && courseRes.rows[0].title) || 'Course';
+                const userRes = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
+                const userEmail = userRes.rows[0] && userRes.rows[0].email;
+                if (userEmail && transporter) {
+                    await transporter.sendMail({
+                        from: fromAddr,
+                        to: userEmail,
+                        subject: `You have access to: ${courseTitle}`,
+                        text: `Your USDT payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
+                    }).catch((err) => console.warn('[usdt] course email failed:', err.message));
+                }
+                if (notifyTo) {
+                    await transporter.sendMail({
+                        from: fromAddr,
+                        to: notifyTo,
+                        subject: `USDT payment: ${userEmail || match.user_id} enrolled in "${courseTitle}"`,
+                        text: `USDT TRC20 payment detected. User ${userEmail || match.user_id} enrolled in course "${courseTitle}". TX: ${txHash}`,
+                    }).catch((err) => console.warn('[usdt] admin email failed:', err.message));
+                }
+            }
+
+            if (match.product_type === 'liquidityscan_pro') {
+                let recipientEmail = match.email;
+                if (!recipientEmail && match.user_id) {
+                    const u = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
+                    recipientEmail = u.rows[0] && u.rows[0].email;
+                }
+                if (recipientEmail && recipientEmail.includes('@')) {
+                    await transporter.sendMail({
+                        from: fromAddr,
+                        to: recipientEmail,
+                        subject: 'Your LiquidityScan PRO payment was received',
+                        text: [
+                            'Hi,',
+                            '',
+                            'Your USDT payment for LiquidityScan PRO was received successfully.',
+                            '',
+                            `Transaction: ${txHash}`,
+                            '',
+                            'Access LiquidityScan PRO at: https://liquidityscan.io',
+                            '',
+                            '– SuperEngulfing',
+                        ].join('\n'),
+                    }).catch((err) => console.warn('[usdt] LS PRO email failed:', err.message));
+                }
+                if (notifyTo) {
+                    await transporter.sendMail({
+                        from: fromAddr,
+                        to: notifyTo,
+                        subject: 'USDT LiquidityScan PRO payment received',
+                        text: `USDT TRC20 payment for LiquidityScan PRO. Email: ${match.email || 'N/A'}. TX: ${txHash}`,
+                    }).catch((err) => console.warn('[usdt] admin LS email failed:', err.message));
+                }
+            }
+        }
+    } catch (e) {
+        if (!e.message || !/usdt_orders/i.test(e.message)) {
+            console.warn('[usdt] processUsdtPayments error:', e.message);
+        }
+    }
+}
+
+// Start USDT payment polling (every 45 seconds)
+let usdtPollInterval = null;
+function startUsdtPolling() {
+    if (usdtPollInterval) return;
+    usdtPollInterval = setInterval(processUsdtPayments, 45000);
+    console.log('   USDT TRC20 payment polling started (every 45s)');
+}
+
 // POST /api/course-payment-complete - For PAID courses: access is granted ONLY by NOWPayments webhook (IPN).
 // This endpoint no longer enrolls on button click — prevents abuse (user claiming "I paid" without paying).
 app.post('/api/course-payment-complete', requireAuth, async (req, res) => {
@@ -5034,4 +5245,6 @@ app.listen(PORT, async () => {
 
     // Start the scheduler
     startScheduler();
+    // Start USDT payment polling
+    startUsdtPolling();
 });

@@ -470,5 +470,19 @@
   "access.step1.desc": "Օգտագործեք մեր գործընկերոի հղումը՝ անվճար հաշիվ բացելու համար: Սկզբնական մակարդակի համար KYC (անձի հաստատում) չի պահանջվում:",
   "access.step2.title": "Ավելացնել հաշվին $100 և գործարք կատարել",
   "access.step2.desc": "Դա Ձեր գումարն է, այն կարող եք թրեյդ անել, հաշվից հանել։ Մենք գումար չենք գանձում։ Դուք տնօրինում եք այն:",
-  "access.registerNow": "Գրանցվել հիմա"
+  "access.registerNow": "Գրանցվել հիմա",
+  "usdt.payAmount": "Վճարեք ճիշտ",
+  "usdt.qrAddressOnly": "QR — Միայն հասցեն",
+  "usdt.qrWithAmount": "QR — Հասցե + Գումար",
+  "usdt.copyAddress": "Պատճենել հասցեն",
+  "usdt.copied": "Պատճենված է!",
+  "usdt.scanToPreFill": "Սկանավորեք՝ գումարը ինքնաբերաբար լցնելու համար",
+  "usdt.waitingPayment": "Սպասում ենք վճարման…",
+  "usdt.waitingHint": "Ուղարկեք USDT TRC20 վերևի հասցեին: Հայտնաբերումը 30–60 վայրկյանը մեկ:",
+  "usdt.verifying": "Վճարումը հայտնաբերվել է, ստուգվում է…",
+  "usdt.verifyingHint": "Հաստատվում է բլոկչեյնում:",
+  "usdt.paymentReceived": "Վճարումը ստացվեց!",
+  "usdt.accessGranted": "Մուտքը բացված է: Մանրամասնության համար ստուգեք էլ. փոստը:",
+  "usdt.goToLiquidityScan": "Գնալ LiquidityScan PRO",
+  "usdt.backToLiquidityScan": "Վերադառնալ LiquidityScan"
 }

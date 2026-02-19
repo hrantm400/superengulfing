@@ -3,6 +3,7 @@ import { useParams, Link } from '@remix-run/react';
 import { useLocale } from '../contexts/LocaleContext';
 import { useTranslation } from '../locales';
 import { authFetch, getApiUrl } from '../lib/api';
+import USDTPaymentPage from '../components/payment/USDTPaymentPage';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface CourseInfo {
@@ -17,9 +18,16 @@ const PayCoursePage: React.FC = () => {
   const { localizePath } = useLocale();
   const { t } = useTranslation();
   const [course, setCourse] = useState<CourseInfo | null>(null);
+  const [order, setOrder] = useState<{
+    order_id: string;
+    address: string;
+    amount: number;
+    amount_display: string;
+    qr_address: string;
+    qr_payment: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [widgetUrl, setWidgetUrl] = useState<string>('');
 
   useEffect(() => {
     if (!courseId) {
@@ -36,10 +44,20 @@ const PayCoursePage: React.FC = () => {
 
   useEffect(() => {
     if (!courseId || !course?.is_paid) return;
-    authFetch(`/api/course-payment-widget-url?course_id=${encodeURIComponent(courseId)}`)
+    authFetch('/api/usdt/create-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_type: 'course', product_id: parseInt(courseId, 10) }),
+    })
       .then((r) => r.json())
-      .then((data) => data.url && setWidgetUrl(data.url))
-      .catch(() => setWidgetUrl('https://nowpayments.io/embeds/payment-widget?iid=6065193944'));
+      .then((data) => {
+        if (data.order_id && data.address) {
+          setOrder(data);
+        } else {
+          setError(data.error || 'Failed to create order');
+        }
+      })
+      .catch((e) => setError(e.message || 'Network error'));
   }, [courseId, course?.is_paid]);
 
   if (loading) {
@@ -72,42 +90,24 @@ const PayCoursePage: React.FC = () => {
     );
   }
 
-  const iframeSrc = widgetUrl || 'https://nowpayments.io/embeds/payment-widget?iid=6065193944';
+  if (!order) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-[480px] mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-foreground mb-2">{t('dashboard.payForCourse')}</h1>
-      <p className="text-muted mb-4">{course.title}</p>
-      {course.price_display && (
-        <p className="text-lg font-semibold text-foreground mb-4">
-          {t('dashboard.price')}: {course.price_display}
-        </p>
-      )}
-
-      <div className="w-full max-w-[410px] mx-auto rounded-2xl overflow-hidden border border-border bg-surfaceElevated shadow-lg mb-6">
-        <iframe
-          src={iframeSrc}
-          title="Payment"
-          width="410"
-          height="696"
-          className="border-0 w-full max-w-[410px] h-[696px]"
-          style={{ overflowY: 'hidden' }}
-        />
-      </div>
-
-      <p className="text-sm text-muted mb-4">
-        {t('dashboard.accessAfterPaymentAuto')}
-      </p>
-      {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Link
-          to={localizePath('/dashboard')}
-          className="px-6 py-3 rounded-xl bg-surfaceElevated hover:bg-surface/80 text-foreground font-medium text-center"
-        >
-          {t('dashboard.backToDashboard')}
-        </Link>
-      </div>
-    </div>
+    <USDTPaymentPage
+      orderId={order.order_id}
+      address={order.address}
+      amount={order.amount}
+      amountDisplay={order.amount_display}
+      productName={course.title}
+      productType="course"
+      onSuccessRedirect={localizePath('/dashboard')}
+    />
   );
 };
 

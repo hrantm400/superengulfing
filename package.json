@@ -18,7 +18,8 @@
     "migrate:certificate-section": "node server/run_certificate_section_migration.cjs",
     "migrate:indicator-access": "node server/run_indicator_access_migration.cjs",
     "migrate:lesson-resources": "node server/run_lesson_resources_migration.cjs",
-    "migrate:site-settings-locale": "node server/run_site_settings_locale_migration.cjs"
+    "migrate:site-settings-locale": "node server/run_site_settings_locale_migration.cjs",
+    "migrate:usdt": "node server/run_usdt_migration.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

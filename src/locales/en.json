@@ -470,5 +470,19 @@
   "onboarding.certJourneyBegins": "The journey begins.",
   "onboarding.certOK": "OK",
   "onboarding.certAcceptSeal": "Accept & Seal",
-  "onboarding.certSealing": "Sealing..."
+  "onboarding.certSealing": "Sealing...",
+  "usdt.payAmount": "Pay exactly",
+  "usdt.qrAddressOnly": "QR — Address only",
+  "usdt.qrWithAmount": "QR — Address + Amount",
+  "usdt.copyAddress": "Copy address",
+  "usdt.copied": "Copied!",
+  "usdt.scanToPreFill": "Scan to pre-fill amount in your wallet",
+  "usdt.waitingPayment": "Waiting for payment…",
+  "usdt.waitingHint": "Send USDT TRC20 to the address above. Detection runs every 30–60 seconds.",
+  "usdt.verifying": "Payment detected, verifying…",
+  "usdt.verifyingHint": "Confirming on blockchain.",
+  "usdt.paymentReceived": "Payment received!",
+  "usdt.accessGranted": "Your access has been granted. Check your email for details.",
+  "usdt.goToLiquidityScan": "Go to LiquidityScan PRO",
+  "usdt.backToLiquidityScan": "Back to LiquidityScan"
 }
