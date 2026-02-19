@@ -116,20 +116,26 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
     }
     try {
       if (editingCourseId) {
-        await fetchWithAdminAuth(`${API_URL}/api/courses/${editingCourseId}`, {
+        const res = await fetchWithAdminAuth(`${API_URL}/api/courses/${editingCourseId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: courseForm.title.trim(),
             description: courseForm.description.trim() || null,
             image_url: courseForm.image_url.trim() || null,
+            locale: adminAudienceLocale,
             is_paid: courseForm.is_paid,
             price_display: courseForm.price_display.trim() || null,
           }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setMessage(data.error || 'Failed to save course');
+          return;
+        }
         setMessage('Course updated');
       } else {
-        await fetchWithAdminAuth(`${API_URL}/api/courses`, {
+        const res = await fetchWithAdminAuth(`${API_URL}/api/courses`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -141,6 +147,11 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
             price_display: courseForm.price_display.trim() || null,
           }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setMessage(data.error || 'Failed to save course');
+          return;
+        }
         setMessage('Course created');
       }
       setShowCourseModal(false);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from '@remix-run/react';
+import { useParams, Link } from '@remix-run/react';
 import { useLocale } from '../contexts/LocaleContext';
 import { useTranslation } from '../locales';
 import { authFetch, getApiUrl } from '../lib/api';
@@ -14,12 +14,10 @@ interface CourseInfo {
 
 const PayCoursePage: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
-  const navigate = useNavigate();
   const { localizePath } = useLocale();
   const { t } = useTranslation();
   const [course, setCourse] = useState<CourseInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [widgetUrl, setWidgetUrl] = useState<string>('');
 
@@ -43,29 +41,6 @@ const PayCoursePage: React.FC = () => {
       .then((data) => data.url && setWidgetUrl(data.url))
       .catch(() => setWidgetUrl('https://nowpayments.io/embeds/payment-widget?iid=6065193944'));
   }, [courseId, course?.is_paid]);
-
-  const handleConfirmPayment = async () => {
-    if (!courseId || !course) return;
-    setConfirming(true);
-    setError(null);
-    try {
-      const res = await authFetch('/api/course-payment-complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ course_id: parseInt(courseId, 10) }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error || t('dashboard.paymentFailed'));
-        setConfirming(false);
-        return;
-      }
-      navigate(localizePath(`/dashboard/courses/${courseId}`));
-    } catch {
-      setError(t('dashboard.paymentFailed'));
-      setConfirming(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -121,18 +96,10 @@ const PayCoursePage: React.FC = () => {
       </div>
 
       <p className="text-sm text-muted mb-4">
-        {t('dashboard.completePaymentThenConfirm')}
+        {t('dashboard.accessAfterPaymentAuto')}
       </p>
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
       <div className="flex flex-col sm:flex-row gap-3">
-        <button
-          type="button"
-          onClick={handleConfirmPayment}
-          disabled={confirming}
-          className="px-6 py-3 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow disabled:opacity-50"
-        >
-          {confirming ? t('dashboard.confirming') : t('dashboard.iveCompletedPayment')}
-        </button>
         <Link
           to={localizePath('/dashboard')}
           className="px-6 py-3 rounded-xl bg-surfaceElevated hover:bg-surface/80 text-foreground font-medium text-center"

@@ -299,6 +299,7 @@
   "dashboard.payForCourse": "Վճարել դասընթացի համար",
   "dashboard.price": "Գին",
   "dashboard.completePaymentThenConfirm": "Կատարեք վճարումը, ապա սեղմեք ստորև՝ հաստատելու և մուտք ստանալու համար։",
+  "dashboard.accessAfterPaymentAuto": "Վճարումից հետո մուտքը կբացվի ավտոմատ մի քանի րոպեի ընթացքում։ Լրացուցիչ սեղմելու կարիք չկա։ Եթե մուտք չեք տեսնում, դիմեք աջակցությանը։",
   "dashboard.confirming": "Հաստատվում է...",
   "dashboard.iveCompletedPayment": "Ես ավարտել եմ վճարումը",
   "dashboard.continue": "Շարունակել",

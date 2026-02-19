@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from '@remix-run/react';
 import AccessBackground from '../components/AccessBackground';
 import AccessHero from '../components/AccessHero';
 import ProcessCard from '../components/ProcessCard';
 import VerificationCard from '../components/VerificationCard';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { useLocale } from '../contexts/LocaleContext';
+import { useUser } from '../contexts/UserContext';
 import { getApiUrl } from '../lib/api';
 
 function ensureAbsoluteUrl(url: string): string {
@@ -15,8 +17,16 @@ function ensureAbsoluteUrl(url: string): string {
 }
 
 const Access: React.FC = () => {
-    const { locale } = useLocale();
+    const navigate = useNavigate();
+    const { locale, localizePath } = useLocale();
+    const { profile } = useUser();
     const [affiliate, setAffiliate] = useState<{ affiliate_label: string; affiliate_url: string }>({ affiliate_label: 'Test Affiliate Link', affiliate_url: '#' });
+
+    useEffect(() => {
+        if (profile != null) {
+            navigate(localizePath('/dashboard'), { replace: true });
+        }
+    }, [profile, navigate, localizePath]);
 
     const loadSettings = React.useCallback(() => {
         fetch(`${getApiUrl()}/api/settings?locale=${locale}`)
@@ -37,6 +47,10 @@ const Access: React.FC = () => {
         document.addEventListener('visibilitychange', onVisibility);
         return () => document.removeEventListener('visibilitychange', onVisibility);
     }, [loadSettings]);
+
+    if (profile != null) {
+        return null;
+    }
 
     return (
         <div className="relative min-h-screen flex flex-col pt-24 md:pt-28">

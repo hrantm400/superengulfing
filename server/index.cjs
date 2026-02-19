@@ -2343,11 +2343,11 @@ app.get('/api/course-payment-widget-url', requireAuth, async (req, res) => {
     }
 });
 
-// POST /api/course-payment-complete - After successful payment for a paid course (JWT). Enrolls user and sends emails.
+// POST /api/course-payment-complete - For PAID courses: access is granted ONLY by NOWPayments webhook (IPN).
+// This endpoint no longer enrolls on button click — prevents abuse (user claiming "I paid" without paying).
 app.post('/api/course-payment-complete', requireAuth, async (req, res) => {
-    const { course_id, payment_id } = req.body;
+    const { course_id } = req.body;
     if (!course_id) return res.status(400).json({ error: 'course_id required' });
-    const userId = req.user.id;
     try {
         const courseResult = await pool.query(
             'SELECT id, title, is_paid FROM courses WHERE id = $1',
@@ -2355,48 +2355,13 @@ app.post('/api/course-payment-complete', requireAuth, async (req, res) => {
         );
         if (courseResult.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
         const course = courseResult.rows[0];
-        const isPaid = course.is_paid === true;
-        if (!isPaid) return res.status(400).json({ error: 'Course is not paid' });
+        if (course.is_paid !== true) return res.status(400).json({ error: 'Course is not paid' });
 
-        await pool.query(
-            `INSERT INTO course_payments (user_id, course_id, payment_id, status)
-             VALUES ($1, $2, $3, 'completed')
-             ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
-            [userId, course_id, (payment_id && String(payment_id).trim()) || null]
-        );
-        await pool.query(
-            'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
-            [userId, course_id]
-        );
-
-        const userRow = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [userId]);
-        const userEmail = userRow.rows[0] && userRow.rows[0].email;
-        const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
-        const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
-        const courseTitle = course.title || 'Course';
-
-        if (userEmail) {
-            await transporter.sendMail({
-                from: fromAddr,
-                to: userEmail,
-                subject: `You have access to: ${courseTitle}`,
-                text: `Your payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
-            }).catch((err) => console.warn('[course-payment-complete] user email failed:', err.message));
-        }
-        if (notifyTo) {
-            await transporter.sendMail({
-                from: fromAddr,
-                to: notifyTo,
-                subject: `Course payment: ${userEmail || userId} enrolled in "${courseTitle}"`,
-                text: `User ${userEmail || userId} (id ${userId}) completed payment and was enrolled in course "${courseTitle}" (id ${course_id}).`,
-            }).catch((err) => console.warn('[course-payment-complete] admin email failed:', err.message));
-        }
-
-        res.json({ success: true, enrolled: true });
+        return res.status(403).json({
+            error: 'Access is granted only after payment confirmation. If you have already paid, access will open automatically within a few minutes. If the problem persists, contact support.',
+            code: 'payment_webhook_only',
+        });
     } catch (error) {
-        if (error.message && /relation "course_payments" does not exist/i.test(error.message)) {
-            return res.status(500).json({ error: 'Run migration 028_paid_courses.sql' });
-        }
         console.error('[/api/course-payment-complete]', error);
         res.status(500).json({ error: error.message });
     }
@@ -2450,7 +2415,7 @@ app.post('/api/courses', requireAdminAuth, async (req, res) => {
     }
 });
 
-// PUT /api/courses/:id - Update course (admin)
+// PUT /api/courses/:id - Update course (admin). Placeholders $1..$N built sequentially.
 app.put('/api/courses/:id', requireAdminAuth, async (req, res) => {
     const id = req.params.id;
     const { title, description, image_url, locale: reqLocale, is_paid, price_display } = req.body;
@@ -2458,15 +2423,18 @@ app.put('/api/courses/:id', requireAdminAuth, async (req, res) => {
     try {
         const updates = ['title = $1', 'description = $2', 'image_url = $3', 'updated_at = NOW()'];
         const params = [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null];
+        let idx = 4;
         if (reqLocale === 'am' || reqLocale === 'en') {
+            updates.push(`locale = $${idx}`);
             params.push(reqLocale);
-            updates.push(`locale = $${params.length}`);
+            idx++;
         }
+        updates.push(`is_paid = $${idx}`, `price_display = $${idx + 1}`);
         params.push(is_paid === true, (price_display != null && String(price_display).trim()) || null);
-        updates.push(`is_paid = $${params.length}`, `price_display = $${params.length + 1}`);
+        idx += 2;
         params.push(id);
         const result = await pool.query(
-            `UPDATE courses SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *`,
+            `UPDATE courses SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
             params
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Course not found' });
@@ -2476,7 +2444,8 @@ app.put('/api/courses/:id', requireAdminAuth, async (req, res) => {
         if (error.message && /column "is_paid" does not exist/i.test(error.message)) {
             const updates = ['title = $1', 'description = $2', 'image_url = $3', 'updated_at = NOW()'];
             const params = [title.trim(), description && description.trim() || null, image_url && image_url.trim() || null];
-            if (reqLocale === 'am' || reqLocale === 'en') { params.push(reqLocale); updates.push(`locale = $${params.length}`); }
+            let idx = 4;
+            if (reqLocale === 'am' || reqLocale === 'en') { updates.push(`locale = $${idx}`); params.push(reqLocale); idx++; }
             params.push(id);
             const result = await pool.query(`UPDATE courses SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
             if (result.rows.length === 0) return res.status(404).json({ error: 'Course not found' });

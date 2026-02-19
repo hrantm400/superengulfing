@@ -299,6 +299,7 @@
   "dashboard.payForCourse": "Pay for course",
   "dashboard.price": "Price",
   "dashboard.completePaymentThenConfirm": "Complete your payment via the method you chose, then click below to confirm and get access.",
+  "dashboard.accessAfterPaymentAuto": "After you pay, access will open automatically within a few minutes. No need to click anything else. If you don't see access, contact support.",
   "dashboard.confirming": "Confirming...",
   "dashboard.iveCompletedPayment": "I've completed payment",
   "dashboard.continue": "Continue",

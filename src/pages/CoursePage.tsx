@@ -14,6 +14,8 @@ interface Course {
   description: string | null;
   image_url: string | null;
   created_at: string;
+  is_paid?: boolean;
+  price_display?: string | null;
 }
 
 interface LessonResource {
@@ -189,14 +191,24 @@ const CoursePage: React.FC = () => {
               </div>
               <div className="p-6 md:p-8">
                 <div className="mb-6">{course.description ? <DescriptionContent content={course.description} /> : <span className="text-muted">—</span>}</div>
-                <button
-                  onClick={handleEnroll}
-                  disabled={enrolling}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow disabled:opacity-50 transition-colors"
-                >
-                  {enrolling ? t('course.enrolling') : t('course.enrollInThisCourse')}
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                {course.is_paid ? (
+                  <Link
+                    to={localizePath(`/dashboard/pay-course/${course.id}`)}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow transition-colors"
+                  >
+                    {t('dashboard.payAndGetAccess')}
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                ) : (
+                  <button
+                    onClick={handleEnroll}
+                    disabled={enrolling}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow disabled:opacity-50 transition-colors"
+                  >
+                    {enrolling ? t('course.enrolling') : t('course.enrollInThisCourse')}
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
