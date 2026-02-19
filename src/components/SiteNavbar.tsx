@@ -118,7 +118,7 @@ const SiteNavbar: React.FC = () => {
 
   const navLinks = [
     { path: '/', label: t('nav.home') },
-    { path: '/course-access', label: t('nav.access') },
+    ...(profile == null ? [{ path: '/course-access', label: t('nav.access') }] : []),
     { path: '/book', label: t('nav.book') },
   ];
 

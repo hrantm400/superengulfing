@@ -7,7 +7,7 @@ import VerificationCard from '../components/VerificationCard';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { useLocale } from '../contexts/LocaleContext';
 import { useUser } from '../contexts/UserContext';
-import { getApiUrl } from '../lib/api';
+import { getApiUrl, getAuthToken } from '../lib/api';
 
 function ensureAbsoluteUrl(url: string): string {
     if (!url || url === '#') return url;
@@ -49,6 +49,10 @@ const Access: React.FC = () => {
     }, [loadSettings]);
 
     if (profile != null) {
+        return null;
+    }
+    // Пока проверяем авторизацию (есть токен, профиль ещё не загружен) — ничего не показываем
+    if (getAuthToken() && profile === null) {
         return null;
     }
 
