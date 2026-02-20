@@ -2610,7 +2610,20 @@ const Admin: React.FC = () => {
                                                     <td className="p-3 max-w-xs truncate" title={r.message}>{r.message}</td>
                                                     <td className="p-3">
                                                         {r.screenshot_url ? (
-                                                            <a href={r.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View</a>
+                                                            <a
+                                                                href={
+                                                                    r.screenshot_url.includes('/api/uploads/')
+                                                                        ? r.screenshot_url
+                                                                        : r.screenshot_url.includes('/uploads/')
+                                                                        ? getApiUrl() + '/api/uploads/' + encodeURIComponent(r.screenshot_url.replace(/^.*\/uploads\//, '').split('?')[0].trim())
+                                                                        : r.screenshot_url
+                                                                }
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-primary hover:underline"
+                                                            >
+                                                                View
+                                                            </a>
                                                         ) : '—'}
                                                     </td>
                                                     <td className="p-3 font-mono text-xs max-w-[120px] truncate" title={r.tx_id || undefined}>{r.tx_id || '—'}</td>

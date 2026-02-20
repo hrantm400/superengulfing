@@ -236,6 +236,18 @@ const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 app.use('/uploads', express.static(uploadsDir));
 
+// GET /api/uploads/:filename — serve uploaded file (so nginx proxy to /api reaches this; payment-issue screenshots use this URL)
+app.get('/api/uploads/:filename', (req, res) => {
+    const raw = req.params.filename || '';
+    const filename = path.basename(raw).replace(/[^a-zA-Z0-9._-]/g, '');
+    if (!filename) return res.status(400).end();
+    const filePath = path.join(uploadsDir, filename);
+    const resolved = path.resolve(filePath);
+    const resolvedDir = path.resolve(uploadsDir);
+    if (!resolved.startsWith(resolvedDir) || resolved === resolvedDir || !fs.existsSync(filePath)) return res.status(404).end();
+    res.sendFile(filePath, { maxAge: '1d' });
+});
+
 // Test: GET /api/ping returns 200 if this server is running (use to verify port 3001 is this app)
 app.get('/api/ping', (req, res) => res.json({ ok: true, message: 'Dashboard API' }));
 
@@ -476,7 +488,7 @@ app.post('/api/upload', requireAdminAuth, uploadMulter.single('file'), (req, res
     const apiUrl = process.env.API_URL || 'http://localhost:3001';
     const filename = path.basename(req.file.path);
     const relativePath = 'uploads/' + filename;
-    res.json({ url: apiUrl + '/uploads/' + encodeURIComponent(filename), path: relativePath, filename: req.file.originalname || filename });
+    res.json({ url: apiUrl + '/api/uploads/' + encodeURIComponent(filename), path: relativePath, filename: req.file.originalname || filename });
 });
 
 // POST /api/payment-issue - User reports "payment didn't go through" (optional auth, multipart: message, order_id, product_type, email?, screenshot?)
@@ -512,7 +524,8 @@ app.post('/api/payment-issue', optionalAuthForPaymentIssue, uploadMulter.single(
         let screenshotUrl = null;
         if (req.file) {
             const apiUrl = process.env.API_URL || 'http://localhost:3001';
-            screenshotUrl = apiUrl + '/uploads/' + encodeURIComponent(path.basename(req.file.path));
+            const filename = path.basename(req.file.path);
+            screenshotUrl = apiUrl + '/api/uploads/' + encodeURIComponent(filename);
         }
         const r = await pool.query(
             `INSERT INTO payment_issue_reports (order_id, product_type, email, message, screenshot_url, tx_id)
