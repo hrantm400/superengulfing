@@ -185,7 +185,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({ payUrl = '/pay/liquidi
                 <h4 className="text-foreground text-[10px] font-black uppercase tracking-widest mb-4 text-center border-b border-border pb-2">
                   What Happens Next:
                 </h4>
-                <ul className="space-y-3">
+                <ul className="space-y-4">
                     {[
                         "Complete payment ($49)",
                         "You're added to the early access list",
@@ -194,15 +194,12 @@ export const PricingCard: React.FC<PricingCardProps> = ({ payUrl = '/pay/liquidi
                     ].map((step, i) => (
                         <li 
                           key={i} 
-                          className="flex items-start gap-3 text-xs text-muted group"
+                          className="flex items-center gap-4 text-sm text-muted group"
                         >
-                            <span className="relative shrink-0 mt-0.5">
-                              <span className="absolute inset-0 rounded-full bg-amber-400/20 blur-[6px] opacity-0 group-hover:opacity-100 transition-opacity" />
-                              <span className="relative inline-flex items-center justify-center size-5 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-black font-extrabold text-[9px] shadow-[0_0_12px_rgba(250,204,21,0.75)]">
+                            <span className="relative shrink-0 flex items-center justify-center size-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black text-lg shadow-[0_0_16px_rgba(250,204,21,0.6)] ring-2 ring-amber-400/40">
                                 {i + 1}
-                              </span>
                             </span>
-                            <span className="leading-snug group-hover:text-foreground transition-colors">
+                            <span className="leading-snug group-hover:text-foreground transition-colors font-medium">
                               {step}
                             </span>
                         </li>
