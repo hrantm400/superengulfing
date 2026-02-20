@@ -39,7 +39,6 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
   const [timeLeft, setTimeLeft] = useState(20 * 60); // 20 minutes
   const [showPaymentIssueModal, setShowPaymentIssueModal] = useState(false);
   const [paymentIssueMessage, setPaymentIssueMessage] = useState('');
-  const [paymentIssueFile, setPaymentIssueFile] = useState<File | null>(null);
   const [paymentIssueSubmitting, setPaymentIssueSubmitting] = useState(false);
   const [paymentIssueError, setPaymentIssueError] = useState<string | null>(null);
   const [paymentIssueSuccess, setPaymentIssueSuccess] = useState(false);
@@ -110,7 +109,6 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
       formData.set('message', msg);
       formData.set('order_id', orderId);
       formData.set('product_type', productType);
-      if (paymentIssueFile) formData.set('screenshot', paymentIssueFile);
       if (paymentIssueHasTxId && paymentIssueTxId.trim()) formData.set('tx_id', paymentIssueTxId.trim());
       const token = getAuthToken();
       const headers: HeadersInit = {};
@@ -129,7 +127,6 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
       setTimeout(() => {
         setShowPaymentIssueModal(false);
         setPaymentIssueMessage('');
-        setPaymentIssueFile(null);
         setPaymentIssueSuccess(false);
         setPaymentIssueHasTxId(false);
         setPaymentIssueTxId('');
@@ -455,7 +452,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
               <p className="text-emerald-400 text-sm">Submitted. We&apos;ll look into it and get back to you.</p>
             ) : (
               <>
-                <p className="text-zinc-400 text-sm mb-3">Describe what happened and attach a screenshot if you have one.</p>
+                <p className="text-zinc-400 text-sm mb-3">Describe what happened. If you have a transaction ID, add it below.</p>
                 <textarea
                   value={paymentIssueMessage}
                   onChange={e => setPaymentIssueMessage(e.target.value)}
@@ -485,15 +482,6 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                     />
                   </div>
                 )}
-                <div className="mt-3">
-                  <label className="block text-xs text-zinc-500 mb-1">Screenshot (optional)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={e => setPaymentIssueFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs text-zinc-400 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-white/10 file:text-white"
-                  />
-                </div>
                 {paymentIssueError && <p className="mt-2 text-red-400 text-xs">{paymentIssueError}</p>}
                 <div className="mt-4 flex gap-2 justify-end">
                   <button type="button" onClick={() => { if (!paymentIssueSubmitting) { setShowPaymentIssueModal(false); setPaymentIssueHasTxId(false); setPaymentIssueTxId(''); } }} className="px-3 py-1.5 rounded-lg text-sm text-zinc-400 hover:text-white">

@@ -491,7 +491,7 @@ app.post('/api/upload', requireAdminAuth, uploadMulter.single('file'), (req, res
     res.json({ url: apiUrl + '/api/uploads/' + encodeURIComponent(filename), path: relativePath, filename: req.file.originalname || filename });
 });
 
-// POST /api/payment-issue - User reports "payment didn't go through" (optional auth, multipart: message, order_id, product_type, email?, screenshot?)
+// POST /api/payment-issue - User reports "payment didn't go through" (optional auth, multipart: message, order_id, product_type, email?, tx_id?)
 const optionalAuthForPaymentIssue = (req, res, next) => {
     req.user = null;
     const authHeader = req.headers.authorization;
@@ -521,16 +521,10 @@ app.post('/api/payment-issue', optionalAuthForPaymentIssue, uploadMulter.single(
         if (!message || message.length < 10) {
             return res.status(400).json({ error: 'message required (min 10 characters)' });
         }
-        let screenshotUrl = null;
-        if (req.file) {
-            const apiUrl = process.env.API_URL || 'http://localhost:3001';
-            const filename = path.basename(req.file.path);
-            screenshotUrl = apiUrl + '/api/uploads/' + encodeURIComponent(filename);
-        }
         const r = await pool.query(
             `INSERT INTO payment_issue_reports (order_id, product_type, email, message, screenshot_url, tx_id)
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`,
-            [orderId, productType, email, message, screenshotUrl, txId]
+             VALUES ($1, $2, $3, $4, NULL, $5) RETURNING id, created_at`,
+            [orderId, productType, email, message, txId]
         );
         const reportId = r.rows[0].id;
         const createdAt = r.rows[0].created_at;

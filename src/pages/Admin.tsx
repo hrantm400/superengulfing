@@ -117,7 +117,6 @@ interface PaymentIssueReport {
     product_type: string;
     email: string | null;
     message: string;
-    screenshot_url: string | null;
     tx_id: string | null;
     status: string;
     resolved_at: string | null;
@@ -2594,7 +2593,6 @@ const Admin: React.FC = () => {
                                                 <th className="text-left p-3">Order ID</th>
                                                 <th className="text-left p-3">Email</th>
                                                 <th className="text-left p-3">Message</th>
-                                                <th className="text-left p-3">Screenshot</th>
                                                 <th className="text-left p-3">Tx ID</th>
                                                 <th className="text-left p-3">Status</th>
                                                 <th className="text-left p-3">Actions</th>
@@ -2608,24 +2606,6 @@ const Admin: React.FC = () => {
                                                     <td className="p-3 font-mono text-xs">{r.order_id || '—'}</td>
                                                     <td className="p-3">{r.email || '—'}</td>
                                                     <td className="p-3 max-w-xs truncate" title={r.message}>{r.message}</td>
-                                                    <td className="p-3">
-                                                        {r.screenshot_url ? (
-                                                            <a
-                                                                href={
-                                                                    r.screenshot_url.includes('/api/uploads/')
-                                                                        ? r.screenshot_url
-                                                                        : r.screenshot_url.includes('/uploads/')
-                                                                        ? getApiUrl() + '/api/uploads/' + encodeURIComponent(r.screenshot_url.replace(/^.*\/uploads\//, '').split('?')[0].trim())
-                                                                        : r.screenshot_url
-                                                                }
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="text-primary hover:underline"
-                                                            >
-                                                                View
-                                                            </a>
-                                                        ) : '—'}
-                                                    </td>
                                                     <td className="p-3 font-mono text-xs max-w-[120px] truncate" title={r.tx_id || undefined}>{r.tx_id || '—'}</td>
                                                     <td className="p-3">
                                                         <span className={`px-2 py-0.5 rounded text-xs ${r.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>{r.status}</span>
