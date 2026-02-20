@@ -6,13 +6,15 @@ interface FeatureMeta {
   icon: string;
   spotlightNumber: string;
   imageUrl?: string;
+  /** Slightly zoom out so image fits better (SE & ICT); RSI uses default cover */
+  imageSize?: string;
 }
 
 // Local images per section: SE Pattern (secover.jpg), RSI Divergence (rsi cover.jpg), ICT Bias (bias cover.jpg)
 const featureMeta: FeatureMeta[] = [
-  { id: 'pattern', icon: 'psychology', spotlightNumber: '01', imageUrl: '/secover.jpg' },
+  { id: 'pattern', icon: 'psychology', spotlightNumber: '01', imageUrl: '/secover.jpg', imageSize: '90%' },
   { id: 'rsi', icon: 'analytics', spotlightNumber: '02', imageUrl: '/rsi%20cover.jpg' },
-  { id: 'ict', icon: 'query_stats', spotlightNumber: '03', imageUrl: '/bias%20cover.jpg' },
+  { id: 'ict', icon: 'query_stats', spotlightNumber: '03', imageUrl: '/bias%20cover.jpg', imageSize: '90%' },
 ];
 
 const LiqScanFeatureSpotlight: React.FC = () => {
@@ -70,8 +72,11 @@ const LiqScanFeatureSpotlight: React.FC = () => {
               <div className="absolute -inset-4 bg-primary/20 blur-3xl rounded-full opacity-30 group-hover:opacity-50 transition-opacity"></div>
               <div className="relative glass-panel rounded-card overflow-hidden border-primary/20 aspect-video lg:aspect-square xl:aspect-video flex items-center justify-center">
                 <div
-                  className="absolute inset-0 bg-cover bg-center transition-all duration-500 transform group-hover:scale-105"
-                  style={{ backgroundImage: activeMeta.imageUrl ? `url("${activeMeta.imageUrl}")` : undefined }}
+                  className="absolute inset-0 bg-center bg-no-repeat transition-all duration-500 transform group-hover:scale-105"
+                  style={{
+                    backgroundImage: activeMeta.imageUrl ? `url("${activeMeta.imageUrl}")` : undefined,
+                    backgroundSize: activeMeta.imageSize || 'cover',
+                  }}
                 ></div>
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-60"></div>
                 <div className="absolute bottom-6 right-6">
