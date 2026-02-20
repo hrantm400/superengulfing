@@ -111,6 +111,19 @@ interface AccessRequest {
     created_at: string;
 }
 
+interface PaymentIssueReport {
+    id: number;
+    order_id: string | null;
+    product_type: string;
+    email: string | null;
+    message: string;
+    screenshot_url: string | null;
+    status: string;
+    resolved_at: string | null;
+    resolved_by: string | null;
+    created_at: string;
+}
+
 interface IndicatorAccessRequest {
     id: number;
     email: string;
@@ -285,7 +298,7 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
     const { fetchWithAdminAuth } = useAdminAuth();
     const urlAudienceAm = location.pathname.startsWith('/am') || new URLSearchParams(location.search).get('audience') === 'am';
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'monitoring' | 'settings' | 'courses'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'monitoring' | 'settings' | 'courses' | 'paymentIssues'>('dashboard');
     const [adminAudienceLocale, setAdminAudienceLocale] = useState<'en' | 'am'>(() => (urlAudienceAm ? 'am' : 'en'));
     const [stats, setStats] = useState<Stats>({ total: 0, today: 0, thisWeek: 0, emailsSent: 0 });
     const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -303,6 +316,7 @@ const Admin: React.FC = () => {
 
     // Indicator access requests
     const [indicatorRequests, setIndicatorRequests] = useState<IndicatorAccessRequest[]>([]);
+    const [paymentIssues, setPaymentIssues] = useState<PaymentIssueReport[]>([]);
 
     // Per-broadcast and per-sequence analytics (loaded on demand)
     const [broadcastAnalytics, setBroadcastAnalytics] = useState<Record<number, { sent: number; opened: number; clicked: number; openRate: string; clickRate: string }>>({});
@@ -472,6 +486,15 @@ const Admin: React.FC = () => {
                 .catch(() => setIndicatorRequests([]));
         }
     }, [activeTab]);
+
+    useEffect(() => {
+        if (activeTab === 'paymentIssues') {
+            fetchWithAdminAuth(`${getApiUrl()}/api/admin/payment-issues`)
+                .then(res => res.json())
+                .then(data => setPaymentIssues(Array.isArray(data) ? data : []))
+                .catch(() => setPaymentIssues([]));
+        }
+    }, [activeTab, fetchWithAdminAuth]);
 
     const fetchBroadcastAnalytics = (id: number) => {
         fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts/${id}/analytics`)
@@ -1135,6 +1158,7 @@ const Admin: React.FC = () => {
                 <TabButton tab="accessRequests" icon="person_add" label="Access Requests" />
                 <TabButton tab="indicatorRequests" icon="trending_up" label="Indicator requests" />
                 <TabButton tab="courses" icon="school" label="Courses" />
+                <TabButton tab="paymentIssues" icon="receipt_long" label="Payment issues" />
                 <TabButton tab="settings" icon="settings" label="Settings" />
 
             </aside>
@@ -2509,6 +2533,83 @@ const Admin: React.FC = () => {
                 )}
 
                 {activeTab === 'courses' && <AdminCourses setMessage={setMessage} adminAudienceLocale={adminAudienceLocale} />}
+
+                {/* Payment issues (Payment didn't go through?) */}
+                {activeTab === 'paymentIssues' && (
+                    <div>
+                        <h1 className="text-3xl font-bold mb-6">Payment issues</h1>
+                        <p className="text-muted text-sm mb-4">Reports from users who said payment didn&apos;t go through. Resolve or grant course access manually.</p>
+                        <div className="bg-surface rounded-xl border border-border overflow-hidden">
+                            {paymentIssues.length === 0 ? (
+                                <p className="p-6 text-muted text-center">No payment issue reports</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="text-muted text-xs border-b border-border">
+                                                <th className="text-left p-3">Date</th>
+                                                <th className="text-left p-3">Product</th>
+                                                <th className="text-left p-3">Order ID</th>
+                                                <th className="text-left p-3">Email</th>
+                                                <th className="text-left p-3">Message</th>
+                                                <th className="text-left p-3">Screenshot</th>
+                                                <th className="text-left p-3">Status</th>
+                                                <th className="text-left p-3">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border">
+                                            {paymentIssues.map((r) => (
+                                                <tr key={r.id}>
+                                                    <td className="p-3 text-muted">{r.created_at ? new Date(r.created_at).toLocaleString() : '—'}</td>
+                                                    <td className="p-3">{r.product_type}</td>
+                                                    <td className="p-3 font-mono text-xs">{r.order_id || '—'}</td>
+                                                    <td className="p-3">{r.email || '—'}</td>
+                                                    <td className="p-3 max-w-xs truncate" title={r.message}>{r.message}</td>
+                                                    <td className="p-3">
+                                                        {r.screenshot_url ? (
+                                                            <a href={r.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View</a>
+                                                        ) : '—'}
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <span className={`px-2 py-0.5 rounded text-xs ${r.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>{r.status}</span>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        {r.status === 'pending' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const res = await fetchWithAdminAuth(`${getApiUrl()}/api/admin/payment-issues/${r.id}/resolve`, {
+                                                                            method: 'POST',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ grant_access: r.product_type === 'course' ? true : false }),
+                                                                        });
+                                                                        const data = await res.json().catch(() => ({}));
+                                                                        if (!res.ok) {
+                                                                            setMessage(data.error || 'Failed to resolve');
+                                                                            return;
+                                                                        }
+                                                                        setMessage('Resolved');
+                                                                        setPaymentIssues(prev => prev.map(x => x.id === r.id ? { ...x, status: 'resolved', resolved_at: new Date().toISOString(), resolved_by: 'admin' } : x));
+                                                                    } catch (e) {
+                                                                        setMessage('Failed to resolve');
+                                                                    }
+                                                                }}
+                                                                className="px-2 py-1 rounded bg-primary/20 text-primary text-xs hover:bg-primary/30"
+                                                            >
+                                                                Resolve
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Settings */}
                 {activeTab === 'settings' && (

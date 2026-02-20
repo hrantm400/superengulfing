@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { Lock, X } from 'lucide-react';
+import React from 'react';
+import { Lock } from 'lucide-react';
 
 interface PricingCardProps {
   customerEmail?: string;
   orderId?: string;
+  payUrl?: string;
 }
 
-export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId }) => {
-  const [showWidget, setShowWidget] = useState(false);
+export const PricingCard: React.FC<PricingCardProps> = ({ payUrl = '/pay/liquidityscan' }) => {
   const btnText = "CLAIM MY 3 MONTHS";
 
   return (
@@ -119,17 +119,17 @@ export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId
 
       <div className="flex flex-col justify-center h-full w-full max-w-md">
         {/* Card Container */}
-        <div className="bg-card-dark border border-white/10 p-1 rounded-2xl shadow-2xl relative overflow-hidden group">
+        <div className="bg-surface border border-border p-1 rounded-2xl shadow-2xl relative overflow-hidden group">
           {/* Hover Glow Effect */}
           <div className="absolute -inset-1 bg-gradient-to-b from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-2xl blur-md pointer-events-none"></div>
           
-          <div className="bg-[#0f0f11] rounded-xl p-8 lg:p-10 relative z-10 flex flex-col gap-6 h-full">
+          <div className="bg-surface rounded-xl p-8 lg:p-10 relative z-10 flex flex-col gap-6 h-full border border-border">
             
             {/* Header */}
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-white text-2xl font-black uppercase tracking-tight">Early Access</h3>
-                <p className="text-text-muted text-xs mt-1 font-medium">Batch #1: Closing Soon</p>
+                <h3 className="text-foreground text-2xl font-black uppercase tracking-tight">Early Access</h3>
+                <p className="text-muted text-xs mt-1 font-medium">Batch #1: Closing Soon</p>
               </div>
               <div className="bg-primary text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded animate-pulse shadow-[0_0_10px_rgba(57,255,20,0.4)]">
                 66% OFF
@@ -137,26 +137,26 @@ export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId
             </div>
 
             {/* Pricing */}
-            <div className="py-6 border-y border-dashed border-white/10 flex flex-col items-center justify-center text-center bg-white/[0.02] rounded-lg">
-              <span className="text-text-muted line-through text-sm font-bold mb-1 opacity-60">$147.00</span>
+            <div className="py-6 border-y border-dashed border-border flex flex-col items-center justify-center text-center bg-background/50 rounded-lg">
+              <span className="text-muted line-through text-sm font-bold mb-1 opacity-60">$147.00</span>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-primary text-5xl font-black tracking-tighter drop-shadow-[0_0_15px_rgba(57,255,20,0.15)]">$49</span>
-                <span className="text-white font-bold uppercase text-lg tracking-tight opacity-90">/ 3 MONTHS</span>
+                <span className="text-foreground font-bold uppercase text-lg tracking-tight opacity-90">/ 3 MONTHS</span>
               </div>
               <p className="text-primary font-bold text-sm mt-2 tracking-wide bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
                 Just $16.33 / month
               </p>
-              <p className="text-text-muted text-[10px] mt-4 max-w-[240px] leading-tight opacity-80">
-                <span className="text-white font-bold">Regular Price: $49/mo</span>.<br/> 
+              <p className="text-muted text-[10px] mt-4 max-w-[240px] leading-tight opacity-80">
+                <span className="text-foreground font-bold">Regular Price: $49/mo</span>.<br/> 
                 Early Access Deal: 3 Months for the price of 1.
               </p>
             </div>
 
             {/* Button */}
             <div className="space-y-4 pt-2">
-              <button 
-                onClick={() => setShowWidget(true)}
-                className="morph-btn group"
+              <a
+                href={payUrl}
+                className="morph-btn group block text-center no-underline"
               >
                 <div className="corners">
                     <span></span><span></span><span></span><span></span>
@@ -172,17 +172,17 @@ export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId
                 <div className="orbit-dots">
                     <span></span><span></span><span></span><span></span>
                 </div>
-              </button>
+              </a>
               
-              <div className="flex items-center justify-center gap-2 text-text-muted text-[10px] uppercase font-bold tracking-wider opacity-70">
+              <div className="flex items-center justify-center gap-2 text-muted text-[10px] uppercase font-bold tracking-wider opacity-70">
                 <Lock size={12} />
                 SSL Secure Checkout
               </div>
             </div>
 
             {/* What Happens Next */}
-            <div className="bg-white/[0.03] rounded-lg p-5 border border-white/5 mt-2">
-                <h4 className="text-white text-[10px] font-black uppercase tracking-widest mb-4 text-center border-b border-white/5 pb-2">
+            <div className="bg-background/30 rounded-lg p-5 border border-border mt-2">
+                <h4 className="text-foreground text-[10px] font-black uppercase tracking-widest mb-4 text-center border-b border-border pb-2">
                   What Happens Next:
                 </h4>
                 <ul className="space-y-3">
@@ -194,15 +194,15 @@ export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId
                     ].map((step, i) => (
                         <li 
                           key={i} 
-                          className="flex items-start gap-3 text-xs text-text-muted group"
+                          className="flex items-start gap-3 text-xs text-muted group"
                         >
                             <span className="relative shrink-0 mt-0.5">
-                              <span className="absolute inset-0 rounded-full bg-[#facc15]/20 blur-[6px] opacity-0 group-hover:opacity-100 transition-opacity" />
-                              <span className="relative inline-flex items-center justify-center size-5 rounded-full bg-gradient-to-br from-[#facc15] to-[#f97316] text-black font-extrabold text-[9px] shadow-[0_0_12px_rgba(250,204,21,0.75)]">
+                              <span className="absolute inset-0 rounded-full bg-amber-400/20 blur-[6px] opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <span className="relative inline-flex items-center justify-center size-5 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-black font-extrabold text-[9px] shadow-[0_0_12px_rgba(250,204,21,0.75)]">
                                 {i + 1}
                               </span>
                             </span>
-                            <span className="leading-snug group-hover:text-white transition-colors">
+                            <span className="leading-snug group-hover:text-foreground transition-colors">
                               {step}
                             </span>
                         </li>
@@ -214,7 +214,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId
 
         {/* Social Proof Quote */}
         <div className="mt-8 text-center max-w-xs mx-auto cursor-default opacity-80 hover:opacity-100 transition-opacity">
-          <p className="text-white text-sm font-medium italic leading-relaxed">
+          <p className="text-foreground text-sm font-medium italic leading-relaxed">
             "I found 3 setups in my first hour that I would've missed manually. This scanner pays for itself instantly."
           </p>
           <div className="mt-3 flex items-center justify-center gap-2">
@@ -223,43 +223,6 @@ export const PricingCard: React.FC<PricingCardProps> = ({ customerEmail, orderId
           </div>
         </div>
       </div>
-
-      {/* Payment Widget Modal */}
-      {showWidget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-black/90 backdrop-blur-md transition-opacity"
-            onClick={() => setShowWidget(false)}
-          />
-          <div className="relative w-full max-w-[420px] bg-white rounded-xl overflow-hidden shadow-2xl border border-white/10 animate-[pulse_0.5s_ease-out]">
-            <button 
-                onClick={() => setShowWidget(false)}
-                className="absolute top-2 right-2 z-10 p-2 bg-black/10 hover:bg-black/20 text-black/70 hover:text-black rounded-full transition-colors"
-            >
-                <X size={20} />
-            </button>
-            <div className="w-full flex justify-center bg-white h-[696px]">
-              <iframe
-                src={(() => {
-                  const base = 'https://nowpayments.io/embeds/payment-widget';
-                  const params = new URLSearchParams({ iid: '6123204707' });
-                  if (customerEmail) params.set('customer_email', customerEmail);
-                  if (orderId) params.set('order_id', orderId);
-                  return `${base}?${params.toString()}`;
-                })()}
-                width="410"
-                height="696"
-                frameBorder="0"
-                scrolling="no"
-                style={{ overflowY: 'hidden', maxWidth: '100%' }}
-                title="Payment Widget"
-              >
-                Can't load widget
-              </iframe>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };

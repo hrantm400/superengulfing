@@ -479,6 +479,150 @@ app.post('/api/upload', requireAdminAuth, uploadMulter.single('file'), (req, res
     res.json({ url: apiUrl + '/uploads/' + encodeURIComponent(filename), path: relativePath, filename: req.file.originalname || filename });
 });
 
+// POST /api/payment-issue - User reports "payment didn't go through" (optional auth, multipart: message, order_id, product_type, email?, screenshot?)
+const optionalAuthForPaymentIssue = (req, res, next) => {
+    req.user = null;
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return next();
+    const token = authHeader.slice(7);
+    try {
+        const decoded = jwt.verify(token, jwtSecret);
+        req.user = { id: decoded.sub, email: decoded.email };
+        next();
+    } catch {
+        next();
+    }
+};
+app.post('/api/payment-issue', optionalAuthForPaymentIssue, uploadMulter.single('screenshot'), async (req, res) => {
+    try {
+        const message = (req.body && req.body.message) ? String(req.body.message).trim() : '';
+        const orderId = (req.body && req.body.order_id) ? String(req.body.order_id).trim() || null : null;
+        const productType = (req.body && req.body.product_type) ? String(req.body.product_type).trim() : '';
+        const emailBody = (req.body && req.body.email) ? String(req.body.email).trim() || null : null;
+        const email = (req.user && req.user.email) || emailBody || null;
+        if (!productType || !['course', 'liquidityscan_pro'].includes(productType)) {
+            return res.status(400).json({ error: 'product_type must be course or liquidityscan_pro' });
+        }
+        if (!message || message.length < 10) {
+            return res.status(400).json({ error: 'message required (min 10 characters)' });
+        }
+        let screenshotUrl = null;
+        if (req.file) {
+            const apiUrl = process.env.API_URL || 'http://localhost:3001';
+            screenshotUrl = apiUrl + '/uploads/' + encodeURIComponent(path.basename(req.file.path));
+        }
+        const r = await pool.query(
+            `INSERT INTO payment_issue_reports (order_id, product_type, email, message, screenshot_url)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
+            [orderId, productType, email, message, screenshotUrl]
+        );
+        return res.json({ id: r.rows[0].id, created_at: r.rows[0].created_at });
+    } catch (e) {
+        if (e.message && /relation "payment_issue_reports" does not exist/i.test(e.message)) {
+            return res.status(503).json({ error: 'Payment issue reports not available. Run migration 031_payment_issue_reports.sql' });
+        }
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/admin/payment-issues - List payment issue reports (admin)
+app.get('/api/admin/payment-issues', requireAdminAuth, async (req, res) => {
+    try {
+        const r = await pool.query(
+            `SELECT id, order_id, product_type, email, message, screenshot_url, status, resolved_at, resolved_by, created_at
+             FROM payment_issue_reports ORDER BY created_at DESC LIMIT 200`
+        );
+        return res.json(r.rows.map(row => ({
+            id: row.id,
+            order_id: row.order_id,
+            product_type: row.product_type,
+            email: row.email,
+            message: row.message,
+            screenshot_url: row.screenshot_url,
+            status: row.status,
+            resolved_at: row.resolved_at ? row.resolved_at.toISOString() : null,
+            resolved_by: row.resolved_by,
+            created_at: row.created_at ? row.created_at.toISOString() : null
+        })));
+    } catch (e) {
+        if (e.message && /relation "payment_issue_reports" does not exist/i.test(e.message)) {
+            return res.status(503).json({ error: 'Run migration 031_payment_issue_reports.sql' });
+        }
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/payment-issues/:id/resolve - Resolve and optionally grant access (admin)
+app.post('/api/admin/payment-issues/:id/resolve', requireAdminAuth, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const { grant_access, course_id } = req.body || {};
+    const adminEmail = req.admin && req.admin.email ? req.admin.email : 'admin';
+    try {
+        const reportRes = await pool.query(
+            'SELECT id, order_id, product_type, email, status FROM payment_issue_reports WHERE id = $1',
+            [id]
+        );
+        if (reportRes.rows.length === 0) return res.status(404).json({ error: 'Report not found' });
+        const report = reportRes.rows[0];
+        if (report.status === 'resolved') return res.json({ ok: true, message: 'Already resolved' });
+
+        if (grant_access === true) {
+            let userId = null;
+            if (report.order_id) {
+                const orderRow = await pool.query(
+                    'SELECT user_id, product_id FROM usdt_orders WHERE order_id = $1',
+                    [report.order_id]
+                );
+                if (orderRow.rows.length > 0) {
+                    userId = orderRow.rows[0].user_id;
+                    const orderProductId = orderRow.rows[0].product_id;
+                    if (report.product_type === 'course' && (orderProductId || course_id)) {
+                        const cid = course_id || orderProductId;
+                        await pool.query(
+                            `INSERT INTO course_payments (user_id, course_id, payment_id, status)
+                             VALUES ($1, $2, $3, 'completed')
+                             ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
+                            [userId, cid, 'manual-' + id]
+                        );
+                        await pool.query(
+                            'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
+                            [userId, cid]
+                        );
+                    }
+                }
+            }
+            if (!userId && report.email) {
+                const userRow = await pool.query('SELECT id FROM dashboard_users WHERE LOWER(email) = LOWER($1) LIMIT 1', [report.email]);
+                if (userRow.rows.length > 0 && report.product_type === 'course' && course_id) {
+                    userId = userRow.rows[0].id;
+                    await pool.query(
+                        `INSERT INTO course_payments (user_id, course_id, payment_id, status)
+                         VALUES ($1, $2, $3, 'completed')
+                         ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
+                        [userId, course_id, 'manual-' + id]
+                    );
+                    await pool.query(
+                        'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
+                        [userId, course_id]
+                    );
+                }
+            }
+        }
+
+        await pool.query(
+            `UPDATE payment_issue_reports SET status = 'resolved', resolved_at = NOW(), resolved_by = $2 WHERE id = $1`,
+            [id, adminEmail]
+        );
+        return res.json({ ok: true });
+    } catch (e) {
+        if (e.message && /relation "payment_issue_reports" does not exist/i.test(e.message)) {
+            return res.status(503).json({ error: 'Run migration 031_payment_issue_reports.sql' });
+        }
+        return res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/me', requireAuth, async (req, res) => {
     try {
         const result = await pool.query(

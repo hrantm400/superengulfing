@@ -16,6 +16,7 @@ async function run() {
         const migrations = [
             { file: '029_usdt_orders.sql', label: '029 (usdt_orders)' },
             { file: '030_usdt_deposit_addresses.sql', label: '030 (usdt_deposit_addresses)' },
+            { file: '031_payment_issue_reports.sql', label: '031 (payment_issue_reports)' },
         ];
 
         for (const m of migrations) {

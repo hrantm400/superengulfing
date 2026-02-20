@@ -72,18 +72,11 @@ const LiqScanPricing: React.FC = () => {
               ))}
             </ul>
             <Link
-              to={localizePath('/pay/liquidityscan')}
+              to={localizePath('/LS3MONTHOFF')}
               className="w-full py-3 rounded-xl font-bold text-sm bg-primary hover:bg-primary-glow text-[#020617] transition-all shadow-[0_0_20px_rgba(57,255,20,0.2)] hover:shadow-[0_0_24px_rgba(57,255,20,0.3)] text-center block"
             >
-              {t('liqScan.pricing.getAccess')}
+              Get 3 months deal
             </Link>
-            <button
-              type="button"
-              onClick={() => (window.location.href = localizePath('/pay/liquidityscan') + '?test=1')}
-              className="w-full mt-2 py-2.5 rounded-xl font-medium text-xs border border-primary/50 text-primary hover:bg-primary/10 transition-colors text-center"
-            >
-              Test with $10 USDT (TRC20)
-            </button>
             <p className="text-center text-[11px] text-muted mt-3">{t('liqScan.pricing.cancelAnytime')}</p>
           </div>
         </div>

@@ -24,25 +24,25 @@ export const HeroContent: React.FC = () => {
 
       {/* Headline */}
       <h1 className="text-5xl md:text-6xl lg:text-7xl font-black leading-[0.9] tracking-tight mb-6 uppercase">
-        <span className="block text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)]">
+        <span className="block text-foreground drop-shadow-[0_0_20px_rgba(0,0,0,0.3)]">
           Stop Hunting
         </span>
         <span className="block text-primary drop-shadow-[0_0_28px_rgba(57,255,20,0.45)]">
           Liquidity.
         </span>
-        <span className="block text-[#facc15] drop-shadow-[0_0_28px_rgba(250,204,21,0.55)]">
+        <span className="block text-amber-400 drop-shadow-[0_0_28px_rgba(250,204,21,0.55)]">
           Let It Find You.
         </span>
       </h1>
 
       {/* Subhead */}
-      <p className="text-text-muted text-lg font-medium leading-relaxed mb-10 max-w-xl">
+      <p className="text-muted text-lg font-medium leading-relaxed mb-10 max-w-xl">
         You learned the pattern. Now let the scanner find every setup — across every market — while you sleep. 24/7. Automatic.
       </p>
 
       {/* Features List */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6 md:p-8 backdrop-blur-md">
-        <h3 className="text-white text-sm font-black uppercase tracking-widest mb-6 border-b border-white/10 pb-4 flex items-center gap-2">
+      <div className="bg-surface border border-border rounded-xl p-6 md:p-8 backdrop-blur-md">
+        <h3 className="text-foreground text-sm font-black uppercase tracking-widest mb-6 border-b border-border pb-4 flex items-center gap-2">
           <span className="text-primary">///</span> What You Get:
         </h3>
         
@@ -54,7 +54,7 @@ export const HeroContent: React.FC = () => {
                 size={18} 
                 strokeWidth={3}
               />
-              <span className="text-gray-200 font-bold text-sm tracking-tight group-hover:text-white transition-colors">
+              <span className="text-muted font-bold text-sm tracking-tight group-hover:text-foreground transition-colors">
                 {feature}
               </span>
             </li>

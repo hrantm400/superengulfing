@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { useLocale } from '../../contexts/LocaleContext';
 import { useTranslation } from '../../locales';
-import { getApiUrl } from '../../lib/api';
-import { Copy, Check, Loader2, ShieldCheck, Clock, Coins, ScanLine } from 'lucide-react';
+import { getApiUrl, getAuthToken } from '../../lib/api';
+import { Copy, Check, Loader2, ShieldCheck, Clock, Coins, ScanLine, X } from 'lucide-react';
 
 export interface USDTPaymentPageProps {
   orderId: string;
@@ -37,6 +37,12 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
   const [polling, setPolling] = useState(true);
   const [tab, setTab] = useState<'addr' | 'qr'>('addr');
   const [timeLeft, setTimeLeft] = useState(20 * 60); // 20 minutes
+  const [showPaymentIssueModal, setShowPaymentIssueModal] = useState(false);
+  const [paymentIssueMessage, setPaymentIssueMessage] = useState('');
+  const [paymentIssueFile, setPaymentIssueFile] = useState<File | null>(null);
+  const [paymentIssueSubmitting, setPaymentIssueSubmitting] = useState(false);
+  const [paymentIssueError, setPaymentIssueError] = useState<string | null>(null);
+  const [paymentIssueSuccess, setPaymentIssueSuccess] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -88,6 +94,45 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
     .padStart(2, '0');
   const seconds = (timeLeft % 60).toString().padStart(2, '0');
   const timerProgress = 100 - (timeLeft / (20 * 60 || 1)) * 100;
+
+  const submitPaymentIssue = async () => {
+    const msg = paymentIssueMessage.trim();
+    if (msg.length < 10) {
+      setPaymentIssueError('Please describe the problem (at least 10 characters).');
+      return;
+    }
+    setPaymentIssueError(null);
+    setPaymentIssueSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.set('message', msg);
+      formData.set('order_id', orderId);
+      formData.set('product_type', productType);
+      if (paymentIssueFile) formData.set('screenshot', paymentIssueFile);
+      const token = getAuthToken();
+      const headers: HeadersInit = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${getApiUrl()}/api/payment-issue`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPaymentIssueError(data.error || 'Failed to submit. Try again.');
+        return;
+      }
+      setPaymentIssueSuccess(true);
+      setTimeout(() => {
+        setShowPaymentIssueModal(false);
+        setPaymentIssueMessage('');
+        setPaymentIssueFile(null);
+        setPaymentIssueSuccess(false);
+      }, 1500);
+    } finally {
+      setPaymentIssueSubmitting(false);
+    }
+  };
 
   const isPending = status === 'pending';
   const isConfirming = status === 'confirming';
@@ -367,7 +412,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                 </p>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Link
-                    to={productType === 'course' ? localizePath('/dashboard') : localizePath('/liquidityscan')}
+                    to={productType === 'course' ? localizePath('/dashboard') : localizePath('/LS3MONTHOFF')}
                     className="inline-flex px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-zinc-100 font-medium transition-colors"
                   >
                     {productType === 'course'
@@ -375,11 +420,67 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                       : t('usdt.backToLiquidityScan')}
                   </Link>
                 </div>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentIssueModal(true)}
+                    className="text-xs text-zinc-400 hover:text-zinc-300 underline underline-offset-2"
+                  >
+                    Payment didn&apos;t go through?
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Payment issue report modal */}
+      {showPaymentIssueModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70" onClick={() => !paymentIssueSubmitting && setShowPaymentIssueModal(false)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-zinc-900 border border-white/10 shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-white">Payment didn&apos;t go through?</h3>
+              <button type="button" onClick={() => !paymentIssueSubmitting && setShowPaymentIssueModal(false)} className="p-1 text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {paymentIssueSuccess ? (
+              <p className="text-emerald-400 text-sm">Submitted. We&apos;ll look into it and get back to you.</p>
+            ) : (
+              <>
+                <p className="text-zinc-400 text-sm mb-3">Describe what happened and attach a screenshot if you have one.</p>
+                <textarea
+                  value={paymentIssueMessage}
+                  onChange={e => setPaymentIssueMessage(e.target.value)}
+                  placeholder="e.g. I sent the USDT but the page still shows waiting..."
+                  className="w-full h-24 px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white placeholder-zinc-500 text-sm resize-none"
+                  maxLength={2000}
+                />
+                <div className="mt-3">
+                  <label className="block text-xs text-zinc-500 mb-1">Screenshot (optional)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => setPaymentIssueFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-zinc-400 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-white/10 file:text-white"
+                  />
+                </div>
+                {paymentIssueError && <p className="mt-2 text-red-400 text-xs">{paymentIssueError}</p>}
+                <div className="mt-4 flex gap-2 justify-end">
+                  <button type="button" onClick={() => !paymentIssueSubmitting && setShowPaymentIssueModal(false)} className="px-3 py-1.5 rounded-lg text-sm text-zinc-400 hover:text-white">
+                    Cancel
+                  </button>
+                  <button type="button" onClick={submitPaymentIssue} disabled={paymentIssueSubmitting} className="px-4 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50">
+                    {paymentIssueSubmitting ? 'Sending…' : 'Submit'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
