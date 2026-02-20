@@ -109,6 +109,8 @@ export default function App() {
       suppressHydrationWarning
     >
       <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5" />
         <meta name="google-site-verification" content="phObeDb8UJ29dMEbXPRhHqtRVnRRDh15trtvFXZ_hEc" />
         <ThemeScript />
         <Meta />
