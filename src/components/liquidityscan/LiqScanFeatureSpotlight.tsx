@@ -8,11 +8,11 @@ interface FeatureMeta {
   imageUrl?: string;
 }
 
-// Thematic images per section: SE Pattern (candlestick/charts), RSI (analytics), ICT Bias (market structure)
+// Local images per section: SE Pattern (secover.jpg), RSI Divergence (rsi cover.jpg), ICT Bias (bias cover.jpg)
 const featureMeta: FeatureMeta[] = [
-  { id: 'pattern', icon: 'psychology', spotlightNumber: '01', imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80' },
-  { id: 'rsi', icon: 'analytics', spotlightNumber: '02', imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80' },
-  { id: 'ict', icon: 'query_stats', spotlightNumber: '03', imageUrl: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80' },
+  { id: 'pattern', icon: 'psychology', spotlightNumber: '01', imageUrl: '/secover.jpg' },
+  { id: 'rsi', icon: 'analytics', spotlightNumber: '02', imageUrl: '/rsi%20cover.jpg' },
+  { id: 'ict', icon: 'query_stats', spotlightNumber: '03', imageUrl: '/bias%20cover.jpg' },
 ];
 
 const LiqScanFeatureSpotlight: React.FC = () => {
