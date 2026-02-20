@@ -500,6 +500,9 @@ app.post('/api/payment-issue', optionalAuthForPaymentIssue, uploadMulter.single(
         const productType = (req.body && req.body.product_type) ? String(req.body.product_type).trim() : '';
         const emailBody = (req.body && req.body.email) ? String(req.body.email).trim() || null : null;
         const email = (req.user && req.user.email) || emailBody || null;
+        let txId = (req.body && req.body.tx_id) ? String(req.body.tx_id).trim() : null;
+        if (txId && txId.length > 128) txId = txId.slice(0, 128);
+        if (!txId) txId = null;
         if (!productType || !['course', 'liquidityscan_pro'].includes(productType)) {
             return res.status(400).json({ error: 'product_type must be course or liquidityscan_pro' });
         }
@@ -512,15 +515,107 @@ app.post('/api/payment-issue', optionalAuthForPaymentIssue, uploadMulter.single(
             screenshotUrl = apiUrl + '/uploads/' + encodeURIComponent(path.basename(req.file.path));
         }
         const r = await pool.query(
-            `INSERT INTO payment_issue_reports (order_id, product_type, email, message, screenshot_url)
-             VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
-            [orderId, productType, email, message, screenshotUrl]
+            `INSERT INTO payment_issue_reports (order_id, product_type, email, message, screenshot_url, tx_id)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`,
+            [orderId, productType, email, message, screenshotUrl, txId]
         );
-        return res.json({ id: r.rows[0].id, created_at: r.rows[0].created_at });
+        const reportId = r.rows[0].id;
+        const createdAt = r.rows[0].created_at;
+        const fromAddr = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER;
+        const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
+        if (transporter && notifyTo) {
+            transporter.sendMail({
+                from: fromAddr,
+                to: notifyTo,
+                subject: `Payment issue from user — ${productType}`,
+                text: [
+                    'A user reported a payment issue.',
+                    `Product: ${productType}`,
+                    `Order ID: ${orderId || '—'}`,
+                    `Email: ${email || '—'}`,
+                    txId ? `Transaction ID: ${txId}` : '',
+                    '',
+                    'Message:',
+                    message,
+                ].filter(Boolean).join('\n'),
+            }).catch((err) => console.warn('[payment-issue] admin email failed:', err.message));
+        }
+        if (transporter && email && email.includes('@')) {
+            transporter.sendMail({
+                from: fromAddr,
+                to: email,
+                subject: 'We received your payment issue report',
+                text: [
+                    'Hi,',
+                    '',
+                    "We've received your request regarding a payment that didn't go through. We'll look into it and get back to you shortly.",
+                    '',
+                    '– SuperEngulfing',
+                ].join('\n'),
+            }).catch((err) => console.warn('[payment-issue] user email failed:', err.message));
+        }
+        return res.json({ id: reportId, created_at: createdAt });
     } catch (e) {
         if (e.message && /relation "payment_issue_reports" does not exist/i.test(e.message)) {
             return res.status(503).json({ error: 'Payment issue reports not available. Run migration 031_payment_issue_reports.sql' });
         }
+        if (e.message && /column "tx_id" does not exist/i.test(e.message)) {
+            return res.status(503).json({ error: 'Run migration 032_payment_issue_tx_id.sql' });
+        }
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/admin/liquidityscan-early-users - List LS3MONTHOFF paid users (admin)
+app.get('/api/admin/liquidityscan-early-users', requireAdminAuth, async (req, res) => {
+    try {
+        const r = await pool.query(
+            `SELECT id, order_id, email, amount_usdt, tx_hash, created_at, user_id
+             FROM usdt_orders
+             WHERE product_type = 'liquidityscan_pro' AND status = 'completed'
+             ORDER BY created_at DESC`
+        );
+        return res.json(r.rows.map(row => ({
+            id: row.id,
+            order_id: row.order_id,
+            email: row.email || null,
+            amount_usdt: row.amount_usdt != null ? Number(row.amount_usdt) : null,
+            tx_hash: row.tx_hash || null,
+            created_at: row.created_at ? row.created_at.toISOString() : null,
+            user_id: row.user_id,
+        })));
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/liquidityscan-early-users - Manually add LS early user (admin)
+app.post('/api/admin/liquidityscan-early-users', requireAdminAuth, async (req, res) => {
+    try {
+        const { email, amount_usdt, note } = req.body || {};
+        const emailStr = email ? String(email).trim() : '';
+        if (!emailStr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
+            return res.status(400).json({ error: 'Valid email is required' });
+        }
+        const amount = amount_usdt != null ? parseFloat(amount_usdt) : 49;
+        const orderId = 'manual-' + Date.now();
+        const r = await pool.query(
+            `INSERT INTO usdt_orders (order_id, product_type, product_id, user_id, email, amount_usdt, status)
+             VALUES ($1, 'liquidityscan_pro', NULL, NULL, $2, $3, 'completed')
+             RETURNING id, order_id, email, amount_usdt, tx_hash, created_at`,
+            [orderId, emailStr, isNaN(amount) ? 49 : amount]
+        );
+        const row = r.rows[0];
+        return res.json({
+            id: row.id,
+            order_id: row.order_id,
+            email: row.email,
+            amount_usdt: row.amount_usdt != null ? Number(row.amount_usdt) : null,
+            tx_hash: row.tx_hash || null,
+            created_at: row.created_at ? row.created_at.toISOString() : null,
+        });
+    } catch (e) {
+        if (e.message && /usdt_orders/i.test(e.message)) return res.status(500).json({ error: e.message });
         return res.status(500).json({ error: e.message });
     }
 });
@@ -529,7 +624,7 @@ app.post('/api/payment-issue', optionalAuthForPaymentIssue, uploadMulter.single(
 app.get('/api/admin/payment-issues', requireAdminAuth, async (req, res) => {
     try {
         const r = await pool.query(
-            `SELECT id, order_id, product_type, email, message, screenshot_url, status, resolved_at, resolved_by, created_at
+            `SELECT id, order_id, product_type, email, message, screenshot_url, tx_id, status, resolved_at, resolved_by, created_at
              FROM payment_issue_reports ORDER BY created_at DESC LIMIT 200`
         );
         return res.json(r.rows.map(row => ({
@@ -539,6 +634,7 @@ app.get('/api/admin/payment-issues', requireAdminAuth, async (req, res) => {
             email: row.email,
             message: row.message,
             screenshot_url: row.screenshot_url,
+            tx_id: row.tx_id || null,
             status: row.status,
             resolved_at: row.resolved_at ? row.resolved_at.toISOString() : null,
             resolved_by: row.resolved_by,

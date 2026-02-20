@@ -118,10 +118,21 @@ interface PaymentIssueReport {
     email: string | null;
     message: string;
     screenshot_url: string | null;
+    tx_id: string | null;
     status: string;
     resolved_at: string | null;
     resolved_by: string | null;
     created_at: string;
+}
+
+interface LiquidityScanEarlyUser {
+    id: number;
+    order_id: string;
+    email: string | null;
+    amount_usdt: number | null;
+    tx_hash: string | null;
+    created_at: string | null;
+    user_id?: number | null;
 }
 
 interface IndicatorAccessRequest {
@@ -298,7 +309,7 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
     const { fetchWithAdminAuth } = useAdminAuth();
     const urlAudienceAm = location.pathname.startsWith('/am') || new URLSearchParams(location.search).get('audience') === 'am';
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'monitoring' | 'settings' | 'courses' | 'paymentIssues'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'monitoring' | 'settings' | 'courses' | 'paymentIssues' | 'liquidityScanEarlyUsers'>('dashboard');
     const [adminAudienceLocale, setAdminAudienceLocale] = useState<'en' | 'am'>(() => (urlAudienceAm ? 'am' : 'en'));
     const [stats, setStats] = useState<Stats>({ total: 0, today: 0, thisWeek: 0, emailsSent: 0 });
     const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -317,6 +328,12 @@ const Admin: React.FC = () => {
     // Indicator access requests
     const [indicatorRequests, setIndicatorRequests] = useState<IndicatorAccessRequest[]>([]);
     const [paymentIssues, setPaymentIssues] = useState<PaymentIssueReport[]>([]);
+    const [liquidityScanEarlyUsers, setLiquidityScanEarlyUsers] = useState<LiquidityScanEarlyUser[]>([]);
+    const [showAddEarlyUserModal, setShowAddEarlyUserModal] = useState(false);
+    const [addEarlyUserEmail, setAddEarlyUserEmail] = useState('');
+    const [addEarlyUserAmount, setAddEarlyUserAmount] = useState('49');
+    const [addEarlyUserSubmitting, setAddEarlyUserSubmitting] = useState(false);
+    const [addEarlyUserError, setAddEarlyUserError] = useState<string | null>(null);
 
     // Per-broadcast and per-sequence analytics (loaded on demand)
     const [broadcastAnalytics, setBroadcastAnalytics] = useState<Record<number, { sent: number; opened: number; clicked: number; openRate: string; clickRate: string }>>({});
@@ -493,6 +510,15 @@ const Admin: React.FC = () => {
                 .then(res => res.json())
                 .then(data => setPaymentIssues(Array.isArray(data) ? data : []))
                 .catch(() => setPaymentIssues([]));
+        }
+    }, [activeTab, fetchWithAdminAuth]);
+
+    useEffect(() => {
+        if (activeTab === 'liquidityScanEarlyUsers') {
+            fetchWithAdminAuth(`${getApiUrl()}/api/admin/liquidityscan-early-users`)
+                .then(res => res.json())
+                .then(data => setLiquidityScanEarlyUsers(Array.isArray(data) ? data : []))
+                .catch(() => setLiquidityScanEarlyUsers([]));
         }
     }, [activeTab, fetchWithAdminAuth]);
 
@@ -1159,6 +1185,7 @@ const Admin: React.FC = () => {
                 <TabButton tab="indicatorRequests" icon="trending_up" label="Indicator requests" />
                 <TabButton tab="courses" icon="school" label="Courses" />
                 <TabButton tab="paymentIssues" icon="receipt_long" label="Payment issues" />
+                <TabButton tab="liquidityScanEarlyUsers" icon="groups" label="LS Early Users" />
                 <TabButton tab="settings" icon="settings" label="Settings" />
 
             </aside>
@@ -2553,6 +2580,7 @@ const Admin: React.FC = () => {
                                                 <th className="text-left p-3">Email</th>
                                                 <th className="text-left p-3">Message</th>
                                                 <th className="text-left p-3">Screenshot</th>
+                                                <th className="text-left p-3">Tx ID</th>
                                                 <th className="text-left p-3">Status</th>
                                                 <th className="text-left p-3">Actions</th>
                                             </tr>
@@ -2570,6 +2598,7 @@ const Admin: React.FC = () => {
                                                             <a href={r.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View</a>
                                                         ) : '—'}
                                                     </td>
+                                                    <td className="p-3 font-mono text-xs max-w-[120px] truncate" title={r.tx_id || undefined}>{r.tx_id || '—'}</td>
                                                     <td className="p-3">
                                                         <span className={`px-2 py-0.5 rounded text-xs ${r.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>{r.status}</span>
                                                     </td>
@@ -2608,6 +2637,129 @@ const Admin: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {/* LiquidityScan Early Users */}
+                {activeTab === 'liquidityScanEarlyUsers' && (
+                    <div>
+                        <h1 className="text-3xl font-bold mb-6">LiquidityScan Early Users</h1>
+                        <p className="text-muted text-sm mb-4">Users who paid for LS3MONTHOFF (LiquidityScan Premium). Payment details below. You can add a user manually if needed.</p>
+                        <div className="mb-4">
+                            <button
+                                type="button"
+                                onClick={() => { setShowAddEarlyUserModal(true); setAddEarlyUserError(null); setAddEarlyUserEmail(''); setAddEarlyUserAmount('49'); }}
+                                className="px-4 py-2 rounded-lg bg-primary/20 text-primary text-sm font-medium hover:bg-primary/30"
+                            >
+                                Add manually
+                            </button>
+                        </div>
+                        <div className="bg-surface rounded-xl border border-border overflow-hidden">
+                            {liquidityScanEarlyUsers.length === 0 ? (
+                                <p className="p-6 text-muted text-center">No LiquidityScan early users yet</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="text-muted text-xs border-b border-border">
+                                                <th className="text-left p-3">Email</th>
+                                                <th className="text-left p-3">Order ID</th>
+                                                <th className="text-left p-3">Amount (USDT)</th>
+                                                <th className="text-left p-3">Tx Hash</th>
+                                                <th className="text-left p-3">Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border">
+                                            {liquidityScanEarlyUsers.map((u) => (
+                                                <tr key={u.id}>
+                                                    <td className="p-3">{u.email || '—'}</td>
+                                                    <td className="p-3 font-mono text-xs">{u.order_id}</td>
+                                                    <td className="p-3">{u.amount_usdt != null ? u.amount_usdt : '—'}</td>
+                                                    <td className="p-3">
+                                                        {u.tx_hash ? (
+                                                            <a href={`https://tronscan.org/#/transaction/${u.tx_hash}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-mono text-xs truncate max-w-[140px] inline-block">View</a>
+                                                        ) : '—'}
+                                                    </td>
+                                                    <td className="p-3 text-muted">{u.created_at ? new Date(u.created_at).toLocaleString() : '—'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Add Early User modal */}
+                        {showAddEarlyUserModal && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                                <div className="absolute inset-0 bg-black/60" onClick={() => !addEarlyUserSubmitting && setShowAddEarlyUserModal(false)} />
+                                <div className="relative w-full max-w-md rounded-xl bg-surface border border-border shadow-xl p-6" onClick={e => e.stopPropagation()}>
+                                    <h3 className="text-lg font-semibold mb-4">Add LiquidityScan Early User</h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-muted text-sm mb-1">Email *</label>
+                                            <input
+                                                type="email"
+                                                value={addEarlyUserEmail}
+                                                onChange={e => setAddEarlyUserEmail(e.target.value)}
+                                                placeholder="user@example.com"
+                                                className="w-full bg-background border border-border rounded-lg px-3 py-2"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-muted text-sm mb-1">Amount USDT (optional)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={addEarlyUserAmount}
+                                                onChange={e => setAddEarlyUserAmount(e.target.value)}
+                                                className="w-full bg-background border border-border rounded-lg px-3 py-2"
+                                            />
+                                        </div>
+                                        {addEarlyUserError && <p className="text-red-500 text-sm">{addEarlyUserError}</p>}
+                                    </div>
+                                    <div className="mt-4 flex gap-2 justify-end">
+                                        <button type="button" onClick={() => !addEarlyUserSubmitting && setShowAddEarlyUserModal(false)} className="px-3 py-1.5 rounded-lg text-sm text-muted hover:bg-surfaceElevated">Cancel</button>
+                                        <button
+                                            type="button"
+                                            disabled={addEarlyUserSubmitting}
+                                            onClick={async () => {
+                                                const email = addEarlyUserEmail.trim();
+                                                if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                                                    setAddEarlyUserError('Valid email is required');
+                                                    return;
+                                                }
+                                                setAddEarlyUserError(null);
+                                                setAddEarlyUserSubmitting(true);
+                                                try {
+                                                    const res = await fetchWithAdminAuth(`${getApiUrl()}/api/admin/liquidityscan-early-users`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ email, amount_usdt: addEarlyUserAmount ? parseFloat(addEarlyUserAmount) : 49 }),
+                                                    });
+                                                    const data = await res.json().catch(() => ({}));
+                                                    if (!res.ok) {
+                                                        setAddEarlyUserError(data.error || 'Failed to add');
+                                                        return;
+                                                    }
+                                                    setLiquidityScanEarlyUsers(prev => [data, ...prev]);
+                                                    setShowAddEarlyUserModal(false);
+                                                    setMessage('Early user added');
+                                                } catch (e) {
+                                                    setAddEarlyUserError('Failed to add');
+                                                } finally {
+                                                    setAddEarlyUserSubmitting(false);
+                                                }
+                                            }}
+                                            className="px-4 py-1.5 rounded-lg text-sm font-medium bg-primary text-black hover:bg-primary/90 disabled:opacity-50"
+                                        >
+                                            {addEarlyUserSubmitting ? 'Adding…' : 'Add'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

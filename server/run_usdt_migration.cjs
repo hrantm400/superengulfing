@@ -17,6 +17,7 @@ async function run() {
             { file: '029_usdt_orders.sql', label: '029 (usdt_orders)' },
             { file: '030_usdt_deposit_addresses.sql', label: '030 (usdt_deposit_addresses)' },
             { file: '031_payment_issue_reports.sql', label: '031 (payment_issue_reports)' },
+            { file: '032_payment_issue_tx_id.sql', label: '032 (payment_issue_tx_id)' },
         ];
 
         for (const m of migrations) {

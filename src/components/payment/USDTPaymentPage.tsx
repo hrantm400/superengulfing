@@ -43,6 +43,8 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
   const [paymentIssueSubmitting, setPaymentIssueSubmitting] = useState(false);
   const [paymentIssueError, setPaymentIssueError] = useState<string | null>(null);
   const [paymentIssueSuccess, setPaymentIssueSuccess] = useState(false);
+  const [paymentIssueHasTxId, setPaymentIssueHasTxId] = useState(false);
+  const [paymentIssueTxId, setPaymentIssueTxId] = useState('');
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -109,6 +111,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
       formData.set('order_id', orderId);
       formData.set('product_type', productType);
       if (paymentIssueFile) formData.set('screenshot', paymentIssueFile);
+      if (paymentIssueHasTxId && paymentIssueTxId.trim()) formData.set('tx_id', paymentIssueTxId.trim());
       const token = getAuthToken();
       const headers: HeadersInit = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -128,6 +131,8 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
         setPaymentIssueMessage('');
         setPaymentIssueFile(null);
         setPaymentIssueSuccess(false);
+        setPaymentIssueHasTxId(false);
+        setPaymentIssueTxId('');
       }, 1500);
     } finally {
       setPaymentIssueSubmitting(false);
@@ -438,11 +443,11 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
       {/* Payment issue report modal */}
       {showPaymentIssueModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70" onClick={() => !paymentIssueSubmitting && setShowPaymentIssueModal(false)} />
+          <div className="absolute inset-0 bg-black/70" onClick={() => { if (!paymentIssueSubmitting) { setShowPaymentIssueModal(false); setPaymentIssueHasTxId(false); setPaymentIssueTxId(''); } }} />
           <div className="relative w-full max-w-md rounded-2xl bg-zinc-900 border border-white/10 shadow-2xl p-6" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-white">Payment didn&apos;t go through?</h3>
-              <button type="button" onClick={() => !paymentIssueSubmitting && setShowPaymentIssueModal(false)} className="p-1 text-zinc-400 hover:text-white">
+              <button type="button" onClick={() => { if (!paymentIssueSubmitting) { setShowPaymentIssueModal(false); setPaymentIssueHasTxId(false); setPaymentIssueTxId(''); } }} className="p-1 text-zinc-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -458,6 +463,28 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   className="w-full h-24 px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white placeholder-zinc-500 text-sm resize-none"
                   maxLength={2000}
                 />
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="payment-issue-has-txid"
+                    checked={paymentIssueHasTxId}
+                    onChange={e => setPaymentIssueHasTxId(e.target.checked)}
+                    className="rounded border-white/20 bg-black/40 text-emerald-500 focus:ring-emerald-500"
+                  />
+                  <label htmlFor="payment-issue-has-txid" className="text-sm text-zinc-300">I have a transaction ID</label>
+                </div>
+                {paymentIssueHasTxId && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      value={paymentIssueTxId}
+                      onChange={e => setPaymentIssueTxId(e.target.value)}
+                      placeholder="Paste your TRC20 transaction ID"
+                      className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white placeholder-zinc-500 text-sm"
+                      maxLength={128}
+                    />
+                  </div>
+                )}
                 <div className="mt-3">
                   <label className="block text-xs text-zinc-500 mb-1">Screenshot (optional)</label>
                   <input
@@ -469,7 +496,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                 </div>
                 {paymentIssueError && <p className="mt-2 text-red-400 text-xs">{paymentIssueError}</p>}
                 <div className="mt-4 flex gap-2 justify-end">
-                  <button type="button" onClick={() => !paymentIssueSubmitting && setShowPaymentIssueModal(false)} className="px-3 py-1.5 rounded-lg text-sm text-zinc-400 hover:text-white">
+                  <button type="button" onClick={() => { if (!paymentIssueSubmitting) { setShowPaymentIssueModal(false); setPaymentIssueHasTxId(false); setPaymentIssueTxId(''); } }} className="px-3 py-1.5 rounded-lg text-sm text-zinc-400 hover:text-white">
                     Cancel
                   </button>
                   <button type="button" onClick={submitPaymentIssue} disabled={paymentIssueSubmitting} className="px-4 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50">
