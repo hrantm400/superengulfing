@@ -196,7 +196,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({ payUrl = '/pay/liquidi
                           key={i} 
                           className="flex items-center gap-4 text-sm text-muted group"
                         >
-                            <span className="relative shrink-0 flex items-center justify-center size-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-black font-black text-lg shadow-[0_0_16px_rgba(250,204,21,0.6)] ring-2 ring-amber-400/40">
+                            <span className="shrink-0 flex items-center justify-center size-10 rounded-full bg-primary text-[#020617] font-black text-xl shadow-md ring-2 ring-primary/50 dark:ring-primary/40">
                                 {i + 1}
                             </span>
                             <span className="leading-snug group-hover:text-foreground transition-colors font-medium">
