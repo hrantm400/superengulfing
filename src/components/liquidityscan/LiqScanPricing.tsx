@@ -1,13 +1,10 @@
 import React from 'react';
-import { Link } from '@remix-run/react';
 import { useTranslation } from '../../locales';
-import { useLocale } from '../../contexts/LocaleContext';
 
 const LIQSCAN_URL = 'https://liquidityscan.io';
 
 const LiqScanPricing: React.FC = () => {
   const { t } = useTranslation();
-  const { localizePath } = useLocale();
   return (
     <section className="max-w-[1440px] mx-auto px-4 sm:px-6 py-16 md:py-20">
       <div className="text-center mb-10">
@@ -60,8 +57,7 @@ const LiqScanPricing: React.FC = () => {
             <h3 className="text-lg font-bold text-foreground pr-16">{t('liqScan.pricing.proTitle')}</h3>
             <p className="text-xs text-muted mt-0.5 mb-4">{t('liqScan.pricing.proSubtitle')}</p>
             <div className="flex items-baseline gap-1.5 mb-5">
-              <span className="text-3xl font-black text-foreground">$43.01</span>
-              <span className="text-xs text-muted">{t('liqScan.pricing.proMonthly')}</span>
+              <span className="text-3xl font-black text-foreground">$49</span>
             </div>
             <ul className="space-y-2.5 mb-6 flex-1 text-sm">
               {['proF1', 'proF2', 'proF3', 'proF4', 'proF5'].map((key) => (
@@ -71,12 +67,14 @@ const LiqScanPricing: React.FC = () => {
                 </li>
               ))}
             </ul>
-            <Link
-              to={localizePath('/LS3MONTHOFF')}
+            <a
+              href={LIQSCAN_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="w-full py-3 rounded-xl font-bold text-sm bg-primary hover:bg-primary-glow text-[#020617] transition-all shadow-[0_0_20px_rgba(57,255,20,0.2)] hover:shadow-[0_0_24px_rgba(57,255,20,0.3)] text-center block"
             >
-              Get 3 months deal
-            </Link>
+              {t('liqScan.pricing.getAccess')}
+            </a>
             <p className="text-center text-[11px] text-muted mt-3">{t('liqScan.pricing.cancelAnytime')}</p>
           </div>
         </div>
