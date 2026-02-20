@@ -82,7 +82,7 @@ const LiqScanPricing: React.FC = () => {
               onClick={() => (window.location.href = localizePath('/pay/liquidityscan') + '?test=1')}
               className="w-full mt-2 py-2.5 rounded-xl font-medium text-xs border border-primary/50 text-primary hover:bg-primary/10 transition-colors text-center"
             >
-              Test with $1 USDT (TRC20)
+              Test with $10 USDT (TRC20)
             </button>
             <p className="text-center text-[11px] text-muted mt-3">{t('liqScan.pricing.cancelAnytime')}</p>
           </div>

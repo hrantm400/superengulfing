@@ -65,7 +65,7 @@ const PayLiquidityScanPage: React.FC = () => {
       address={order.address}
       amount={order.amount}
       amountDisplay={order.amount_display}
-      productName={isTest ? 'LiquidityScan PRO — Test $1' : 'LiquidityScan PRO'}
+      productName={isTest ? 'LiquidityScan PRO — Test $10' : 'LiquidityScan PRO'}
       productType="liquidityscan_pro"
     />
   );

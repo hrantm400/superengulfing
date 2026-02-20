@@ -104,7 +104,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
       : 'text-amber-400';
 
   return (
-    <div className="px-4 py-10 flex justify-center">
+    <div className="px-4 pt-20 pb-10 flex justify-center">
       <div
         className="relative w-full max-w-5xl mx-auto rounded-3xl overflow-hidden font-sans text-white shadow-2xl"
         style={{ backgroundColor: '#09090b' }}
@@ -144,9 +144,15 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   </span>
                   <span className="text-xl font-semibold text-zinc-500">USDT</span>
                 </div>
-                <p className="text-xs text-zinc-500 mt-1 font-mono">
-                  {t('usdt.payAmount')} · TRC20 on Tron
-                </p>
+                <div className="mt-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-3">
+                  <p className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
+                    {t('usdt.payAmount')}
+                  </p>
+                  <p className="text-lg font-bold font-mono text-emerald-400 mt-0.5">
+                    {amountDisplay} USDT
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">TRC20 on Tron</p>
+                </div>
                 <div className="mt-5 pt-5 border-t border-white/10 flex justify-between items-center text-sm">
                   <span className="text-zinc-500">Network</span>
                   <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full text-xs">

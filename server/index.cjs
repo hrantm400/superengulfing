@@ -2492,8 +2492,8 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
     }
 
     const orderId = `USDT_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-    const baseAmount = isTest ? 1.0 : (product_type === 'liquidityscan_pro' ? LIQUIDITYSCAN_BASE_USD : COURSE_BASE_USD);
-    const centsOffset = isTest ? 0 : (simpleHash(orderId) % 99) * 0.01;
+    const baseAmount = isTest ? 10.0 : (product_type === 'liquidityscan_pro' ? LIQUIDITYSCAN_BASE_USD : COURSE_BASE_USD);
+    const centsOffset = (simpleHash(orderId) % 99) * 0.01;
     const amountUsdt = Math.round((baseAmount + centsOffset) * 100) / 100;
 
     let orderDbId = null;
