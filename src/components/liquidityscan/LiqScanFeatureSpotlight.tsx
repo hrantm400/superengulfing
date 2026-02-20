@@ -31,7 +31,7 @@ const LiqScanFeatureSpotlight: React.FC = () => {
             <div
               key={meta.id}
               onClick={() => setActiveFeatureId(meta.id)}
-              className={`flex-1 min-w-[200px] sm:min-w-[280px] shrink-0 flex items-center gap-3 px-4 sm:px-6 py-4 cursor-pointer border-b-2 transition-colors ${activeFeatureId === meta.id ? 'border-primary bg-primary/5 text-primary' : 'border-transparent text-muted hover:text-foreground'}`}
+              className={`flex-1 min-w-[200px] sm:min-w-[280px] min-h-[44px] shrink-0 flex items-center gap-3 px-4 sm:px-6 py-4 cursor-pointer border-b-2 transition-colors ${activeFeatureId === meta.id ? 'border-primary bg-primary/5 text-primary' : 'border-transparent text-muted hover:text-foreground'}`}
             >
               <span className="material-symbols-outlined text-2xl">{meta.icon}</span>
               <div className="text-left">
@@ -42,7 +42,7 @@ const LiqScanFeatureSpotlight: React.FC = () => {
           ))}
         </div>
 
-        <div className="p-8 md:p-12 lg:p-16">
+        <div className="p-4 sm:p-6 md:p-12 lg:p-16">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="space-y-8">
               <div className="space-y-4">
@@ -80,7 +80,7 @@ const LiqScanFeatureSpotlight: React.FC = () => {
                 ></div>
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-60"></div>
                 <div className="absolute bottom-6 right-6">
-                  <div className="px-3 py-1 bg-primary text-[#020617] text-[10px] font-black uppercase rounded tracking-tighter">
+                  <div className="px-3 py-1.5 sm:py-1 bg-primary text-[#020617] text-xs font-black uppercase rounded tracking-tighter">
                     {t('liqScan.featureSpotlight.livePreview')}
                   </div>
                 </div>

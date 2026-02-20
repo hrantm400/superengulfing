@@ -42,7 +42,7 @@ const LiqScanPricing: React.FC = () => {
             href={LIQSCAN_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-3 rounded-xl font-semibold text-sm border border-border bg-surfaceElevated hover:bg-surface hover:border-primary/30 text-foreground transition-all text-center block"
+            className="w-full min-h-[48px] flex items-center justify-center py-3 rounded-xl font-semibold text-sm border border-border bg-surfaceElevated hover:bg-surface hover:border-primary/30 text-foreground transition-all text-center"
           >
             {t('liqScan.pricing.startFree')}
           </a>
@@ -51,7 +51,7 @@ const LiqScanPricing: React.FC = () => {
         <div className="relative rounded-2xl overflow-hidden">
           <div className="absolute -inset-px bg-gradient-to-b from-primary/40 to-primary/20 rounded-2xl blur-sm opacity-60"></div>
           <div className="relative p-6 border border-primary/40 rounded-2xl bg-surface flex flex-col h-full shadow-[0_0_0_1px_rgba(57,255,20,0.15)]">
-            <div className="absolute top-0 right-0 px-3 py-1 bg-primary text-[#020617] font-bold text-[10px] uppercase tracking-wider rounded-bl-xl">
+            <div className="absolute top-0 right-0 px-3 py-1 bg-primary text-[#020617] font-bold text-xs uppercase tracking-wider rounded-bl-xl">
               {t('liqScan.pricing.bestValue')}
             </div>
             <h3 className="text-lg font-bold text-foreground pr-16">{t('liqScan.pricing.proTitle')}</h3>
@@ -71,11 +71,11 @@ const LiqScanPricing: React.FC = () => {
               href={LIQSCAN_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-3 rounded-xl font-bold text-sm bg-primary hover:bg-primary-glow text-[#020617] transition-all shadow-[0_0_20px_rgba(57,255,20,0.2)] hover:shadow-[0_0_24px_rgba(57,255,20,0.3)] text-center block"
+              className="w-full min-h-[48px] flex items-center justify-center py-3 rounded-xl font-bold text-sm bg-primary hover:bg-primary-glow text-[#020617] transition-all shadow-[0_0_20px_rgba(57,255,20,0.2)] hover:shadow-[0_0_24px_rgba(57,255,20,0.3)] text-center"
             >
               {t('liqScan.pricing.getAccess')}
             </a>
-            <p className="text-center text-[11px] text-muted mt-3">{t('liqScan.pricing.cancelAnytime')}</p>
+            <p className="text-center text-xs text-muted mt-3">{t('liqScan.pricing.cancelAnytime')}</p>
           </div>
         </div>
       </div>

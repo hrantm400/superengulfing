@@ -162,7 +162,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
           <div className="absolute w-[400px] h-[400px] bg-emerald-400/10 blur-3xl -right-32 bottom-0" />
         </div>
 
-        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start p-6 md:p-10">
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start p-4 sm:p-6 md:p-10">
           {/* left */}
           <div className="lg:col-span-5 space-y-6">
             <div className="flex items-center gap-3">
@@ -240,7 +240,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   <Clock className="w-4 h-4 text-zinc-400 absolute" />
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase text-zinc-500 font-bold">Expires</p>
+                  <p className="text-xs uppercase text-zinc-500 font-bold">Expires</p>
                   <p className="text-lg font-mono font-bold leading-none">
                     {minutes}:{seconds}
                   </p>
@@ -257,7 +257,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   />
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase text-zinc-500 font-bold">Status</p>
+                  <p className="text-xs uppercase text-zinc-500 font-bold">Status</p>
                   <p className={`text-sm font-semibold leading-none ${statusColor}`}>{statusLabel}</p>
                 </div>
               </div>
@@ -297,7 +297,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
               </div>
             )}
 
-            <div className="relative z-10 p-6 md:p-10 flex-1 flex flex-col items-center justify-center">
+            <div className="relative z-10 p-4 sm:p-6 md:p-10 flex-1 flex flex-col items-center justify-center">
               {/* tabs */}
               <div className="w-full max-w-xs mx-auto mb-8">
                 <div className="relative flex items-center rounded-2xl bg-black/40 border border-white/10 p-1">
@@ -310,7 +310,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setTab('addr')}
-                    className={`relative z-10 flex-1 py-2 text-xs font-semibold rounded-xl transition-colors ${
+                    className={`relative z-10 flex-1 min-h-[44px] flex items-center justify-center py-3 sm:py-2 text-xs font-semibold rounded-xl transition-colors ${
                       tab === 'addr' ? 'text-white' : 'text-zinc-400'
                     }`}
                   >
@@ -319,7 +319,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setTab('qr')}
-                    className={`relative z-10 flex-1 py-2 text-xs font-semibold rounded-xl transition-colors ${
+                    className={`relative z-10 flex-1 min-h-[44px] flex items-center justify-center py-3 sm:py-2 text-xs font-semibold rounded-xl transition-colors ${
                       tab === 'qr' ? 'text-white' : 'text-zinc-400'
                     }`}
                   >
@@ -334,7 +334,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   <QRCodeSVG value={qrValue} size={192} level="M" />
                   <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-80 animate-[pulse_2.4s_ease-in-out_infinite]" />
                 </div>
-                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-zinc-900 border border-zinc-800 rounded-full text-[10px] font-semibold uppercase tracking-wide text-zinc-300 shadow-xl flex items-center gap-2">
+                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 sm:py-1.5 bg-zinc-900 border border-zinc-800 rounded-full text-xs font-semibold uppercase tracking-wide text-zinc-300 shadow-xl flex items-center gap-2">
                   <ScanLine className="w-3 h-3 text-emerald-400" />
                   <span>{tab === 'addr' ? 'Address only' : 'Auto-fill amount'}</span>
                 </div>
@@ -354,7 +354,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   <button
                     type="button"
                     onClick={copyAddress}
-                    className="relative p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                    className="relative min-h-[44px] min-w-[44px] flex items-center justify-center p-3 sm:p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
                   >
                     {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                   </button>
@@ -409,7 +409,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   </AnimatePresence>
                 </div>
 
-                <p className="text-[11px] text-zinc-500 mt-4">
+                <p className="text-xs text-zinc-500 mt-4">
                   {t('dashboard.accessAfterPaymentAuto')}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-2">
@@ -426,7 +426,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowPaymentIssueModal(true)}
-                    className="text-xs text-zinc-400 hover:text-zinc-300 underline underline-offset-2"
+                    className="min-h-[44px] flex items-center justify-center sm:justify-start text-xs text-zinc-400 hover:text-zinc-300 underline underline-offset-2 w-full sm:w-auto"
                   >
                     Payment didn&apos;t go through?
                   </button>
@@ -441,10 +441,10 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
       {showPaymentIssueModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70" onClick={() => { if (!paymentIssueSubmitting) { setShowPaymentIssueModal(false); setPaymentIssueHasTxId(false); setPaymentIssueTxId(''); } }} />
-          <div className="relative w-full max-w-md rounded-2xl bg-zinc-900 border border-white/10 shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+          <div className="relative w-full max-w-md rounded-2xl bg-zinc-900 border border-white/10 shadow-2xl p-6 mx-4 sm:mx-0" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-white">Payment didn&apos;t go through?</h3>
-              <button type="button" onClick={() => { if (!paymentIssueSubmitting) { setShowPaymentIssueModal(false); setPaymentIssueHasTxId(false); setPaymentIssueTxId(''); } }} className="p-1 text-zinc-400 hover:text-white">
+              <button type="button" onClick={() => { if (!paymentIssueSubmitting) { setShowPaymentIssueModal(false); setPaymentIssueHasTxId(false); setPaymentIssueTxId(''); } }} className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-zinc-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -484,10 +484,10 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                 )}
                 {paymentIssueError && <p className="mt-2 text-red-400 text-xs">{paymentIssueError}</p>}
                 <div className="mt-4 flex gap-2 justify-end">
-                  <button type="button" onClick={() => { if (!paymentIssueSubmitting) { setShowPaymentIssueModal(false); setPaymentIssueHasTxId(false); setPaymentIssueTxId(''); } }} className="px-3 py-1.5 rounded-lg text-sm text-zinc-400 hover:text-white">
+                  <button type="button" onClick={() => { if (!paymentIssueSubmitting) { setShowPaymentIssueModal(false); setPaymentIssueHasTxId(false); setPaymentIssueTxId(''); } }} className="min-h-[44px] px-4 py-3 sm:py-2 rounded-lg text-sm text-zinc-400 hover:text-white">
                     Cancel
                   </button>
-                  <button type="button" onClick={submitPaymentIssue} disabled={paymentIssueSubmitting} className="px-4 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50">
+                  <button type="button" onClick={submitPaymentIssue} disabled={paymentIssueSubmitting} className="min-h-[44px] px-4 py-3 sm:py-2 rounded-lg text-sm font-medium bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50">
                     {paymentIssueSubmitting ? 'Sending…' : 'Submit'}
                   </button>
                 </div>

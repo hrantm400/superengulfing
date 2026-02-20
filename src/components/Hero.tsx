@@ -58,7 +58,7 @@ const Hero: React.FC = () => {
       <div className="max-w-4xl mx-auto space-y-12 relative">
 
         {/* Status Badge */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-primary/20 bg-primary/5 text-primary text-[10px] font-mono uppercase tracking-widest mb-4 animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.1s' }}>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-primary/20 bg-primary/5 text-primary text-xs font-mono uppercase tracking-widest mb-4 animate-fade-in-up opacity-0 [animation-fill-mode:forwards]" style={{ animationDelay: '0.1s' }}>
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
           {t('home.hero.badge')}
         </div>
@@ -132,7 +132,7 @@ const Hero: React.FC = () => {
           </form>
 
           {/* Meta Information / Trust Signals */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[10px] md:text-xs text-gray-500 font-mono uppercase tracking-wider">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-500 font-mono uppercase tracking-wider">
             <span className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[14px] text-primary">terminal</span>
               Logic: low &lt; low[1]

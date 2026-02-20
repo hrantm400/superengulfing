@@ -192,7 +192,7 @@ const IndicatorAccessCard: React.FC<IndicatorAccessCardProps> = ({
                     placeholder="@yourusername"
                     className="w-full h-11 bg-surfaceElevated border border-border rounded-btn px-4 text-foreground placeholder-muted text-base md:text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 transition-all duration-300"
                   />
-                  <p className="text-[10px] text-muted mt-1.5">Find this in your profile URL.</p>
+                  <p className="text-xs text-muted mt-1.5">Find this in your profile URL.</p>
                 </div>
                 {submitError && <p className="text-xs text-red-400">{submitError}</p>}
                 <button
@@ -215,14 +215,14 @@ const IndicatorAccessCard: React.FC<IndicatorAccessCardProps> = ({
 
               <div className="bg-surfaceElevated border border-border rounded-lg p-4 mb-4 cursor-default select-none opacity-90 pointer-events-none">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-[10px] text-muted uppercase font-bold">Username</span>
+                  <span className="text-xs text-muted uppercase font-bold">Username</span>
                   <span className="text-sm font-mono text-foreground font-medium">{displayUsername}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-muted uppercase font-bold">Submitted</span>
+                  <span className="text-xs text-muted uppercase font-bold">Submitted</span>
                   <span className="text-xs text-muted">{formatRequestedAt(indicatorRequestedAt)}</span>
                 </div>
-                <p className="text-[10px] text-muted mt-2">Waiting for approval — not editable.</p>
+                <p className="text-xs text-muted mt-2">Waiting for approval — not editable.</p>
               </div>
 
               <div className="flex items-start gap-3 text-xs text-muted">
@@ -241,10 +241,10 @@ const IndicatorAccessCard: React.FC<IndicatorAccessCardProps> = ({
 
               <div className="bg-surfaceElevated/80 border border-border rounded-lg p-4 mb-4 cursor-default select-none opacity-90">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-[10px] text-muted uppercase font-bold">Username</span>
+                  <span className="text-xs text-muted uppercase font-bold">Username</span>
                   <span className="text-sm font-mono text-foreground font-medium">{displayUsername}</span>
                 </div>
-                <p className="text-[10px] text-muted mt-2">This field is not editable — access is active.</p>
+                <p className="text-xs text-muted mt-2">This field is not editable — access is active.</p>
               </div>
 
               <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-3 mb-6">
