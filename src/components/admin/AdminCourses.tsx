@@ -6,6 +6,19 @@ import { RichTextEditor } from './RichTextEditor';
 
 const API_URL = getApiUrl();
 
+async function uploadImageForEditor(file: File, fetchWithAdminAuth: (url: string, opts?: RequestInit) => Promise<Response>): Promise<string | null> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetchWithAdminAuth(`${getApiUrl()}/api/upload`, { method: 'POST', body: formData });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.url) return data.url;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 interface CourseRow {
   id: number;
   title: string;
@@ -435,9 +448,10 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
                 <RichTextEditor
                   value={courseForm.description}
                   onChange={(html) => setCourseForm({ ...courseForm, description: html })}
-                  placeholder="Optional description. Paste from Google Docs — formatting is preserved."
+                  placeholder="Optional description. Paste from Google Docs — formatting is preserved. Paste or drop images to upload."
                   minHeight="220px"
                   className="rounded-xl"
+                  onUploadImage={(file) => uploadImageForEditor(file, fetchWithAdminAuth)}
                 />
               </div>
               <div>
@@ -478,9 +492,10 @@ export const AdminCourses: React.FC<AdminCoursesProps> = ({ setMessage, adminAud
                 <RichTextEditor
                   value={lessonForm.description}
                   onChange={(html) => setLessonForm({ ...lessonForm, description: html })}
-                  placeholder="Optional description. Paste from Google Docs — formatting is preserved."
+                  placeholder="Optional description. Paste from Google Docs — formatting is preserved. Paste or drop images to upload."
                   minHeight="140px"
                   className="rounded-xl"
+                  onUploadImage={(file) => uploadImageForEditor(file, fetchWithAdminAuth)}
                 />
               </div>
               <div>

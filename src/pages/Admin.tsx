@@ -918,6 +918,19 @@ const Admin: React.FC = () => {
         }
     };
 
+    const uploadImageForEditor = async (file: File): Promise<string | null> => {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/upload`, { method: 'POST', body: formData });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.url) return data.url;
+            return null;
+        } catch {
+            return null;
+        }
+    };
+
     const createBroadcast = async () => {
         if (!broadcastForm.subject || !broadcastForm.body) return;
         await fetchWithAdminAuth(`${getApiUrl()}/api/broadcasts`, {
@@ -1771,9 +1784,10 @@ const Admin: React.FC = () => {
                                 <RichTextEditor
                                     value={broadcastForm.body}
                                     onChange={(body) => setBroadcastForm({ ...broadcastForm, body })}
-                                    placeholder="Email body (HTML). Use {{first_name}}, {{email}}, {{unsubscribe_url}}"
+                                    placeholder="Email body (HTML). Use {{first_name}}, {{email}}, {{unsubscribe_url}}. Paste or drop images to upload."
                                     minHeight="200px"
                                     className="w-full"
+                                    onUploadImage={uploadImageForEditor}
                                 />
                                 <div className="border-t border-border pt-4 mt-4">
                                     <label className="block text-muted text-sm font-semibold mb-2">Versions by language (optional)</label>
@@ -2112,9 +2126,10 @@ const Admin: React.FC = () => {
                                                         <RichTextEditor
                                                             value={sequenceEmailForm.body}
                                                             onChange={(body) => setSequenceEmailForm({ ...sequenceEmailForm, body })}
-                                                            placeholder="Body (HTML). Use {{first_name}}, {{unsubscribe_url}}"
+                                                            placeholder="Body (HTML). Use {{first_name}}, {{unsubscribe_url}}. Paste or drop images to upload."
                                                             minHeight="140px"
                                                             className="w-full"
+                                                            onUploadImage={uploadImageForEditor}
                                                         />
                                                         <div className="flex gap-4">
                                                             <label className="flex items-center gap-2">

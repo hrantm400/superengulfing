@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import DOMPurify from 'dompurify';
 import MarkdownContent from './MarkdownContent';
+import { X } from 'lucide-react';
 
 /** Heuristic: content looks like HTML (e.g. from TipTap / paste from Google Docs). */
 export function isLikelyHtml(content: string | null): boolean {
@@ -35,6 +36,16 @@ function isImageUrl(href: string): boolean {
 }
 
 export function HtmlContent({ content, className = '' }: HtmlContentProps) {
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
+  const handleContentClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target;
+    if (target instanceof HTMLImageElement && target.src) {
+      e.preventDefault();
+      setLightboxSrc(target.src);
+    }
+  }, []);
+
   if (!content?.trim()) return null;
   const sanitized = DOMPurify.sanitize(content, {
     ALLOWED_TAGS,
@@ -53,10 +64,39 @@ export function HtmlContent({ content, className = '' }: HtmlContentProps) {
   });
   if (!sanitized.trim()) return null;
   return (
-    <div
-      className={`markdown-prose prose-img:max-w-full prose-img:rounded-lg ${className}`.trim()}
-      dangerouslySetInnerHTML={{ __html: sanitized }}
-    />
+    <>
+      <div
+        role="presentation"
+        className={`markdown-prose prose-img:max-w-full prose-img:rounded-lg prose-img:cursor-zoom-in ${className}`.trim()}
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+        onClick={handleContentClick}
+      />
+      {lightboxSrc && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setLightboxSrc(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Escape' && setLightboxSrc(null)}
+          aria-label="Close"
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            onClick={() => setLightboxSrc(null)}
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={lightboxSrc}
+            alt=""
+            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
   );
 }
 
