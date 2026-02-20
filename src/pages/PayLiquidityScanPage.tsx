@@ -60,14 +60,16 @@ const PayLiquidityScanPage: React.FC = () => {
   }
 
   return (
-    <USDTPaymentPage
-      orderId={order.order_id}
-      address={order.address}
-      amount={order.amount}
-      amountDisplay={order.amount_display}
-      productName={isTest ? 'LiquidityScan PRO — Test $10' : 'LiquidityScan PRO'}
-      productType="liquidityscan_pro"
-    />
+    <div className="pt-20 pb-8">
+      <USDTPaymentPage
+        orderId={order.order_id}
+        address={order.address}
+        amount={order.amount}
+        amountDisplay={order.amount_display}
+        productName={isTest ? 'LiquidityScan PRO — Test $10' : 'LiquidityScan PRO'}
+        productType="liquidityscan_pro"
+      />
+    </div>
   );
 };
 
