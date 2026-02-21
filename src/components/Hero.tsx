@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import PdfSuccessPopup from './PdfSuccessPopup';
-import Liquid3DPdfButton from './Liquid3DPdfButton';
 import { useTranslation } from '../locales';
 import { useLocale } from '../contexts/LocaleContext';
 import { getApiUrl } from '../lib/api';
@@ -119,9 +118,14 @@ const Hero: React.FC = () => {
               />
             </div>
 
-            <Liquid3DPdfButton type="submit" disabled={status === 'loading'}>
+            <button
+              type="submit"
+              disabled={status === 'loading'}
+              className="w-full h-16 bg-primary hover:bg-primary-glow text-black rounded-lg font-bold text-lg md:text-xl shadow-glow-primary hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100"
+            >
               {status === 'loading' ? t('home.hero.sending') : t('home.hero.buttonFull')}
-            </Liquid3DPdfButton>
+              <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </button>
 
             {status === 'error' && (
               <div className="text-red-400 text-sm font-medium text-center animate-scale-in">{message}</div>
