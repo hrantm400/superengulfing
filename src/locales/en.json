@@ -443,6 +443,7 @@
   "onboarding.verifyingIdentity": "VERIFYING IDENTITY...",
   "onboarding.certificateTitle": "Your Declaration",
   "onboarding.certManifestoTitle": "Official Manifesto",
+  "onboarding.certOfficialTitle": "O F F I C I A L   D E C L A R A T I O N",
   "onboarding.certAuthorizedSignature": "Authorized Signature",
   "onboarding.certIssued": "ISSUED",
   "onboarding.certificateHint": "Type the declaration below to continue.",
