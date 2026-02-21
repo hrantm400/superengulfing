@@ -1043,13 +1043,13 @@ app.put('/api/me/onboarding-reset', requireAuth, async (req, res) => {
     }
 });
 
-// Certificate: premium diploma-style design (no "Signed" line)
+// Certificate: ultra-premium design (SVG + dark HTML email)
 // Server-side certificate strings for PNG/SVG and email (locale from dashboard_users)
 const CERT_TRANSLATIONS = {
     en: {
-        certTitle: 'MY DECLARATION',
+        certTitle: 'O F F I C I A L   D E C L A R A T I O N',
         certIntroPrefix: 'I, ',
-        certIntroSuffix: ', declare the following:',
+        certIntroSuffix: ', hereby declare the following:',
         decl1: 'I am done getting stopped out.',
         decl2: 'I am done watching price move without me.',
         decl3: 'I am done being the exit liquidity.',
@@ -1061,19 +1061,19 @@ const CERT_TRANSLATIONS = {
         decl9: 'I will not quit when it gets hard.',
         decl10: 'I will become consistently profitable.',
         decl11: 'This is not a hope. This is a decision.',
-        certCommitment: '[ THIS IS MY COMMITMENT \u2192 ]',
-        shareTitle: 'My Declaration \u2014 SuperEngulfing',
+        certCommitment: 'THIS IS MY COMMITMENT',
+        shareTitle: 'My Official Declaration \u2014 SuperEngulfing',
         shareDescription: 'This is my commitment.',
         shareAlt: 'Certificate of Commitment',
-        emailSubject: 'Your Declaration \u2014 SuperEngulfing',
-        emailTitle: 'Your Declaration',
-        emailLedger: 'This declaration is stored on the SuperEngulfing secure ledger.',
-        emailFooter: 'SuperEngulfing. All rights reserved.'
+        emailSubject: 'Confidential: Your Official Declaration',
+        emailTitle: 'Your Official Declaration',
+        emailLedger: 'This declaration is permanently etched and verified on the SuperEngulfing secure ledger.',
+        emailFooter: 'SuperEngulfing Elite Protocol. All rights reserved.'
     },
     am: {
-        certTitle: 'ԻՄ ՀԱՅՏԱՐԱՐՈՒԹՅՈՒՆԸ',
+        certTitle: 'Պ Ա Շ Տ Ո Ն Ա Կ Ա Ն   Հ Ա Յ Տ Ա Ր Ա Ր ՈՒ Թ Յ ՈՒ Ն',
         certIntroPrefix: 'Ես՝ ',
-        certIntroSuffix: '-ս, հայտարարում եմ հետևյալը.',
+        certIntroSuffix: '-ս, պաշտոնապես հայտարարում եմ.',
         decl1: 'Բավական է դուրս մնալ խաղից:',
         decl2: 'Բավական է հետևել գնին առանց իմ մասնակցության:',
         decl3: 'Բավական է լինել «սնունդ» (exit liquidity) խոշորների համար:',
@@ -1085,14 +1085,14 @@ const CERT_TRANSLATIONS = {
         decl9: 'Չեմ հանձնվի, երբ դժվար լինի:',
         decl10: 'Կդառնամ կայուն շահույթով աշխատող թրեյդեր:',
         decl11: 'Սա հույս չէ: Սա որոշում է:',
-        certCommitment: '[ ՍԱ ԻՄ ՈՐՈՇՈՒՄՆ Է → ]',
+        certCommitment: 'ՍԱ ԻՄ ՀԱՆՁՆԱՌՈՒԹՅՈՒՆՆ Է',
         shareTitle: 'Սա իմ որոշումն է — SuperEngulfing',
         shareDescription: 'Սա իմ հանձնառությունն է:',
         shareAlt: 'Հանձնառության վկայական',
-        emailSubject: 'Ձեր Հայտարարությունը — SuperEngulfing',
-        emailTitle: 'Ձեր Հայտարարությունը',
-        emailLedger: 'Այս հայտարարությունը պահպանված է SuperEngulfing-ի ապահով գրանցամատյանում (ledger):',
-        emailFooter: 'SuperEngulfing. Բոլոր իրավունքները պաշտպանված են:'
+        emailSubject: 'Գաղտնի. Ձեր Պաշտոնական Հայտարարությունը',
+        emailTitle: 'Ձեր Պաշտոնական Հայտարարությունը',
+        emailLedger: 'Այս հայտարարությունը հավերժ վավերացված և պահպանված է SuperEngulfing-ի գրանցամատյանում:',
+        emailFooter: 'SuperEngulfing Elite Protocol. Բոլոր իրավունքները պաշտպանված են:'
     }
 };
 function escapeForSvg(str) {
@@ -1131,72 +1131,95 @@ async function getCertificateUser(userId) {
 function buildCertificateSvg(firstName, locale) {
     const tr = getCertTr(locale);
     const name = escapeForSvg(firstName);
-    const date = new Date().toISOString().split('T')[0];
+    const date = new Date().toLocaleDateString(locale === 'am' ? 'hy-AM' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const e = (s) => escapeForSvg(tr[s] || s);
+    const fakeHash = '0x' + crypto.randomBytes(16).toString('hex');
+    const certId = 'SE-' + (10000 + Math.floor(Math.random() * 90000));
     return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="880" viewBox="0 0 640 880">
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="920" viewBox="0 0 680 920">
   <defs>
-    <linearGradient id="bgCert" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#080c14"/>
-      <stop offset="35%" style="stop-color:#0f172a"/>
-      <stop offset="100%" style="stop-color:#020617"/>
+    <radialGradient id="bgGlow" cx="50%" cy="35%" r="75%" fx="50%" fy="25%">
+      <stop offset="0%" style="stop-color:#141720"/>
+      <stop offset="50%" style="stop-color:#06080C"/>
+      <stop offset="100%" style="stop-color:#000000"/>
+    </radialGradient>
+    <linearGradient id="goldMetal" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#996515"/>
+      <stop offset="25%" style="stop-color:#D4AF37"/>
+      <stop offset="50%" style="stop-color:#FFF8DC"/>
+      <stop offset="75%" style="stop-color:#D4AF37"/>
+      <stop offset="100%" style="stop-color:#8B6508"/>
     </linearGradient>
-    <linearGradient id="goldMain" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#fde68a"/>
-      <stop offset="35%" style="stop-color:#d4af37"/>
-      <stop offset="100%" style="stop-color:#92400e"/>
+    <linearGradient id="goldDark" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:rgba(212,175,55,0.0)"/>
+      <stop offset="50%" style="stop-color:rgba(212,175,55,0.6)"/>
+      <stop offset="100%" style="stop-color:rgba(212,175,55,0.0)"/>
     </linearGradient>
-    <linearGradient id="goldSoft" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:rgba(212,175,55,0.5)"/>
-      <stop offset="100%" style="stop-color:rgba(212,175,55,0.15)"/>
-    </linearGradient>
-    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    <pattern id="guilloche" width="100" height="100" patternUnits="userSpaceOnUse">
+      <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.015)" stroke-width="0.5"/>
+      <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(255,255,255,0.015)" stroke-width="0.5"/>
+      <path d="M 0 50 Q 25 25 50 50 T 100 50" fill="none" stroke="rgba(212,175,55,0.02)" stroke-width="0.5"/>
+    </pattern>
+    <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
-  <rect width="640" height="880" fill="url(#bgCert)"/>
-  <!-- Outer ornamental frame -->
-  <rect x="0" y="0" width="640" height="880" fill="none" stroke="url(#goldMain)" stroke-width="3"/>
-  <rect x="8" y="8" width="624" height="864" fill="none" stroke="url(#goldSoft)" stroke-width="1" opacity="0.6"/>
-  <!-- Corner flourishes -->
-  <line x1="20" y1="20" x2="20" y2="68" stroke="url(#goldMain)" stroke-width="2" opacity="0.85"/>
-  <line x1="20" y1="20" x2="68" y2="20" stroke="url(#goldMain)" stroke-width="2" opacity="0.85"/>
-  <line x1="620" y1="20" x2="620" y2="68" stroke="url(#goldMain)" stroke-width="2" opacity="0.85"/>
-  <line x1="572" y1="20" x2="620" y2="20" stroke="url(#goldMain)" stroke-width="2" opacity="0.85"/>
-  <line x1="20" y1="812" x2="20" y2="860" stroke="url(#goldMain)" stroke-width="2" opacity="0.85"/>
-  <line x1="20" y1="860" x2="68" y2="860" stroke="url(#goldMain)" stroke-width="2" opacity="0.85"/>
-  <line x1="620" y1="812" x2="620" y2="860" stroke="url(#goldMain)" stroke-width="2" opacity="0.85"/>
-  <line x1="572" y1="860" x2="620" y2="860" stroke="url(#goldMain)" stroke-width="2" opacity="0.85"/>
-  <!-- Top rule -->
-  <line x1="100" y1="56" x2="540" y2="56" stroke="url(#goldMain)" stroke-width="2" opacity="0.9"/>
-  <text x="320" y="100" text-anchor="middle" font-family="Georgia, serif" font-size="10" fill="rgba(212,175,55,0.85)" letter-spacing="0.35em">${e('certTitle')}</text>
-  <line x1="100" y1="118" x2="540" y2="118" stroke="url(#goldMain)" stroke-width="1" opacity="0.6"/>
-  <!-- Intro line -->
-  <text x="320" y="162" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#f1f5f9">${e('certIntroPrefix')}<tspan fill="#fbbf24" font-weight="bold">${name}</tspan>${e('certIntroSuffix')}</text>
-  <line x1="80" y1="188" x2="560" y2="188" stroke="rgba(212,175,55,0.25)" stroke-width="1"/>
-  <!-- Declaration lines -->
-  <text x="320" y="222" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#cbd5e1">${e('decl1')}</text>
-  <text x="320" y="252" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#cbd5e1">${e('decl2')}</text>
-  <text x="320" y="282" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#cbd5e1">${e('decl3')}</text>
-  <text x="320" y="324" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#fbbf24" font-weight="bold">${e('decl4')}</text>
-  <text x="320" y="364" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#cbd5e1">${e('decl5')}</text>
-  <text x="320" y="394" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#cbd5e1">${e('decl6')}</text>
-  <text x="320" y="424" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#cbd5e1">${e('decl7')}</text>
-  <text x="320" y="454" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#cbd5e1">${e('decl8')}</text>
-  <text x="320" y="484" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#cbd5e1">${e('decl9')}</text>
-  <text x="320" y="514" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#cbd5e1">${e('decl10')}</text>
-  <text x="320" y="556" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#f8fafc" font-weight="bold">${e('decl11')}</text>
-  <!-- Commitment block -->
-  <line x1="80" y1="598" x2="560" y2="598" stroke="url(#goldSoft)" stroke-width="1"/>
-  <text x="320" y="638" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="url(#goldMain)" filter="url(#softGlow)" letter-spacing="0.12em">${e('certCommitment')}</text>
-  <line x1="120" y1="668" x2="520" y2="668" stroke="url(#goldMain)" stroke-width="1" opacity="0.6"/>
-  <!-- Seal -->
-  <circle cx="320" cy="758" r="40" fill="none" stroke="url(#goldMain)" stroke-width="2.5" opacity="0.95"/>
-  <circle cx="320" cy="758" r="34" fill="none" stroke="rgba(212,175,55,0.3)" stroke-width="1"/>
-  <text x="320" y="766" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="#d4af37" font-weight="bold">SE</text>
-  <text x="320" y="818" text-anchor="middle" font-family="Georgia, serif" font-size="11" fill="#64748b">${date}</text>
-  <text x="320" y="848" text-anchor="middle" font-family="Georgia, serif" font-size="9" fill="#475569" letter-spacing="0.08em">SuperEngulfing</text>
+  <rect width="680" height="920" fill="url(#bgGlow)"/>
+  <rect width="680" height="920" fill="url(#guilloche)"/>
+  <g opacity="0.02" transform="translate(340, 520) scale(4)">
+    <circle cx="0" cy="0" r="40" fill="none" stroke="#fff" stroke-width="2"/>
+    <text x="0" y="8" text-anchor="middle" font-family="Georgia, serif" font-size="24" font-weight="bold" fill="#fff">SE</text>
+  </g>
+  <rect x="24" y="24" width="632" height="872" fill="none" stroke="rgba(212,175,55,0.3)" stroke-width="1"/>
+  <rect x="28" y="28" width="624" height="864" fill="none" stroke="url(#goldMetal)" stroke-width="2"/>
+  <rect x="36" y="36" width="608" height="848" fill="none" stroke="rgba(212,175,55,0.4)" stroke-width="1"/>
+  <path d="M 28 50 L 50 50 L 50 28 M 36 50 L 36 36 L 50 36" fill="none" stroke="url(#goldMetal)" stroke-width="1.5"/>
+  <circle cx="50" cy="50" r="2" fill="url(#goldMetal)"/>
+  <path d="M 652 50 L 630 50 L 630 28 M 644 50 L 644 36 L 630 36" fill="none" stroke="url(#goldMetal)" stroke-width="1.5"/>
+  <circle cx="630" cy="50" r="2" fill="url(#goldMetal)"/>
+  <path d="M 28 870 L 50 870 L 50 892 M 36 870 L 36 884 L 50 884" fill="none" stroke="url(#goldMetal)" stroke-width="1.5"/>
+  <circle cx="50" cy="870" r="2" fill="url(#goldMetal)"/>
+  <path d="M 652 870 L 630 870 L 630 892 M 644 870 L 644 884 L 630 884" fill="none" stroke="url(#goldMetal)" stroke-width="1.5"/>
+  <circle cx="630" cy="870" r="2" fill="url(#goldMetal)"/>
+  <text x="340" y="115" text-anchor="middle" font-family="Palatino Linotype, Book Antiqua, Palatino, serif" font-size="16" fill="url(#goldMetal)" font-weight="bold" letter-spacing="0.3em">${e('certTitle')}</text>
+  <path d="M 240 145 L 340 150 L 440 145" fill="none" stroke="url(#goldDark)" stroke-width="1.5"/>
+  <circle cx="340" cy="150" r="3" fill="url(#goldMetal)"/>
+  <text x="340" y="210" text-anchor="middle" font-family="Georgia, serif" font-size="17" fill="#A0AEC0" font-style="italic">${e('certIntroPrefix')}</text>
+  <text x="340" y="250" text-anchor="middle" font-family="Palatino Linotype, Palatino, serif" font-size="28" fill="#FFF8DC" font-weight="bold" letter-spacing="0.05em">${name}</text>
+  <line x1="200" y1="265" x2="480" y2="265" stroke="rgba(212,175,55,0.3)" stroke-width="1"/>
+  <text x="340" y="295" text-anchor="middle" font-family="Georgia, serif" font-size="16" fill="#A0AEC0" font-style="italic">${e('certIntroSuffix')}</text>
+  <g font-family="Georgia, serif" font-size="14.5" text-anchor="middle" fill="#CBD5E1">
+    <text x="340" y="350">${e('decl1')}</text>
+    <text x="340" y="380">${e('decl2')}</text>
+    <text x="340" y="410">${e('decl3')}</text>
+    <rect x="180" y="435" width="320" height="34" fill="rgba(212,175,55,0.05)" rx="4"/>
+    <text x="340" y="458" fill="url(#goldMetal)" font-size="16" font-weight="bold" font-style="italic" filter="url(#goldGlow)">${e('decl4')}</text>
+    <text x="340" y="505">${e('decl5')}</text>
+    <text x="340" y="535">${e('decl6')}</text>
+    <text x="340" y="565">${e('decl7')}</text>
+    <text x="340" y="595">${e('decl8')}</text>
+    <text x="340" y="625">${e('decl9')}</text>
+    <text x="340" y="655">${e('decl10')}</text>
+    <text x="340" y="710" fill="#FFFFFF" font-size="17" font-weight="bold" letter-spacing="0.05em">${e('decl11')}</text>
+  </g>
+  <line x1="240" y1="750" x2="440" y2="750" stroke="url(#goldDark)" stroke-width="1"/>
+  <text x="340" y="775" text-anchor="middle" font-family="Palatino Linotype, serif" font-size="12" fill="url(#goldMetal)" letter-spacing="0.4em" font-weight="bold">${e('certCommitment')}</text>
+  <g transform="translate(340, 835)">
+    <circle cx="0" cy="0" r="42" fill="none" stroke="url(#goldMetal)" stroke-width="3" stroke-dasharray="4 3"/>
+    <circle cx="0" cy="0" r="37" fill="#050505" stroke="url(#goldMetal)" stroke-width="1.5"/>
+    <circle cx="0" cy="0" r="31" fill="none" stroke="rgba(212,175,55,0.5)" stroke-width="1"/>
+    <circle cx="0" cy="0" r="26" fill="none" stroke="url(#goldMetal)" stroke-width="0.5" stroke-dasharray="2 2"/>
+    <text x="0" y="-12" text-anchor="middle" font-family="Arial, sans-serif" font-size="6" fill="url(#goldMetal)" letter-spacing="0.2em">VERIFIED</text>
+    <text x="0" y="8" text-anchor="middle" font-family="Times New Roman, serif" font-size="22" fill="url(#goldMetal)" font-weight="bold">SE</text>
+    <text x="0" y="20" text-anchor="middle" font-family="Arial, sans-serif" font-size="5" fill="url(#goldMetal)" letter-spacing="0.2em">LEDGER</text>
+  </g>
+  <text x="140" y="820" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#E2E8F0">${escapeForSvg(date)}</text>
+  <line x1="80" y1="830" x2="200" y2="830" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <text x="140" y="865" text-anchor="middle" font-family="Courier New, monospace" font-size="9" fill="rgba(212,175,55,0.8)">${escapeForSvg(certId)}</text>
+  <path d="M 480 820 Q 500 800 510 815 T 530 810 Q 545 805 550 825 T 580 815" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="480" y1="830" x2="600" y2="830" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <text x="540" y="865" text-anchor="middle" font-family="Courier New, monospace" font-size="7" fill="#4A5568" letter-spacing="0.05em">${escapeForSvg(fakeHash.substring(0, 20))}...</text>
 </svg>`;
 }
 
@@ -1372,43 +1395,81 @@ app.post('/api/me/send-certificate', requireAuth, async (req, res) => {
         }
 
         const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        // Certificate email — light theme, locale-aware
-        const certificateHtml = `
-<!DOCTYPE html>
+        const certId = 'SE-' + (10000 + Math.floor(Math.random() * 90000));
+        const emailDate = new Date().toLocaleDateString(locale === 'am' ? 'hy-AM' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        // Certificate email — ultra-premium dark theme
+        const certificateHtml = `<!DOCTYPE html>
 <html lang="${locale === 'am' ? 'hy' : 'en'}">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${esc(tr.emailTitle)}</title></head>
-<body style="margin:0; background:#f8fafc; color:#0f172a; font-family: Georgia, 'Times New Roman', serif;">
-  <div style="max-width:620px; margin:0 auto; padding: 32px 20px;">
-    <div style="text-align: center; margin-bottom: 28px;">
-      <span style="color: #059669; font-size: 20px; font-weight: 700; letter-spacing: 0.05em;">SuperEngulfing</span>
-      <div style="color: #64748b; font-size: 11px; margin-top: 6px; letter-spacing: 0.2em;">${esc(tr.certTitle)}</div>
-    </div>
-    <div style="background:#ffffff; padding: 28px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
-      <div style="border: 2px solid #fbbf24; padding: 36px 28px; background:#fffbeb; border-radius: 8px; text-align: center;">
-        <div style="height: 2px; background: linear-gradient(90deg, transparent, #fbbf24, transparent); margin: 0 auto 16px; max-width: 280px;"></div>
-        <h1 style="font-family: Georgia, serif; color: #b45309; font-size: 15px; font-weight: 400; margin: 0 0 12px 0; letter-spacing: 0.15em;">${esc(tr.certTitle)}</h1>
-        <div style="height: 2px; background: linear-gradient(90deg, transparent, #fbbf24, transparent); margin: 0 auto 24px; max-width: 280px;"></div>
-        <p style="font-size: 14px; line-height: 1.8; color: #334155; margin: 0 0 20px 0;">${esc(tr.certIntroPrefix)}<strong style="color: #b45309;">${esc(firstName)}</strong>${esc(tr.certIntroSuffix)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #475569; margin: 4px 0;">${esc(tr.decl1)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #475569; margin: 4px 0;">${esc(tr.decl2)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #475569; margin: 4px 0;">${esc(tr.decl3)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #b45309; font-weight: bold; margin: 16px 0 4px 0;">${esc(tr.decl4)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #475569; margin: 4px 0;">${esc(tr.decl5)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #475569; margin: 4px 0;">${esc(tr.decl6)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #475569; margin: 4px 0;">${esc(tr.decl7)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #475569; margin: 4px 0;">${esc(tr.decl8)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #475569; margin: 4px 0;">${esc(tr.decl9)}</p>
-        <p style="font-size: 13px; line-height: 2; color: #475569; margin: 4px 0;">${esc(tr.decl10)}</p>
-        <p style="font-size: 14px; line-height: 1.8; color: #0f172a; font-weight: bold; margin: 20px 0 24px 0;">${esc(tr.decl11)}</p>
-        <div style="height: 2px; background: linear-gradient(90deg, transparent, #fbbf24, transparent); margin: 0 auto 16px; max-width: 240px;"></div>
-        <p style="font-size: 12px; color: #b45309; letter-spacing: 0.1em; margin: 0 0 16px 0;">${esc(tr.certCommitment)}</p>
-        <div style="height: 2px; background: linear-gradient(90deg, transparent, #fbbf24, transparent); margin: 0 auto 24px; max-width: 240px;"></div>
-        <div style="width: 56px; height: 56px; margin: 0 auto 10px; border: 2px solid #f59e0b; border-radius: 50%; line-height: 52px; text-align: center; background: #fef3c7;"><span style="color: #b45309; font-size: 16px; font-weight: bold;">SE</span></div>
-        <p style="margin: 0; font-size: 11px; color: #64748b;">${new Date().toISOString().split('T')[0]}</p>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${esc(tr.emailTitle)}</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #030303; -webkit-font-smoothing: antialiased; }
+    .wrapper { width: 100%; table-layout: fixed; background-color: #030303; padding: 50px 0; }
+    .main { max-width: 600px; margin: 0 auto; background: #0A0A0A; background-image: linear-gradient(180deg, #111 0%, #050505 100%); border-radius: 4px; border: 1px solid #222; overflow: hidden; box-shadow: 0 40px 80px rgba(0,0,0,0.8), 0 0 40px rgba(212,175,55,0.05); }
+    .top-accent { height: 3px; background: linear-gradient(90deg, #996515, #FFF8DC, #996515); width: 100%; }
+    .header { text-align: center; padding: 45px 30px 25px; border-bottom: 1px solid #1a1a1a; }
+    .confidential { color: #666; font-family: -apple-system, sans-serif; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 20px; }
+    .logo { color: #D4AF37; font-family: Palatino Linotype, Book Antiqua, Palatino, serif; font-size: 26px; font-weight: bold; letter-spacing: 0.15em; margin: 0; }
+    .content { padding: 40px 45px; text-align: center; }
+    h1 { font-family: Palatino Linotype, serif; color: #E2E8F0; font-size: 16px; font-weight: 400; letter-spacing: 0.25em; margin: 0 0 30px 0; text-transform: uppercase; }
+    .intro { font-family: Georgia, serif; font-size: 17px; color: #A0AEC0; margin: 0 0 35px 0; font-style: italic; }
+    .name { color: #FFF8DC; font-weight: bold; font-size: 22px; font-style: normal; display: block; margin-top: 10px; letter-spacing: 0.05em; font-family: Palatino Linotype, serif; }
+    .decl-list { margin: 0; padding: 0; font-family: Georgia, serif; }
+    .decl-item { color: #8892B0; font-size: 15px; line-height: 2.4; margin: 0; }
+    .decl-highlight-box { background: rgba(212,175,55,0.03); border-top: 1px solid rgba(212,175,55,0.2); border-bottom: 1px solid rgba(212,175,55,0.2); padding: 20px 10px; margin: 25px 0; }
+    .decl-highlight { color: #D4AF37; font-size: 18px; font-weight: bold; font-style: italic; margin: 0; }
+    .decl-final { color: #FFFFFF; font-size: 19px; font-weight: bold; margin-top: 40px; letter-spacing: 0.05em; }
+    .commitment-line { font-family: Palatino Linotype, serif; color: #D4AF37; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; margin: 40px 0 0 0; font-weight: bold; }
+    .footer { background: #050505; padding: 40px; text-align: center; border-top: 1px solid #1a1a1a; }
+    .seal-container { position: relative; width: 60px; height: 60px; margin: 0 auto 20px; }
+    .seal-outer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 2px dashed #D4AF37; border-radius: 50%; opacity: 0.5; }
+    .seal-inner { position: absolute; top: 4px; left: 4px; right: 4px; bottom: 4px; border: 1px solid #D4AF37; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #D4AF37; font-family: Palatino Linotype, serif; font-size: 20px; font-weight: bold; background: #000; }
+    .ledger-box { border: 1px solid #222; background: #0A0A0A; padding: 15px; border-radius: 4px; margin-bottom: 25px; }
+    .ledger-text { color: #A0AEC0; font-family: -apple-system, sans-serif; font-size: 11px; line-height: 1.6; margin: 0; }
+    .meta-data { color: #666; font-family: Courier New, monospace; font-size: 10px; margin-top: 8px; }
+    .copyright { color: #444; font-family: -apple-system, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="main">
+      <div class="top-accent"></div>
+      <div class="header">
+        <div class="confidential">Strictly Confidential</div>
+        <p class="logo">SUPERENGULFING</p>
       </div>
-      <p style="text-align: center; color: #64748b; font-size: 12px; margin-top: 24px;">${esc(tr.emailLedger)}</p>
+      <div class="content">
+        <h1>${esc(tr.certTitle)}</h1>
+        <p class="intro">${esc(tr.certIntroPrefix)}<span class="name">${esc(firstName)}</span>${esc(tr.certIntroSuffix)}</p>
+        <div class="decl-list">
+          <p class="decl-item">${esc(tr.decl1)}</p>
+          <p class="decl-item">${esc(tr.decl2)}</p>
+          <p class="decl-item">${esc(tr.decl3)}</p>
+          <div class="decl-highlight-box"><p class="decl-highlight">${esc(tr.decl4)}</p></div>
+          <p class="decl-item">${esc(tr.decl5)}</p>
+          <p class="decl-item">${esc(tr.decl6)}</p>
+          <p class="decl-item">${esc(tr.decl7)}</p>
+          <p class="decl-item">${esc(tr.decl8)}</p>
+          <p class="decl-item">${esc(tr.decl9)}</p>
+          <p class="decl-item">${esc(tr.decl10)}</p>
+          <p class="decl-final">${esc(tr.decl11)}</p>
+        </div>
+        <p class="commitment-line">${esc(tr.certCommitment)}</p>
+      </div>
+      <div class="footer">
+        <div class="seal-container">
+          <div class="seal-outer"></div>
+          <div class="seal-inner">SE</div>
+        </div>
+        <div class="ledger-box">
+          <p class="ledger-text">${esc(tr.emailLedger)}</p>
+          <div class="meta-data">ID: ${esc(certId)} &nbsp;|&nbsp; DATE: ${esc(emailDate)}</div>
+        </div>
+        <p class="copyright">&copy; ${new Date().getFullYear()} ${esc(tr.emailFooter)}</p>
+      </div>
     </div>
-    <div style="text-align: center; margin-top: 28px; color: #94a3b8; font-size: 11px;">&copy; ${new Date().getFullYear()} ${esc(tr.emailFooter)}</div>
   </div>
 </body>
 </html>`;
