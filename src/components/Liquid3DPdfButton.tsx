@@ -48,7 +48,7 @@ export const Liquid3DPdfButton: React.FC<Liquid3DPdfButtonProps> = ({
     isHovered && !isPressed ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
 
   return (
-    <div className={`relative group w-full max-w-[360px] perspective-[1200px] ${className}`}>
+    <div className={`relative group w-full perspective-[1200px] ${className}`}>
       <style>
         {`
           @keyframes wave-forward {
