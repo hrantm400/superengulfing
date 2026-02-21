@@ -5,17 +5,26 @@ import { useLocale } from '../contexts/LocaleContext';
 import { useUser } from '../contexts/UserContext';
 import { useTranslation } from '../locales';
 import { motion, AnimatePresence, useScroll, useTransform, useMotionValue, useSpring } from 'framer-motion';
-import { Menu, X, ChevronRight, Sparkles, LayoutDashboard, LogOut, Sun, Moon } from 'lucide-react';
+import { Menu, X, ChevronRight, Sparkles, LayoutDashboard, LogOut } from 'lucide-react';
 import TelegramIcon from './icons/TelegramIcon';
+import ThemeToggle from './ThemeToggle';
 
-// --- 3D Tilt Component (Visuals Only) ---
+// --- 3D Tilt Component (Visuals Only); disabled on touch to avoid extra work ---
 const TiltButton = ({ children, className, onClick, to, href }: any) => {
+  const [isCoarsePointer, setIsCoarsePointer] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)').matches : true
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)');
+    const fn = () => setIsCoarsePointer(mq.matches);
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, []);
+
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-
   const mouseX = useSpring(x, { stiffness: 500, damping: 100 });
   const mouseY = useSpring(y, { stiffness: 500, damping: 100 });
-
   const rotateX = useTransform(mouseY, [-0.5, 0.5], ['17.5deg', '-17.5deg']);
   const rotateY = useTransform(mouseX, [-0.5, 0.5], ['-17.5deg', '17.5deg']);
 
@@ -36,6 +45,14 @@ const TiltButton = ({ children, className, onClick, to, href }: any) => {
 
   const Component = to ? Link : href ? 'a' : 'div';
   const props = to ? { to } : href ? { href } : { onClick };
+
+  if (isCoarsePointer) {
+    return (
+      <Component className={`relative inline-block ${className}`} {...props}>
+        {children}
+      </Component>
+    );
+  }
 
   return (
     <Component
@@ -109,6 +126,16 @@ const SiteNavbar: React.FC = () => {
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
+
+  // Close mobile menu on Escape
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isMobileMenuOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
@@ -261,12 +288,9 @@ const SiteNavbar: React.FC = () => {
                   <span>Telegram</span>
                 </a>
               )}
-              <button
-                onClick={() => toggleTheme()}
-                className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full flex items-center justify-center text-muted hover:text-foreground hover:bg-neutral-100 dark:hover:bg-white/10 transition-all duration-300 active:scale-90"
-              >
-                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-              </button>
+              <div className="min-h-[44px] flex items-center">
+                <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
+              </div>
 
               {isAuthenticated ? (
                 <>
@@ -332,8 +356,12 @@ const SiteNavbar: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-40 bg-background/95 backdrop-blur-2xl md:hidden flex flex-col pt-nav-safe px-4 sm:px-6"
+            onClick={() => setIsMobileMenuOpen(false)}
+            role="button"
+            tabIndex={-1}
+            aria-label="Close menu"
           >
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-6 pt-2" onClick={(e) => e.stopPropagation()}>
               {navLinks.map((link, idx) => {
                 const to = localizePath(link.path);
                 return (
@@ -346,7 +374,7 @@ const SiteNavbar: React.FC = () => {
                     <Link
                       to={to}
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className={`block text-3xl font-black tracking-tighter ${location.pathname === to ? 'text-primary' : 'text-foreground'}`}
+                      className={`flex items-center min-h-[44px] text-3xl font-black tracking-tighter ${location.pathname === to ? 'text-primary' : 'text-foreground'}`}
                     >
                       {link.label}
                     </Link>
@@ -373,7 +401,7 @@ const SiteNavbar: React.FC = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="tg-btn w-full justify-center text-sm font-semibold"
+                    className="tg-btn w-full justify-center min-h-[44px] text-sm font-semibold"
                   >
                     <span className="svg-wrapper flex items-center">
                       <TelegramIcon size={20} />
@@ -386,7 +414,7 @@ const SiteNavbar: React.FC = () => {
                     <Link
                       to={localizePath('/dashboard')}
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center justify-between p-4 rounded-xl bg-neutral-100 dark:bg-white/5 active:scale-95 transition-transform border border-transparent focus:border-primary"
+                      className="flex items-center justify-between min-h-[44px] p-4 rounded-xl bg-neutral-100 dark:bg-white/5 active:scale-95 transition-transform border border-transparent focus:border-primary"
                     >
                       <span className="font-semibold flex items-center gap-3">
                         <LayoutDashboard className="text-primary" /> {t('nav.dashboard')}
@@ -395,7 +423,7 @@ const SiteNavbar: React.FC = () => {
                     </Link>
                     <button
                       onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
-                      className="flex items-center justify-between p-4 rounded-xl bg-red-500/10 text-red-500 active:scale-95 transition-transform"
+                      className="flex items-center justify-between min-h-[44px] p-4 rounded-xl bg-red-500/10 text-red-500 active:scale-95 transition-transform"
                     >
                       <span className="font-semibold flex items-center gap-3">
                         <LogOut /> {t('nav.logout')}
@@ -406,7 +434,7 @@ const SiteNavbar: React.FC = () => {
                   <Link
                     to={localizePath('/login')}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center justify-center p-4 rounded-xl bg-primary text-black font-bold text-lg shadow-[0_0_20px_rgba(57,255,20,0.3)] active:scale-95 transition-transform"
+                    className="flex items-center justify-center min-h-[48px] p-4 rounded-xl bg-primary text-black font-bold text-lg shadow-[0_0_20px_rgba(57,255,20,0.3)] active:scale-95 transition-transform"
                   >
                     {t('nav.loginAccess')}
                   </Link>
@@ -416,19 +444,16 @@ const SiteNavbar: React.FC = () => {
                 <Link
                   to={locale === 'am' ? (location.pathname.replace(/^\/am/, '') || '/') : `/am${location.pathname}`}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center justify-between p-4 rounded-xl border border-neutral-200 dark:border-white/10 active:bg-white/5"
+                  className="flex items-center justify-between min-h-[44px] p-4 rounded-xl border border-neutral-200 dark:border-white/10 active:bg-white/5"
                 >
                   <span className="text-muted font-medium">{locale === 'am' ? 'English' : 'Հայերեն'}</span>
                   <span className="text-primary font-bold">{locale === 'am' ? 'EN' : 'AM'}</span>
                 </Link>
               )}
-                <button
-                  onClick={toggleTheme}
-                  className="flex items-center justify-between p-4 rounded-xl border border-neutral-200 dark:border-white/10 mt-2 active:bg-white/5"
-                >
+                <div className="flex items-center justify-between min-h-[44px] p-4 rounded-xl border border-neutral-200 dark:border-white/10 mt-2">
                   <span className="text-muted font-medium">{t('nav.switchTheme')}</span>
-                  {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-                </button>
+                  <ThemeToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
+                </div>
               </motion.div>
             </div>
           </motion.div>
