@@ -105,13 +105,13 @@ const Hero: React.FC = () => {
 
             <div className="relative group">
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                <span className="material-symbols-outlined text-muted">mail</span>
+                <span className="material-symbols-outlined text-gray-500 dark:text-slate-400">mail</span>
               </div>
               <input
                 type="email"
                 required
                 disabled={status === 'loading'}
-                className="w-full h-16 bg-surface/80 border border-border rounded-lg px-12 text-lg text-foreground placeholder:text-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 transition-all duration-300 backdrop-blur-md font-mono disabled:opacity-50"
+                className="w-full h-16 bg-surface/80 border border-border rounded-lg px-12 text-lg text-gray-900 dark:text-slate-100 placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 transition-all duration-300 backdrop-blur-md font-mono disabled:opacity-50"
                 placeholder={t('home.hero.placeholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
