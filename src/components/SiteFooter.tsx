@@ -5,7 +5,7 @@ import { useTranslation } from '../locales';
 const SiteFooter: React.FC = () => {
   const { t } = useTranslation();
   return (
-    <footer className="border-t border-border py-12 bg-background/80 backdrop-blur-sm relative z-10 mt-12">
+    <footer className="border-t border-border py-12 pb-[max(3rem,env(safe-area-inset-bottom))] bg-background/80 backdrop-blur-sm relative z-10 mt-12">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6">
 
         <div className="flex flex-col md:flex-row justify-between items-start gap-12 mb-12">

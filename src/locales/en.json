@@ -115,6 +115,8 @@
   "setPassword.alreadySetPart2": "Otherwise request access again from the ",
   "setPassword.alreadySetPart3": " page.",
   "thankYou.badge": "Request Received",
+  "thankYou.doNotClose": "Do not close this page — you will not be able to see it again.",
+  "thankYou.watchVideo": "Watch the video carefully.",
   "thankYou.headline": "Success! Your Blueprint is on its way.",
   "thankYou.subline": "Check your inbox in 2-3 minutes. While you wait, download your PDF below or watch the welcome video.",
   "thankYou.cta": "Get your free course and indicator",

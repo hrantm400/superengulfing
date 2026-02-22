@@ -96,13 +96,13 @@ const SetPassword: React.FC = () => {
                                         onChange={(e) => setPasswordState(e.target.value)}
                                         placeholder="••••••••"
                                         minLength={6}
-                                        className="w-full bg-background border border-border rounded-lg px-4 py-3 pr-11 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
+                                        className="w-full min-h-[48px] bg-background border border-border rounded-lg px-4 py-3 pr-11 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
                                         autoComplete="new-password"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword((v) => !v)}
-                                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted hover:text-foreground"
+                                        className="absolute inset-y-0 right-0 flex items-center min-w-[44px] min-h-[48px] pr-3 text-muted hover:text-foreground"
                                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                                     >
                                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -121,13 +121,13 @@ const SetPassword: React.FC = () => {
                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                         placeholder="••••••••"
                                         minLength={6}
-                                        className="w-full bg-background border border-border rounded-lg px-4 py-3 pr-11 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
+                                        className="w-full min-h-[48px] bg-background border border-border rounded-lg px-4 py-3 pr-11 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
                                         autoComplete="new-password"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setShowConfirm((v) => !v)}
-                                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted hover:text-foreground"
+                                        className="absolute inset-y-0 right-0 flex items-center min-w-[44px] min-h-[48px] pr-3 text-muted hover:text-foreground"
                                         aria-label={showConfirm ? 'Hide password confirmation' : 'Show password confirmation'}
                                     >
                                         {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -138,7 +138,7 @@ const SetPassword: React.FC = () => {
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="w-full bg-primary hover:bg-primary/90 text-black font-bold py-3 px-4 rounded-lg shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
+                                className="w-full min-h-[48px] bg-primary hover:bg-primary/90 text-black font-bold py-3 px-4 rounded-lg shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
                             >
                                 {isSubmitting ? t('setPassword.setting') : t('setPassword.setButton')}
                             </button>

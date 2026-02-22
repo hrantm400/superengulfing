@@ -204,8 +204,8 @@ function SequenceSubscribersList({ sequenceId, fetchWithAdminAuth }: { sequenceI
     if (subs.length === 0) return <p className="text-muted text-sm">No subscribers in this sequence yet.</p>;
 
     return (
-        <div className="max-h-60 overflow-y-auto">
-            <table className="w-full text-sm">
+        <div className="max-h-60 overflow-y-auto overflow-x-auto">
+            <table className="w-full text-sm min-w-[32rem]">
                 <thead>
                     <tr className="text-muted text-xs">
                         <th className="text-left py-1 pr-4">Email</th>
@@ -1702,14 +1702,14 @@ const Admin: React.FC = () => {
                                     value={templateForm.subject}
                                     onChange={(e) => setTemplateForm({ ...templateForm, subject: e.target.value })}
                                     placeholder="Email subject"
-                                    className="w-full bg-background border border-border rounded-lg px-4 py-2"
+                                    className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2"
                                 />
                                 <textarea
                                     value={templateForm.body}
                                     onChange={(e) => setTemplateForm({ ...templateForm, body: e.target.value })}
                                     placeholder="Email body (HTML supported)"
                                     rows={6}
-                                    className="w-full bg-background border border-border rounded-lg px-4 py-2 font-mono text-sm"
+                                    className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2 font-mono text-sm"
                                 />
                                 {editingTemplateId ? (
                                     <div className="flex gap-3">
@@ -1778,7 +1778,7 @@ const Admin: React.FC = () => {
                                     value={broadcastForm.subject}
                                     onChange={(e) => setBroadcastForm({ ...broadcastForm, subject: e.target.value })}
                                     placeholder="Email subject"
-                                    className="w-full bg-background border border-border rounded-lg px-4 py-2"
+                                    className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2"
                                 />
                                 <RichTextEditor
                                     value={broadcastForm.body}
@@ -1794,13 +1794,13 @@ const Admin: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <span className="text-xs text-primary font-medium">Armenian (AM)</span>
-                                            <input type="text" value={broadcastForm.subject_am} onChange={(e) => setBroadcastForm({ ...broadcastForm, subject_am: e.target.value })} placeholder="Subject (AM)" className="w-full mt-1 bg-background border border-border rounded-lg px-4 py-2 text-sm" />
-                                            <textarea value={broadcastForm.body_am} onChange={(e) => setBroadcastForm({ ...broadcastForm, body_am: e.target.value })} placeholder="Body (AM)" rows={3} className="w-full mt-1 bg-background border border-border rounded-lg px-4 py-2 font-mono text-xs" />
+                                            <input type="text" value={broadcastForm.subject_am} onChange={(e) => setBroadcastForm({ ...broadcastForm, subject_am: e.target.value })} placeholder="Subject (AM)" className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2 text-sm" />
+                                            <textarea value={broadcastForm.body_am} onChange={(e) => setBroadcastForm({ ...broadcastForm, body_am: e.target.value })} placeholder="Body (AM)" rows={3} className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2 font-mono text-xs" />
                                         </div>
                                         <div>
                                             <span className="text-xs text-primary font-medium">English (EN)</span>
-                                            <input type="text" value={broadcastForm.subject_en} onChange={(e) => setBroadcastForm({ ...broadcastForm, subject_en: e.target.value })} placeholder="Subject (EN)" className="w-full mt-1 bg-background border border-border rounded-lg px-4 py-2 text-sm" />
-                                            <textarea value={broadcastForm.body_en} onChange={(e) => setBroadcastForm({ ...broadcastForm, body_en: e.target.value })} placeholder="Body (EN)" rows={3} className="w-full mt-1 bg-background border border-border rounded-lg px-4 py-2 font-mono text-xs" />
+                                            <input type="text" value={broadcastForm.subject_en} onChange={(e) => setBroadcastForm({ ...broadcastForm, subject_en: e.target.value })} placeholder="Subject (EN)" className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2 text-sm" />
+                                            <textarea value={broadcastForm.body_en} onChange={(e) => setBroadcastForm({ ...broadcastForm, body_en: e.target.value })} placeholder="Body (EN)" rows={3} className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2 font-mono text-xs" />
                                         </div>
                                     </div>
                                 </div>
@@ -2120,7 +2120,7 @@ const Admin: React.FC = () => {
                                                             value={sequenceEmailForm.subject}
                                                             onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject: e.target.value })}
                                                             placeholder="Subject"
-                                                            className="w-full bg-background border border-border rounded-lg px-4 py-2"
+                                                            className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2"
                                                         />
                                                         <RichTextEditor
                                                             value={sequenceEmailForm.body}
@@ -2138,7 +2138,7 @@ const Admin: React.FC = () => {
                                                                     min={0}
                                                                     value={sequenceEmailForm.delay_days}
                                                                     onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, delay_days: parseInt(e.target.value) || 0 })}
-                                                                    className="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm"
+                                                                    className="w-20 bg-white text-gray-900 border border-gray-300 rounded-lg px-2 py-1 text-sm"
                                                                 />
                                                             </label>
                                                             <label className="flex items-center gap-2">
@@ -2148,15 +2148,15 @@ const Admin: React.FC = () => {
                                                                     min={0}
                                                                     value={sequenceEmailForm.delay_hours}
                                                                     onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, delay_hours: parseInt(e.target.value) || 0 })}
-                                                                    className="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm"
+                                                                    className="w-20 bg-white text-gray-900 border border-gray-300 rounded-lg px-2 py-1 text-sm"
                                                                 />
                                                             </label>
                                                         </div>
                                                         <div className="border-t border-border pt-4">
                                                             <span className="text-muted text-xs font-semibold">Versions by language (optional)</span>
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                                                                <div><input type="text" value={sequenceEmailForm.subject_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_am: e.target.value })} placeholder="Subject (AM)" className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_am: e.target.value })} placeholder="Body (AM)" rows={2} className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
-                                                                <div><input type="text" value={sequenceEmailForm.subject_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_en: e.target.value })} placeholder="Subject (EN)" className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_en: e.target.value })} placeholder="Body (EN)" rows={2} className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
+                                                                <div><input type="text" value={sequenceEmailForm.subject_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_am: e.target.value })} placeholder="Subject (AM)" className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_am: e.target.value })} placeholder="Body (AM)" rows={2} className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
+                                                                <div><input type="text" value={sequenceEmailForm.subject_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_en: e.target.value })} placeholder="Subject (EN)" className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_en: e.target.value })} placeholder="Body (EN)" rows={2} className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
                                                             </div>
                                                         </div>
                                                         <div className="border-t border-border pt-4">
@@ -2165,8 +2165,8 @@ const Admin: React.FC = () => {
                                                                 <input type="checkbox" checked={sequenceEmailForm.conditions?.previous_email_opened === true} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, previous_email_opened: e.target.checked } })} className="rounded" />
                                                                 <span className="text-sm">Send only if previous email was opened</span>
                                                             </label>
-                                                            <input type="text" value={(sequenceEmailForm.conditions?.has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Has tags (comma-separated)" className="w-full mt-2 bg-background border border-border rounded-lg px-3 py-1.5 text-sm" />
-                                                            <input type="text" value={(sequenceEmailForm.conditions?.not_has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, not_has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Not has tags (comma-separated)" className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm" />
+                                                            <input type="text" value={(sequenceEmailForm.conditions?.has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Has tags (comma-separated)" className="w-full mt-2 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
+                                                            <input type="text" value={(sequenceEmailForm.conditions?.not_has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, not_has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Not has tags (comma-separated)" className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
                                                         </div>
                                                         <div>
                                                             <span className="text-muted text-xs font-semibold">Attachments</span>
@@ -2213,24 +2213,24 @@ const Admin: React.FC = () => {
                                                 <div className="bg-surface rounded-xl p-6 border border-primary/30 mb-6">
                                                     <h3 className="font-semibold mb-4">Edit Step</h3>
                                                     <div className="space-y-4">
-                                                        <input type="text" value={sequenceEmailForm.subject} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject: e.target.value })} placeholder="Subject" className="w-full bg-background border border-border rounded-lg px-4 py-2" />
-                                                        <textarea value={sequenceEmailForm.body} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body: e.target.value })} placeholder="Body (HTML)" rows={4} className="w-full bg-background border border-border rounded-lg px-4 py-2 font-mono text-sm" />
+                                                        <input type="text" value={sequenceEmailForm.subject} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject: e.target.value })} placeholder="Subject" className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2" />
+                                                        <textarea value={sequenceEmailForm.body} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body: e.target.value })} placeholder="Body (HTML)" rows={4} className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-4 py-2 font-mono text-sm" />
                                                         <div className="flex gap-4">
-                                                            <label className="flex items-center gap-2"><span className="text-muted text-sm">Delay days</span><input type="number" min={0} value={sequenceEmailForm.delay_days} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, delay_days: parseInt(e.target.value) || 0 })} className="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm" /></label>
-                                                            <label className="flex items-center gap-2"><span className="text-muted text-sm">Delay hours</span><input type="number" min={0} value={sequenceEmailForm.delay_hours} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, delay_hours: parseInt(e.target.value) || 0 })} className="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm" /></label>
+                                                            <label className="flex items-center gap-2"><span className="text-muted text-sm">Delay days</span><input type="number" min={0} value={sequenceEmailForm.delay_days} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, delay_days: parseInt(e.target.value) || 0 })} className="w-20 bg-white text-gray-900 border border-gray-300 rounded-lg px-2 py-1 text-sm" /></label>
+                                                            <label className="flex items-center gap-2"><span className="text-muted text-sm">Delay hours</span><input type="number" min={0} value={sequenceEmailForm.delay_hours} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, delay_hours: parseInt(e.target.value) || 0 })} className="w-20 bg-white text-gray-900 border border-gray-300 rounded-lg px-2 py-1 text-sm" /></label>
                                                         </div>
                                                         <div className="border-t border-border pt-4">
                                                             <span className="text-muted text-xs font-semibold">AM/EN (optional)</span>
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                                                                <div><input type="text" value={sequenceEmailForm.subject_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_am: e.target.value })} placeholder="Subject (AM)" className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_am: e.target.value })} placeholder="Body (AM)" rows={2} className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
-                                                                <div><input type="text" value={sequenceEmailForm.subject_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_en: e.target.value })} placeholder="Subject (EN)" className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_en: e.target.value })} placeholder="Body (EN)" rows={2} className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
+                                                                <div><input type="text" value={sequenceEmailForm.subject_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_am: e.target.value })} placeholder="Subject (AM)" className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_am} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_am: e.target.value })} placeholder="Body (AM)" rows={2} className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
+                                                                <div><input type="text" value={sequenceEmailForm.subject_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, subject_en: e.target.value })} placeholder="Subject (EN)" className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" /><textarea value={sequenceEmailForm.body_en} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, body_en: e.target.value })} placeholder="Body (EN)" rows={2} className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 font-mono text-xs" /></div>
                                                             </div>
                                                         </div>
                                                         <div className="border-t border-border pt-4">
                                                             <span className="text-muted text-xs font-semibold">Conditions</span>
                                                             <label className="flex items-center gap-2 mt-2"><input type="checkbox" checked={sequenceEmailForm.conditions?.previous_email_opened === true} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, previous_email_opened: e.target.checked } })} className="rounded" /><span className="text-sm">Only if previous opened</span></label>
-                                                            <input type="text" value={(sequenceEmailForm.conditions?.has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Has tags (comma-separated)" className="w-full mt-2 bg-background border border-border rounded-lg px-3 py-1.5 text-sm" />
-                                                            <input type="text" value={(sequenceEmailForm.conditions?.not_has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, not_has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Not has tags" className="w-full mt-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm" />
+                                                            <input type="text" value={(sequenceEmailForm.conditions?.has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Has tags (comma-separated)" className="w-full mt-2 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
+                                                            <input type="text" value={(sequenceEmailForm.conditions?.not_has_tags || []).join(', ')} onChange={(e) => setSequenceEmailForm({ ...sequenceEmailForm, conditions: { ...sequenceEmailForm.conditions, not_has_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } })} placeholder="Not has tags" className="w-full mt-1 bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
                                                         </div>
                                                         <div className="flex gap-3">
                                                             <button onClick={updateSequenceEmail} className="px-6 py-2 bg-primary text-black font-bold rounded-lg shadow-glow-primary-sm">Update Step</button>
@@ -2367,7 +2367,8 @@ const Admin: React.FC = () => {
                                 {analyticsData.byType && analyticsData.byType.length > 0 && (
                                     <div className="bg-surface rounded-xl p-6 border border-border mb-8">
                                         <h3 className="text-lg font-semibold mb-4">By Email Type</h3>
-                                        <table className="w-full text-sm">
+                                        <div className="overflow-x-auto">
+                                        <table className="w-full text-sm min-w-[28rem]">
                                             <thead className="text-left text-muted">
                                                 <tr>
                                                     <th className="pb-2">Type</th>
@@ -2387,6 +2388,7 @@ const Admin: React.FC = () => {
                                                 ))}
                                             </tbody>
                                         </table>
+                                        </div>
                                     </div>
                                 )}
                                 <div className="bg-surface rounded-xl p-6 border border-border">

@@ -128,7 +128,7 @@ const Login: React.FC = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="you@example.com"
-                                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
+                                className="w-full min-h-[48px] bg-background border border-border rounded-lg px-4 py-3 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
                                 autoComplete="email"
                             />
                         </div>
@@ -143,13 +143,13 @@ const Login: React.FC = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
-                                    className="w-full bg-background border border-border rounded-lg px-4 py-3 pr-12 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
+                                    className="w-full min-h-[48px] bg-background border border-border rounded-lg px-4 py-3 pr-12 text-foreground placeholder-muted focus:border-primary focus:ring-2 focus:ring-primary/50 outline-none transition-all duration-300"
                                     autoComplete="current-password"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword((v) => !v)}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-muted hover:text-foreground hover:bg-white/5 transition-colors"
+                                    className="absolute right-0 top-0 bottom-0 min-w-[44px] flex items-center justify-center pr-2 rounded-lg text-muted hover:text-foreground hover:bg-white/5 transition-colors"
                                     title={showPassword ? 'Hide password' : 'Show password'}
                                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                                 >
@@ -167,7 +167,7 @@ const Login: React.FC = () => {
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="w-full bg-primary hover:bg-primary/90 text-black font-bold py-3 px-4 rounded-lg shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
+                            className="w-full min-h-[48px] bg-primary hover:bg-primary/90 text-black font-bold py-3 px-4 rounded-lg shadow-glow-primary-sm hover:shadow-glow-primary hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
                         >
                             {isSubmitting ? t('login.loggingIn') : t('login.button')}
                         </button>

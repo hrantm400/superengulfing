@@ -1979,6 +1979,9 @@ app.get('/api/confirm/:token', async (req, res) => {
             [subscriber.id, 'welcome', 'Welcome Email with PDF', 'sent']
         );
 
+        // Third email: course access — link to Access page + how to get access
+        await sendCourseAccessEmail(subscriber.email, subLocale);
+
         // Auto-add to ALL active sequences matching subscriber locale
         try {
             const activeSeqs = await pool.query(
@@ -3789,12 +3792,19 @@ async function getBroadcastSubscribers(broadcast) {
 }
 
 // Run broadcast send (used by POST handler and by job worker). Returns { sentCount, failedCount, useAbTest } or throws.
+// Only broadcasts with status 'draft' or 'scheduled' can be sent; after send, status becomes 'sent'.
 async function runBroadcastSend(broadcastId, options = {}) {
     const { ab_test, subject_b } = options;
     const id = broadcastId;
     const broadcast = await pool.query('SELECT * FROM broadcasts WHERE id = $1', [id]);
     if (broadcast.rows.length === 0) throw new Error('Broadcast not found');
     const b = broadcast.rows[0];
+    if (b.status === 'sent') {
+        throw new Error('Broadcast already sent. Only draft or scheduled broadcasts can be sent.');
+    }
+    if (b.status !== 'draft' && b.status !== 'scheduled') {
+        throw new Error('Broadcast can only be sent when status is draft or scheduled.');
+    }
     if (ab_test && subject_b) {
         await pool.query(
             'UPDATE broadcasts SET subject_b = $1, ab_test_ends_at = NOW() + INTERVAL \'24 hours\', ab_test_winner = NULL WHERE id = $2',
@@ -4645,12 +4655,14 @@ function wrapEmailTemplate(body, logId = null) {
     .header { text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #e2e8f0; }
     .logo { color: #059669; font-size: 22px; font-weight: 700; letter-spacing: 0.02em; }
     .tagline { color: #4b5563; font-size: 12px; margin-top: 4px; }
-    .content { color: #000000; font-size: 15px; }
-    .content h1 { color: #000000; font-size: 20px; font-weight: 600; margin: 0 0 16px 0; }
+    .content { color: #1a1a1a; font-size: 15px; }
+    .content, .content * { color: #1a1a1a; }
+    .content a { color: #059669 !important; text-decoration: none; }
+    .content .btn, .content a.btn { color: #ffffff !important; }
+    .content h1 { color: #1a1a1a; font-size: 20px; font-weight: 600; margin: 0 0 16px 0; }
     .content p { margin: 0 0 14px 0; }
     .content ul { margin: 12px 0; padding-left: 20px; }
     .content li { margin-bottom: 6px; }
-    .content a { color: #059669; text-decoration: none; }
     .content a:hover { text-decoration: underline; }
     .btn { display: inline-block; background: #059669; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px; margin: 8px 0; }
     .footer { margin-top: 32px; text-align: center; color: #4b5563; font-size: 12px; }
@@ -4817,6 +4829,65 @@ async function sendWelcomeEmail(email, locale = 'en') {
         return true;
     } catch (error) {
         console.error(`❌ Failed to send welcome email to ${email}:`, error.message);
+        return false;
+    }
+}
+
+// Third email after welcome: course access — link to Access page + how to get access (video, steps)
+async function sendCourseAccessEmail(email, locale = 'en') {
+    const thankYouBaseRaw = process.env.THANK_YOU_URL || (process.env.API_URL || 'http://localhost:3001').replace(/\/api$/, '');
+    const baseUrl = thankYouBaseRaw.replace(/\/thank-you\/?$/i, '') || thankYouBaseRaw;
+    const courseAccessUrl = locale === 'am' ? `${baseUrl}/am/course-access` : `${baseUrl}/course-access`;
+    const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
+    const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
+    const isAm = locale === 'am';
+    const subject = isAm ? 'Ցանկանու՞մ եք մուտքի մասին նամակ – SuperEngulfing' : 'Do you want the course access email? - SuperEngulfing';
+    const htmlContent = isAm ? `
+                <h1>Մուտք դասընթացին</h1>
+                <p>Ողջույն,</p>
+                <p>Տեսանյութում մանրամասն բացատրվում է, <strong>ինչպես ստանալ մուտք</strong> դասընթացին և ինդիկատորին։</p>
+                <p style="text-align: center; margin: 28px 0;">
+                    <a href="${courseAccessUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Բացել մուտքի էջը</a>
+                </p>
+                <p><strong>Ինչպես ստանալ մուտք.</strong></p>
+                <ul>
+                    <li>Գրանցվեք գործընկերոջ հղումով (անվճար)</li>
+                    <li>Ավելացրեք հաշվին $100 և կատարեք գործարք</li>
+                    <li>Ներկայացրեք ձեր UID-ն մուտքի էջում — մենք կհաստատենք 24 ժամի ընթացքում</li>
+                </ul>
+                <p class="muted">Հղումը դեպի մուտքի էջ. <a href="${courseAccessUrl}">${courseAccessUrl}</a></p>
+            ` : `
+                <h1>Course access</h1>
+                <p>Hello,</p>
+                <p>In the video you'll see <strong>exactly how to get access</strong> to the course and indicator.</p>
+                <p style="text-align: center; margin: 28px 0;">
+                    <a href="${courseAccessUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Go to Access page</a>
+                </p>
+                <p><strong>How it works:</strong></p>
+                <ul>
+                    <li>Register using our partner link (free)</li>
+                    <li>Deposit $100 and make a trade</li>
+                    <li>Submit your UID on the Access page — we'll verify within 24 hours</li>
+                </ul>
+                <p class="muted">Access page link: <a href="${courseAccessUrl}">${courseAccessUrl}</a></p>
+            `;
+    const textContent = isAm
+        ? `Մուտք դասընթացին – SuperEngulfing\n\nՏեսանյութում մանրամասն բացատրվում է, ինչպես ստանալ մուտք:\n\nԲացել մուտքի էջը: ${courseAccessUrl}\n\nԻնչպես ստանալ մուտք: Գրանցվել, ավելացնել $100 և գործարք կատարել, ներկայացնել UID մուտքի էջում։`
+        : `Do you want the course access email? – SuperEngulfing\n\nIn the video you'll see exactly how to get access.\n\nGo to Access page: ${courseAccessUrl}\n\nHow it works: Register, deposit $100 and trade, submit your UID on the Access page. We'll verify within 24 hours.`;
+
+    try {
+        await transporter.sendMail({
+            from: fromAddr,
+            to: email,
+            replyTo: replyTo,
+            subject,
+            text: textContent,
+            html: wrapEmailTemplate(htmlContent)
+        });
+        console.log(`📧 Course access email sent to ${email}`);
+        return true;
+    } catch (error) {
+        console.error(`❌ Failed to send course access email to ${email}:`, error.message);
         return false;
     }
 }
@@ -5499,7 +5570,7 @@ async function checkSequenceStepConditions(subscriberId, sequenceId, stepPositio
     return true;
 }
 
-// Process sequence emails
+// Process sequence emails. Only active sequences and active subscribers are sent; draft/paused sequences are never run.
 async function processSequenceEmails() {
     try {
         const dueEmails = await pool.query(`
@@ -5507,8 +5578,8 @@ async function processSequenceEmails() {
             FROM subscriber_sequences ss
             JOIN subscribers s ON ss.subscriber_id = s.id
             JOIN sequences seq ON ss.sequence_id = seq.id
-            WHERE ss.status = 'active' 
-              AND seq.status = 'active' 
+            WHERE ss.status = 'active'
+              AND seq.status = 'active'
               AND ss.next_email_at <= NOW()
               AND s.status = 'active'
         `);

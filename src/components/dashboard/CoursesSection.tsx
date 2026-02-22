@@ -366,7 +366,7 @@ export const CoursesSection: React.FC<CoursesSectionProps> = ({ embedded = false
                     {course.is_paid ? (
                       <Link
                         to={localizePath(`/dashboard/pay-course/${course.id}`)}
-                        className={`w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow transition-colors ${embedded ? 'py-2 text-xs' : 'px-4 py-3 text-sm'}`}
+                        className={`w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow transition-colors ${embedded ? 'py-2 text-xs' : 'px-4 py-3 text-sm'}`}
                       >
                         {t('dashboard.payAndGetAccess')}
                         <ChevronRight className="w-4 h-4" />
@@ -375,7 +375,7 @@ export const CoursesSection: React.FC<CoursesSectionProps> = ({ embedded = false
                       <button
                         onClick={() => handleEnroll(course.id)}
                         disabled={enrollingId === course.id}
-                        className={`w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow transition-colors disabled:opacity-50 ${embedded ? 'py-2 text-xs' : 'px-4 py-3 text-sm'}`}
+                        className={`w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-black font-bold hover:bg-primary-glow transition-colors disabled:opacity-50 ${embedded ? 'py-2 text-xs' : 'px-4 py-3 text-sm'}`}
                       >
                         {enrollingId === course.id ? t('dashboard.enrolling') : t('dashboard.enroll')}
                         <ChevronRight className="w-4 h-4" />

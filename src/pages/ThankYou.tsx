@@ -64,6 +64,18 @@ const ThankYou: React.FC<{ localeFromLoader?: 'en' | 'am' | null }> = ({ localeF
             <main className="flex-1 relative z-10 py-16 md:py-24">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
 
+                    {/* Prominent notice: do not close, watch video */}
+                    <AnimatedSection className="mb-10" delayMs={0}>
+                        <div className="inline-block w-full max-w-2xl px-6 py-5 rounded-xl border-2 border-amber-500/60 bg-amber-500/10 text-center">
+                            <p className="text-amber-200 font-bold text-lg md:text-xl leading-snug mb-2">
+                                {t('thankYou.doNotClose')}
+                            </p>
+                            <p className="text-amber-100/95 font-semibold text-base md:text-lg">
+                                {t('thankYou.watchVideo')}
+                            </p>
+                        </div>
+                    </AnimatedSection>
+
                     {/* Success Badge */}
                     <AnimatedSection className="mb-12 space-y-4" delayMs={60}>
                         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-widest mb-4">
