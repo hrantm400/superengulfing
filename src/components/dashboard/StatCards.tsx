@@ -284,7 +284,7 @@ const DEFAULT_COURSE_IMAGE = 'https://lh3.googleusercontent.com/aida-public/AB6A
 
 const CoursesDashboardCard: React.FC = () => {
   const navigate = useNavigate();
-  const { localizePath } = useLocale();
+  const { localizePath, locale } = useLocale();
   const { t } = useTranslation();
   const [title, setTitle] = useState('Mastery Mini Course');
   const [totalLessons, setTotalLessons] = useState(14);
@@ -294,33 +294,43 @@ const CoursesDashboardCard: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
+        // Always use catalog with locale (AM/EN) and pick the first-created course for the teaser
+        const catalogRes = await fetch(`${getApiUrl()}/api/courses?locale=${locale}`);
+        if (!catalogRes.ok) return;
+        const catalog = await catalogRes.json();
+        const list: Array<{ id: number; title?: string; image_url?: string | null; created_at?: string; lesson_count?: string }> = catalog.courses || [];
+        const sortedByCreated = [...list].sort((a, b) => {
+          const at = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return at - bt;
+        });
+        const firstCreated = sortedByCreated[0];
+        if (!firstCreated) return;
+
+        setTitle(firstCreated.title || 'Mastery Mini Course');
+        setTotalLessons(parseInt(firstCreated.lesson_count || '14', 10));
+        if (firstCreated.image_url) setImageUrl(firstCreated.image_url);
+
         const res = await authFetch('/api/courses/my-courses');
-        if (!res.ok) return;
-        const data = await res.json();
-        const courses = data.courses || [];
-        if (courses.length > 0) {
-          const first = courses[0];
-          setTitle(first.title || 'Mastery Mini Course');
-          setTotalLessons(first.total_lessons || 14);
-          setProgressPercent(first.progress_percent ?? 0);
-          if (first.image_url) setImageUrl(first.image_url);
-        } else {
-          const catalogRes = await fetch(`${getApiUrl()}/api/courses`);
-          if (catalogRes.ok) {
-            const catalog = await catalogRes.json();
-            const list = catalog.courses || [];
-            if (list.length > 0) {
-              setTitle(list[0].title || 'Mastery Mini Course');
-              if (list[0].image_url) setImageUrl(list[0].image_url);
-            }
+        if (res.ok) {
+          const data = await res.json();
+          const courses = data.courses || [];
+          const myCourse = courses.find((c: { id: number }) => c.id === firstCreated.id);
+          if (myCourse) {
+            setTotalLessons(myCourse.total_lessons ?? parseInt(firstCreated.lesson_count || '14', 10));
+            setProgressPercent(myCourse.progress_percent ?? 0);
+          } else {
+            setProgressPercent(0);
           }
+        } else {
+          setProgressPercent(0);
         }
       } catch (_) {
         /* use defaults */
       }
     };
     load();
-  }, []);
+  }, [locale]);
 
   const statusLabel = progressPercent >= 100 ? 'Completed' : progressPercent > 0 ? 'In Progress' : 'Not Started';
   const statusBadgeClass =
