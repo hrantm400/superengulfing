@@ -111,7 +111,7 @@ const Hero: React.FC = () => {
                 type="email"
                 required
                 disabled={status === 'loading'}
-                className="w-full h-16 bg-surface/80 border border-border rounded-lg px-12 text-lg text-gray-900 dark:text-slate-100 placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 transition-all duration-300 backdrop-blur-md font-mono disabled:opacity-50"
+                className="w-full h-16 bg-white dark:bg-slate-800/95 border border-border rounded-lg px-12 text-lg text-gray-900 dark:text-slate-100 placeholder:text-gray-500 dark:placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 transition-all duration-300 backdrop-blur-md font-mono disabled:opacity-50"
                 placeholder={t('home.hero.placeholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
