@@ -2023,10 +2023,12 @@ app.get('/api/confirm/:token', async (req, res) => {
         );
 
         if (result.rows.length === 0) {
+            console.log('[confirm] Invalid or expired token (no subscriber found)');
             return res.status(400).send('<html><body style="background:#f8fafc;color:#0f172a;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;"><div style="text-align:center;"><h1>❌ Invalid Link</h1><p style="color:#64748b;">This confirmation link is invalid or expired.</p></div></body></html>');
         }
 
         const subscriber = result.rows[0];
+        console.log('[confirm] Token valid, subscriber id=', subscriber.id, 'email=', subscriber.email, 'already confirmed_at=', !!subscriber.confirmed_at);
 
         // Determine subscriber locale once
         const subLocale = subscriber.locale === 'am' ? 'am' : 'en';
@@ -2048,11 +2050,12 @@ app.get('/api/confirm/:token', async (req, res) => {
             return res.redirect(thankYouUrl);
         }
 
-        // Update subscriber to confirmed and set thank-you token
+        // Update subscriber to confirmed and set thank-you token (this is what makes them active)
         await pool.query(
             "UPDATE subscribers SET status = 'active', confirmed_at = NOW(), confirmation_token = NULL, thank_you_token = $1, thank_you_token_expires_at = $2 WHERE id = $3",
             [thankYouToken, thankYouExpires, subscriber.id]
         );
+        console.log('[confirm] Subscriber marked active: id=', subscriber.id, 'email=', subscriber.email);
 
         // Send welcome email with PDF link
         await sendWelcomeEmail(subscriber.email, (subscriber.locale === 'am' ? 'am' : 'en'));
@@ -2096,6 +2099,7 @@ app.get('/api/confirm/:token', async (req, res) => {
         const thankYouUrl = subLocale === 'am' ? `${thankYouBase}/am/thank-you?token=${thankYouToken}` : `${thankYouBase}/thank-you?token=${thankYouToken}`;
         res.redirect(thankYouUrl);
     } catch (error) {
+        console.error('[confirm] Error confirming subscription:', error);
         res.status(500).send('Error confirming subscription');
     }
 });
@@ -4687,7 +4691,8 @@ function replaceMergeTags(text, subscriber) {
     return out;
 }
 
-// Compute next_email_at for first sequence step. If delay is 0,0 use past so scheduler sends within ~1 min.
+// Compute next_email_at for first sequence step (in UTC so comparison with PostgreSQL NOW() works).
+// If delay is 0,0 use past so scheduler sends within ~1 min.
 function getNextEmailAtForFirstStep(delay_days, delay_hours) {
     const d = delay_days || 0;
     const h = delay_hours || 0;
@@ -4697,8 +4702,8 @@ function getNextEmailAtForFirstStep(delay_days, delay_hours) {
         return past;
     }
     const next = new Date();
-    next.setDate(next.getDate() + d);
-    next.setHours(next.getHours() + h);
+    next.setUTCDate(next.getUTCDate() + d);
+    next.setUTCHours(next.getUTCHours() + h);
     return next;
 }
 
@@ -5655,6 +5660,7 @@ async function checkSequenceStepConditions(subscriberId, sequenceId, stepPositio
 }
 
 // Process sequence emails. Only active sequences and active subscribers are sent; draft/paused sequences are never run.
+// Subscribers with status 'pending' (unconfirmed) do NOT receive sequence emails — they must be 'active'.
 async function processSequenceEmails() {
     try {
         const dueEmails = await pool.query(`
@@ -5667,6 +5673,19 @@ async function processSequenceEmails() {
               AND ss.next_email_at <= NOW()
               AND s.status = 'active'
         `);
+
+        // If nothing to send, log hint when there are due rows blocked by subscriber status (e.g. pending)
+        if (dueEmails.rows.length === 0) {
+            const blocked = await pool.query(`
+                SELECT COUNT(*) as cnt FROM subscriber_sequences ss
+                JOIN subscribers s ON ss.subscriber_id = s.id
+                JOIN sequences seq ON ss.sequence_id = seq.id
+                WHERE ss.status = 'active' AND seq.status = 'active' AND ss.next_email_at <= NOW() AND s.status != 'active'
+            `);
+            if (Number(blocked.rows[0]?.cnt || 0) > 0) {
+                console.log('[sequence] No emails sent this run;', blocked.rows[0].cnt, 'due row(s) skipped — subscriber status is not active (confirm email or set status=active for testing).');
+            }
+        }
 
         for (const subSeq of dueEmails.rows) {
             // Get the email at current_step + 1
@@ -5699,8 +5718,8 @@ async function processSequenceEmails() {
                 if (nextEmail.rows.length > 0) {
                     const { delay_days, delay_hours } = nextEmail.rows[0];
                     const nextAt = new Date();
-                    nextAt.setDate(nextAt.getDate() + (delay_days || 0));
-                    nextAt.setHours(nextAt.getHours() + (delay_hours || 0));
+                    nextAt.setUTCDate(nextAt.getUTCDate() + (delay_days || 0));
+                    nextAt.setUTCHours(nextAt.getUTCHours() + (delay_hours || 0));
                     await pool.query(
                         'UPDATE subscriber_sequences SET current_step = current_step + 1, next_email_at = $1 WHERE id = $2',
                         [nextAt, subSeq.id]
@@ -5754,8 +5773,8 @@ async function processSequenceEmails() {
                 if (nextEmail.rows.length > 0) {
                     const { delay_days, delay_hours } = nextEmail.rows[0];
                     const nextAt = new Date();
-                    nextAt.setDate(nextAt.getDate() + (delay_days || 0));
-                    nextAt.setHours(nextAt.getHours() + (delay_hours || 0));
+                    nextAt.setUTCDate(nextAt.getUTCDate() + (delay_days || 0));
+                    nextAt.setUTCHours(nextAt.getUTCHours() + (delay_hours || 0));
 
                     await pool.query(
                         'UPDATE subscriber_sequences SET current_step = current_step + 1, next_email_at = $1 WHERE id = $2',
