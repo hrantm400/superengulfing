@@ -717,6 +717,90 @@ app.post('/api/admin/payment-issues/:id/resolve', requireAdminAuth, async (req, 
             `UPDATE payment_issue_reports SET status = 'resolved', resolved_at = NOW(), resolved_by = $2 WHERE id = $1`,
             [id, adminEmail]
         );
+
+        const { admin_note } = req.body || {};
+        const noteEscaped = (admin_note && String(admin_note).trim()) ? String(admin_note).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+        if (report.email && report.email.includes('@')) {
+            const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
+            const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
+            let htmlContent = `
+                <h1>Your payment issue has been resolved</h1>
+                <p>Hello,</p>
+                <p>Thank you for contacting us. We've looked into your payment issue and marked it as resolved.</p>
+                ${grant_access === true ? '<p><strong>Access has been granted to your account.</strong> You can log in to your dashboard and use your course or product.</p>' : ''}
+                ${noteEscaped ? `<p style="background: rgba(255,255,255,0.05); padding: 12px 16px; border-radius: 8px; margin: 12px 0;">${noteEscaped}</p>` : ''}
+                <p>If you have any further questions, reply to this email.</p>
+                <p>— The SuperEngulfing Team</p>
+            `;
+            try {
+                await transporter.sendMail({
+                    from: fromAddr,
+                    to: report.email,
+                    replyTo,
+                    subject: 'Your payment issue has been resolved – SuperEngulfing',
+                    html: wrapEmailTemplate(htmlContent)
+                });
+                console.log(`📧 Payment issue resolved email sent to ${report.email}`);
+            } catch (err) {
+                console.error(`❌ Failed to send payment-issue-resolved email to ${report.email}:`, err.message);
+            }
+        }
+
+        return res.json({ ok: true });
+    } catch (e) {
+        if (e.message && /relation "payment_issue_reports" does not exist/i.test(e.message)) {
+            return res.status(503).json({ error: 'Run migration 031_payment_issue_reports.sql' });
+        }
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/payment-issues/:id/reject - Reject payment issue and notify user (admin)
+app.post('/api/admin/payment-issues/:id/reject', requireAdminAuth, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const { admin_note } = req.body || {};
+    const adminEmail = req.admin && req.admin.email ? req.admin.email : 'admin';
+    try {
+        const reportRes = await pool.query(
+            'SELECT id, order_id, product_type, email, status FROM payment_issue_reports WHERE id = $1',
+            [id]
+        );
+        if (reportRes.rows.length === 0) return res.status(404).json({ error: 'Report not found' });
+        const report = reportRes.rows[0];
+        if (report.status !== 'pending') return res.status(400).json({ error: 'Report is not pending' });
+
+        await pool.query(
+            `UPDATE payment_issue_reports SET status = 'rejected', resolved_at = NOW(), resolved_by = $2 WHERE id = $1`,
+            [id, adminEmail]
+        );
+
+        if (report.email && report.email.includes('@')) {
+            const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
+            const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
+            const noteEscaped = (admin_note && String(admin_note).trim()) ? String(admin_note).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+            const htmlContent = `
+                <h1>Regarding your payment issue</h1>
+                <p>Hello,</p>
+                <p>Thank you for reaching out. We were unable to verify your payment with the information provided.</p>
+                <p>If you have a transaction ID or additional details, please reply to this email or contact us at <a href="mailto:info@superengulfing.com">info@superengulfing.com</a> and we'll look into it.</p>
+                ${noteEscaped ? `<p style="background: rgba(255,255,255,0.05); padding: 12px 16px; border-radius: 8px; margin: 12px 0;">${noteEscaped}</p>` : ''}
+                <p>— The SuperEngulfing Team</p>
+            `;
+            try {
+                await transporter.sendMail({
+                    from: fromAddr,
+                    to: report.email,
+                    replyTo,
+                    subject: 'Regarding your payment issue – SuperEngulfing',
+                    html: wrapEmailTemplate(htmlContent)
+                });
+                console.log(`📧 Payment issue rejected email sent to ${report.email}`);
+            } catch (err) {
+                console.error(`❌ Failed to send payment-issue-rejected email to ${report.email}:`, err.message);
+            }
+        }
+
         return res.json({ ok: true });
     } catch (e) {
         if (e.message && /relation "payment_issue_reports" does not exist/i.test(e.message)) {

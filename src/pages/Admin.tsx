@@ -327,6 +327,7 @@ const Admin: React.FC = () => {
     // Indicator access requests
     const [indicatorRequests, setIndicatorRequests] = useState<IndicatorAccessRequest[]>([]);
     const [paymentIssues, setPaymentIssues] = useState<PaymentIssueReport[]>([]);
+    const [paymentIssueNotes, setPaymentIssueNotes] = useState<Record<number, string>>({});
     const [liquidityScanEarlyUsers, setLiquidityScanEarlyUsers] = useState<LiquidityScanEarlyUser[]>([]);
     const [showAddEarlyUserModal, setShowAddEarlyUserModal] = useState(false);
     const [addEarlyUserEmail, setAddEarlyUserEmail] = useState('');
@@ -2610,34 +2611,74 @@ const Admin: React.FC = () => {
                                                     <td className="p-3 max-w-xs truncate" title={r.message}>{r.message}</td>
                                                     <td className="p-3 font-mono text-xs max-w-[120px] truncate" title={r.tx_id || undefined}>{r.tx_id || '—'}</td>
                                                     <td className="p-3">
-                                                        <span className={`px-2 py-0.5 rounded text-xs ${r.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>{r.status}</span>
+                                                        <span className={`px-2 py-0.5 rounded text-xs ${r.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-400' : r.status === 'rejected' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>{r.status}</span>
                                                     </td>
                                                     <td className="p-3">
                                                         {r.status === 'pending' && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={async () => {
-                                                                    try {
-                                                                        const res = await fetchWithAdminAuth(`${getApiUrl()}/api/admin/payment-issues/${r.id}/resolve`, {
-                                                                            method: 'POST',
-                                                                            headers: { 'Content-Type': 'application/json' },
-                                                                            body: JSON.stringify({ grant_access: r.product_type === 'course' ? true : false }),
-                                                                        });
-                                                                        const data = await res.json().catch(() => ({}));
-                                                                        if (!res.ok) {
-                                                                            setMessage(data.error || 'Failed to resolve');
-                                                                            return;
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Note (optional)"
+                                                                    value={paymentIssueNotes[r.id] ?? ''}
+                                                                    onChange={(e) => setPaymentIssueNotes(prev => ({ ...prev, [r.id]: e.target.value }))}
+                                                                    className="max-w-[140px] px-2 py-1 rounded bg-surface border border-border text-foreground text-xs placeholder:text-muted focus:outline-none focus:border-primary"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/admin/payment-issues/${r.id}/resolve`, {
+                                                                                method: 'POST',
+                                                                                headers: { 'Content-Type': 'application/json' },
+                                                                                body: JSON.stringify({
+                                                                                    grant_access: r.product_type === 'course',
+                                                                                    admin_note: (paymentIssueNotes[r.id] ?? '').trim() || undefined,
+                                                                                }),
+                                                                            });
+                                                                            const data = await res.json().catch(() => ({}));
+                                                                            if (!res.ok) {
+                                                                                setMessage(data.error || 'Failed to resolve');
+                                                                                return;
+                                                                            }
+                                                                            setMessage('Resolved');
+                                                                            setPaymentIssues(prev => prev.map(x => x.id === r.id ? { ...x, status: 'resolved', resolved_at: new Date().toISOString(), resolved_by: 'admin' } : x));
+                                                                            setPaymentIssueNotes(prev => { const next = { ...prev }; delete next[r.id]; return next; });
+                                                                        } catch (e) {
+                                                                            setMessage('Failed to resolve');
                                                                         }
-                                                                        setMessage('Resolved');
-                                                                        setPaymentIssues(prev => prev.map(x => x.id === r.id ? { ...x, status: 'resolved', resolved_at: new Date().toISOString(), resolved_by: 'admin' } : x));
-                                                                    } catch (e) {
-                                                                        setMessage('Failed to resolve');
-                                                                    }
-                                                                }}
-                                                                className="px-2 py-1 rounded bg-primary/20 text-primary text-xs hover:bg-primary/30"
-                                                            >
-                                                                Resolve
-                                                            </button>
+                                                                    }}
+                                                                    className="px-2 py-1 rounded bg-primary/20 text-primary text-xs hover:bg-primary/30"
+                                                                >
+                                                                    Resolve
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            const res = await fetchWithAdminAuth(`${getApiUrl()}/api/admin/payment-issues/${r.id}/reject`, {
+                                                                                method: 'POST',
+                                                                                headers: { 'Content-Type': 'application/json' },
+                                                                                body: JSON.stringify({
+                                                                                    admin_note: (paymentIssueNotes[r.id] ?? '').trim() || undefined,
+                                                                                }),
+                                                                            });
+                                                                            const data = await res.json().catch(() => ({}));
+                                                                            if (!res.ok) {
+                                                                                setMessage(data.error || 'Failed to reject');
+                                                                                return;
+                                                                            }
+                                                                            setMessage('Rejected');
+                                                                            setPaymentIssues(prev => prev.map(x => x.id === r.id ? { ...x, status: 'rejected', resolved_at: new Date().toISOString(), resolved_by: 'admin' } : x));
+                                                                            setPaymentIssueNotes(prev => { const next = { ...prev }; delete next[r.id]; return next; });
+                                                                        } catch (e) {
+                                                                            setMessage('Failed to reject');
+                                                                        }
+                                                                    }}
+                                                                    className="px-2 py-1 rounded bg-red-500/20 text-red-400 text-xs hover:bg-red-500/30"
+                                                                >
+                                                                    Reject
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </td>
                                                 </tr>
