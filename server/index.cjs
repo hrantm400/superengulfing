@@ -5955,21 +5955,24 @@ async function processSequenceEmails() {
                 );
                 const logId = logResult.rows[0].id;
 
-                // Per-sequence unsubscribe link
+                // Per-sequence unsubscribe link (localized)
                 let bodyWithUnsub = bodyPersonal;
                 try {
                     const apiUrl = process.env.API_URL || 'http://localhost:3001';
                     const seqToken = createSequenceUnsubToken(subSeq.subscriber_id, subSeq.sequence_id);
                     const seqUnsubUrl = `${apiUrl}/api/unsubscribe-sequence?token=${encodeURIComponent(seqToken)}`;
+                    const isAmSeq = (subSeq.locale === 'am');
+                    const footerText = isAmSeq
+                        ? `Եթե այլևս չես ցանկանում ստանալ այս կոնկրետ շարքի (sequence) նամակները, սեղմիր այստեղ՝ <a href="${seqUnsubUrl}">Չեղարկել այս շարքը</a>.`
+                        : `If you no longer want to receive emails from this specific sequence, click here to <a href="${seqUnsubUrl}">unsubscribe from this sequence only</a>. Other emails (Access / Courses / LiquidityScan) will continue unless you unsubscribe from them separately.`;
                     bodyWithUnsub += `
                         <div class="divider"></div>
                         <p class="muted" style="font-size:13px;color:#9ca3af;margin-top:16px;">
-                            Եթե այլևս չես ցանկանում ստանալ այս կոնկրետ շարքի (sequence) նամակները, սեղմիր այստեղ՝
-                            <a href="${seqUnsubUrl}">Չեղարկել այս շարքը</a>.
+                            ${footerText}
                         </p>
                     `;
                 } catch {
-                    // If token generation fails, просто шлём без дополнительной ссылки.
+                    // If token generation fails, send without additional per-sequence link.
                 }
 
                 const mailOpts = {

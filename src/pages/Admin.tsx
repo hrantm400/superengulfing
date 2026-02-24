@@ -502,6 +502,7 @@ const Admin: React.FC = () => {
     // Edit subscriber (custom fields, first_name, status)
     const [editSubscriberId, setEditSubscriberId] = useState<number | null>(null);
     const [editSubscriberForm, setEditSubscriberForm] = useState({ first_name: '', status: 'active', custom_fields_json: '{}' });
+    const [subscriberSequencesModal, setSubscriberSequencesModal] = useState<Subscriber | null>(null);
 
     // Sequence triggers (when tag added -> add to sequence)
     const [sequenceTriggers, setSequenceTriggers] = useState<{ id: number; tag_id: number; sequence_id: number; tag_name: string; sequence_name: string }[]>([]);
@@ -1736,9 +1737,32 @@ const Admin: React.FC = () => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-muted">{formatDate(sub.created_at)}</td>
-                                            <td className="px-6 py-4 text-sm">
-                                                <button onClick={() => { setEditSubscriberId(sub.id); setEditSubscriberForm({ first_name: sub.first_name || '', status: sub.status, custom_fields_json: JSON.stringify(sub.custom_fields || {}, null, 2) }); }} className="text-primary hover:underline mr-2">Edit</button>
-                                                <button onClick={() => deleteSubscriber(sub.id)} className="text-red-400 hover:text-red-300">Delete</button>
+                                            <td className="px-6 py-4 text-sm space-x-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setEditSubscriberId(sub.id);
+                                                        setEditSubscriberForm({
+                                                            first_name: sub.first_name || '',
+                                                            status: sub.status,
+                                                            custom_fields_json: JSON.stringify(sub.custom_fields || {}, null, 2),
+                                                        });
+                                                    }}
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => setSubscriberSequencesModal(sub)}
+                                                    className="text-blue-400 hover:text-blue-300"
+                                                >
+                                                    Sequences
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteSubscriber(sub.id)}
+                                                    className="text-red-400 hover:text-red-300"
+                                                >
+                                                    Delete
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -1775,6 +1799,13 @@ const Admin: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
+                        )}
+                        {subscriberSequencesModal && (
+                            <SubscriberSequencesModal
+                                subscriber={subscriberSequencesModal}
+                                onClose={() => setSubscriberSequencesModal(null)}
+                                fetchWithAdminAuth={fetchWithAdminAuth}
+                            />
                         )}
                     </div>
                 )}
