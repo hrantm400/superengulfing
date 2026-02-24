@@ -48,14 +48,6 @@ const Access: React.FC = () => {
         return () => document.removeEventListener('visibilitychange', onVisibility);
     }, [loadSettings]);
 
-    if (profile != null) {
-        return null;
-    }
-    // Пока проверяем авторизацию (есть токен, профиль ещё не загружен) — ничего не показываем
-    if (getAuthToken() && profile === null) {
-        return null;
-    }
-
     return (
         <div className="relative min-h-screen flex flex-col pt-24 md:pt-28">
             {/* Affiliate banner – below navbar, editable from admin */}
