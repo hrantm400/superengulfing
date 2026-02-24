@@ -1750,8 +1750,9 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
                     'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
                     [userId, courseId]
                 );
-                const userRow = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [userId]);
+                const userRow = await pool.query('SELECT email, locale FROM dashboard_users WHERE id = $1', [userId]);
                 const userEmail = userRow.rows[0] && userRow.rows[0].email;
+                const userLocale = userRow.rows[0] && (userRow.rows[0].locale === 'am' ? 'am' : 'en');
                 const courseTitle = course.title || 'Course';
                 if (userEmail) {
                     await transporter.sendMail({
@@ -1760,6 +1761,15 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
                         subject: `You have access to: ${courseTitle}`,
                         text: `Your payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
                     }).catch((err) => console.warn('[nowpayments-ipn] course user email failed:', err.message));
+
+                    // Auto-transition: ACCESS -> COURSES sequences
+                    try {
+                        const sub = await ensureSubscriberForEmail(userEmail, userLocale || 'en');
+                        await stopSequencesByKind(sub.id, 'access');
+                        await addToSequenceByKind(sub.id, sub.locale, 'course');
+                    } catch (seqErr) {
+                        console.error('[nowpayments-ipn] course sequence update failed:', seqErr && seqErr.message);
+                    }
                 }
                 if (notifyTo) {
                     await transporter.sendMail({
@@ -1838,6 +1848,14 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
                         '– SuperEngulfing',
                     ].join('\n'),
                 });
+
+                // Auto-add to LiquidityScan sequence (does not stop other sequences)
+                try {
+                    const sub = await ensureSubscriberForEmail(cleanedCustomerEmail, 'en');
+                    await addToSequenceByKind(sub.id, sub.locale, 'liqscan');
+                } catch (seqErr) {
+                    console.error('[nowpayments-ipn] liqscan sequence update failed:', seqErr && seqErr.message);
+                }
             }
         }
     } catch (err) {
@@ -2069,32 +2087,10 @@ app.get('/api/confirm/:token', async (req, res) => {
         // Third email: course access — link to Access page + how to get access
         await sendCourseAccessEmail(subscriber.email, subLocale);
 
-        // Auto-add to ALL active sequences matching subscriber locale
+        // Auto-add to PDF sequence for this locale (kind='pdf')
         try {
-            const activeSeqs = await pool.query(
-                "SELECT id FROM sequences WHERE status = 'active' AND COALESCE(locale, 'en') = $1",
-                [subLocale]
-            );
-            for (const seq of activeSeqs.rows) {
-                const existing = await pool.query(
-                    'SELECT id FROM subscriber_sequences WHERE subscriber_id = $1 AND sequence_id = $2',
-                    [subscriber.id, seq.id]
-                );
-                if (existing.rows.length === 0) {
-                    const firstEmail = await pool.query(
-                        'SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 ORDER BY position LIMIT 1',
-                        [seq.id]
-                    );
-                    const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
-                    const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
-                    const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
-                    await pool.query(
-                        'INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at) VALUES ($1, $2, 0, $3)',
-                        [subscriber.id, seq.id, nextEmailAt]
-                    );
-                }
-            }
-        } catch (e) { console.error('Auto-add to sequences error:', e.message); }
+            await addToSequenceByKind(subscriber.id, subLocale, 'pdf');
+        } catch (e) { console.error('Auto-add to pdf sequence error:', e.message); }
 
         const thankYouUrl = subLocale === 'am' ? `${thankYouBase}/am/thank-you?token=${thankYouToken}` : `${thankYouBase}/thank-you?token=${thankYouToken}`;
         res.redirect(thankYouUrl);
@@ -2296,6 +2292,16 @@ app.post('/api/access-requests/:id/accept', requireAdminAuth, async (req, res) =
         );
         await pool.query('COMMIT');
         await sendSetPasswordEmail(email, setPasswordToken, locale);
+
+        // Auto-transition: PDF -> ACCESS sequence for this email
+        try {
+            const sub = await ensureSubscriberForEmail(email, locale);
+            await stopSequencesByKind(sub.id, 'pdf');
+            await addToSequenceByKind(sub.id, sub.locale, 'access');
+        } catch (e) {
+            console.error('[access-accept] Failed to update sequences for', email, e.message);
+        }
+
         res.json({ success: true });
     } catch (error) {
         await pool.query('ROLLBACK').catch(() => { });
@@ -3595,6 +3601,56 @@ app.post('/api/subscribers/bulk-unsubscribe', requireAdminAuth, async (req, res)
     }
 });
 
+// GET /api/subscriber-sequences - List sequences for a subscriber (admin)
+app.get('/api/subscriber-sequences', requireAdminAuth, async (req, res) => {
+    const subscriberId = parseInt(req.query.subscriber_id, 10);
+    if (!subscriberId) {
+        return res.status(400).json({ error: 'subscriber_id required' });
+    }
+    try {
+        const result = await pool.query(
+            `SELECT ss.id,
+                    ss.sequence_id,
+                    ss.status,
+                    ss.current_step,
+                    ss.next_email_at,
+                    ss.started_at,
+                    seq.name,
+                    COALESCE(seq.locale, 'en') as locale,
+                    COALESCE(seq.kind, '') as kind
+             FROM subscriber_sequences ss
+             JOIN sequences seq ON seq.id = ss.sequence_id
+             WHERE ss.subscriber_id = $1
+             ORDER BY ss.started_at DESC, ss.id DESC`,
+            [subscriberId]
+        );
+        res.json({ sequences: result.rows });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/subscribers/:id/sequences/:seqId/unsubscribe - Stop one sequence for a subscriber (admin)
+app.post('/api/subscribers/:id/sequences/:seqId/unsubscribe', requireAdminAuth, async (req, res) => {
+    const subscriberId = parseInt(req.params.id, 10);
+    const sequenceId = parseInt(req.params.seqId, 10);
+    if (!subscriberId || !sequenceId) {
+        return res.status(400).json({ error: 'Invalid subscriber or sequence id' });
+    }
+    try {
+        const result = await pool.query(
+            "UPDATE subscriber_sequences SET status = 'unsubscribed' WHERE subscriber_id = $1 AND sequence_id = $2 AND status = 'active' RETURNING id",
+            [subscriberId, sequenceId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Active subscription for this sequence not found' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // PUT /api/subscribers/:id - Update subscriber
 app.put('/api/subscribers/:id', requireAdminAuth, async (req, res) => {
     const { id } = req.params;
@@ -4707,6 +4763,78 @@ function getNextEmailAtForFirstStep(delay_days, delay_hours) {
     return next;
 }
 
+// Ensure there is a subscriber row for a given email; return { id, locale }.
+async function ensureSubscriberForEmail(email, localeHint = 'en') {
+    const locale = (localeHint === 'am' ? 'am' : 'en');
+    const norm = String(email || '').toLowerCase().trim();
+    if (!norm) throw new Error('Email is required');
+
+    const existing = await pool.query('SELECT id, locale FROM subscribers WHERE email = $1', [norm]);
+    if (existing.rows.length > 0) {
+        const row = existing.rows[0];
+        return { id: row.id, locale: row.locale === 'am' ? 'am' : 'en' };
+    }
+
+    const inserted = await pool.query(
+        "INSERT INTO subscribers (email, status, locale, source) VALUES ($1, 'active', $2, $3) RETURNING id, locale",
+        [norm, locale, 'access-flow']
+    );
+    return { id: inserted.rows[0].id, locale: inserted.rows[0].locale === 'am' ? 'am' : 'en' };
+}
+
+// Find active sequence by kind and locale (one per pair is expected).
+async function findSequenceIdByKindAndLocale(kind, locale) {
+    const loc = (locale === 'am' ? 'am' : 'en');
+    const result = await pool.query(
+        "SELECT id FROM sequences WHERE status = 'active' AND kind = $1 AND COALESCE(locale, 'en') = $2 ORDER BY id ASC LIMIT 1",
+        [kind, loc]
+    );
+    return result.rows.length > 0 ? result.rows[0].id : null;
+}
+
+// Add subscriber to a sequence of given kind+locale if not already there.
+async function addToSequenceByKind(subscriberId, locale, kind) {
+    const seqId = await findSequenceIdByKindAndLocale(kind, locale);
+    if (!seqId) {
+        return false;
+    }
+    const existing = await pool.query(
+        'SELECT id FROM subscriber_sequences WHERE subscriber_id = $1 AND sequence_id = $2',
+        [subscriberId, seqId]
+    );
+    if (existing.rows.length > 0) {
+        return false;
+    }
+
+    const firstEmail = await pool.query(
+        'SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 ORDER BY position LIMIT 1',
+        [seqId]
+    );
+    const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
+    const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
+    const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
+
+    await pool.query(
+        'INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at) VALUES ($1, $2, 0, $3)',
+        [subscriberId, seqId, nextEmailAt]
+    );
+    return true;
+}
+
+// Stop all active sequences of a given kind for subscriber (used when переход в новую воронку).
+async function stopSequencesByKind(subscriberId, kind) {
+    await pool.query(
+        `UPDATE subscriber_sequences ss
+         SET status = 'completed'
+         FROM sequences s
+         WHERE ss.sequence_id = s.id
+           AND ss.subscriber_id = $1
+           AND ss.status = 'active'
+           AND s.kind = $2`,
+        [subscriberId, kind]
+    );
+}
+
 // Pick subject/body by subscriber locale from a broadcast or sequence_emails row (with subject_am, body_am, subject_en, body_en).
 function pickContentByLocale(row, locale) {
     const loc = locale === 'am' ? 'am' : 'en';
@@ -5316,6 +5444,60 @@ app.get('/api/unsubscribe', async (req, res) => {
     }
 });
 
+// GET /api/unsubscribe-sequence?token=... - Unsubscribe from a specific sequence only
+app.get('/api/unsubscribe-sequence', async (req, res) => {
+    const token = req.query.token;
+    if (!token || typeof token !== 'string') {
+        return res.status(400).send('Invalid unsubscribe link');
+    }
+
+    const decoded = decodeSequenceUnsubToken(token);
+    if (!decoded) {
+        return res.status(400).send('Invalid or expired unsubscribe link');
+    }
+
+    const { subscriberId, sequenceId } = decoded;
+
+    try {
+        const row = await pool.query(
+            `SELECT ss.id, s.email, seq.name, COALESCE(seq.kind, '') as kind
+             FROM subscriber_sequences ss
+             JOIN subscribers s ON s.id = ss.subscriber_id
+             JOIN sequences seq ON seq.id = ss.sequence_id
+             WHERE ss.subscriber_id = $1 AND ss.sequence_id = $2
+             LIMIT 1`,
+            [subscriberId, sequenceId]
+        );
+
+        if (row.rows.length === 0) {
+            return res.status(404).send('Subscription not found');
+        }
+
+        await pool.query(
+            "UPDATE subscriber_sequences SET status = 'unsubscribed' WHERE subscriber_id = $1 AND sequence_id = $2",
+            [subscriberId, sequenceId]
+        );
+
+        const seqName = row.rows[0].name || 'this sequence';
+
+        res.send(`
+            <html>
+            <body style="background:#0f172a;color:#e5e7eb;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;">
+                <div style="text-align:center;max-width:480px;padding:24px;border-radius:16px;background:#020617;box-shadow:0 20px 40px rgba(15,23,42,0.7);border:1px solid rgba(148,163,184,0.3);">
+                    <h1 style="font-size:24px;margin-bottom:16px;">You unsubscribed from this sequence</h1>
+                    <p style="color:#e5e7eb;margin-bottom:8px;">Sequence: <strong>${seqName}</strong></p>
+                    <p style="color:#9ca3af;margin-bottom:16px;">Other emails (например, Access / Courses / LiquidityScan) вы будете продолжать получать, если от них не отписались отдельно.</p>
+                    <p style="color:#6b7280;font-size:13px;margin-top:16px;">Если вы сделали это случайно, просто подпишитесь на эту серию писем ещё раз на сайте.</p>
+                </div>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('[unsubscribe-sequence] error:', error && error.message);
+        res.status(500).send('Error processing sequence unsubscribe');
+    }
+});
+
 // ==================== EMAIL ANALYTICS ====================
 
 // 1x1 transparent pixel for tracking email opens
@@ -5667,6 +5849,26 @@ async function checkSequenceStepConditions(subscriberId, sequenceId, stepPositio
     return true;
 }
 
+// ==================== PER-SEQUENCE UNSUBSCRIBE TOKENS ====================
+
+function createSequenceUnsubToken(subscriberId, sequenceId) {
+    const payload = { sub: subscriberId, seq: sequenceId, purpose: 'seq-unsub' };
+    return jwt.sign(payload, jwtSecret, { expiresIn: '30d' });
+}
+
+function decodeSequenceUnsubToken(token) {
+    try {
+        const decoded = jwt.verify(token, jwtSecret);
+        if (!decoded || decoded.purpose !== 'seq-unsub') return null;
+        const subscriberId = parseInt(decoded.sub, 10);
+        const sequenceId = parseInt(decoded.seq, 10);
+        if (!subscriberId || !sequenceId) return null;
+        return { subscriberId, sequenceId };
+    } catch {
+        return null;
+    }
+}
+
 // Process sequence emails. Only active sequences and active subscribers are sent; draft/paused sequences are never run.
 // Subscribers with status 'pending' (unconfirmed) do NOT receive sequence emails — they must be 'active'.
 async function processSequenceEmails() {
@@ -5753,11 +5955,28 @@ async function processSequenceEmails() {
                 );
                 const logId = logResult.rows[0].id;
 
+                // Per-sequence unsubscribe link
+                let bodyWithUnsub = bodyPersonal;
+                try {
+                    const apiUrl = process.env.API_URL || 'http://localhost:3001';
+                    const seqToken = createSequenceUnsubToken(subSeq.subscriber_id, subSeq.sequence_id);
+                    const seqUnsubUrl = `${apiUrl}/api/unsubscribe-sequence?token=${encodeURIComponent(seqToken)}`;
+                    bodyWithUnsub += `
+                        <div class="divider"></div>
+                        <p class="muted" style="font-size:13px;color:#9ca3af;margin-top:16px;">
+                            Եթե այլևս չես ցանկանում ստանալ այս կոնկրետ շարքի (sequence) նամակները, սեղմիր այստեղ՝
+                            <a href="${seqUnsubUrl}">Չեղարկել այս շարքը</a>.
+                        </p>
+                    `;
+                } catch {
+                    // If token generation fails, просто шлём без дополнительной ссылки.
+                }
+
                 const mailOpts = {
                     from: process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>',
                     to: subSeq.email,
                     subject: subj,
-                    html: wrapEmailTemplate(bodyPersonal, logId)
+                    html: wrapEmailTemplate(bodyWithUnsub, logId)
                 };
                 const attachList = Array.isArray(seqEmail.attachments) ? seqEmail.attachments : (typeof seqEmail.attachments === 'string' ? (() => { try { return JSON.parse(seqEmail.attachments); } catch (_) { return []; } })() : []);
                 if (attachList.length > 0) {

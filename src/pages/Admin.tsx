@@ -171,6 +171,18 @@ interface AdminMetrics {
     };
 }
 
+interface SubscriberSequence {
+    id: number;
+    sequence_id: number;
+    status: string;
+    current_step: number;
+    next_email_at: string | null;
+    started_at: string;
+    name: string;
+    locale: string;
+    kind: string;
+}
+
 const REJECT_REASON_TEMPLATES: { id: string; label: string; text: string }[] = [
     { id: 'verify', label: 'Could not verify (WEEX/account)', text: 'We could not verify your account / UID.' },
     { id: 'criteria', label: 'Does not meet criteria', text: 'Your application does not meet our current criteria.' },
@@ -229,6 +241,148 @@ function SequenceSubscribersList({ sequenceId, fetchWithAdminAuth }: { sequenceI
                     ))}
                 </tbody>
             </table>
+        </div>
+    );
+}
+
+function SubscriberSequencesModal({
+    subscriber,
+    onClose,
+    fetchWithAdminAuth,
+}: {
+    subscriber: Subscriber;
+    onClose: () => void;
+    fetchWithAdminAuth: (url: string, opts?: RequestInit) => Promise<Response>;
+}) {
+    const [sequences, setSequences] = useState<SubscriberSequence[] | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const load = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const res = await fetchWithAdminAuth(`${getApiUrl()}/api/subscriber-sequences?subscriber_id=${subscriber.id}`);
+                const data = await res.json();
+                setSequences(Array.isArray(data.sequences) ? data.sequences : []);
+            } catch (e) {
+                console.error('Failed to load subscriber sequences', e);
+                setError('Failed to load sequences');
+                setSequences([]);
+            }
+            setLoading(false);
+        };
+        load();
+    }, [subscriber.id, fetchWithAdminAuth]);
+
+    const stopSequence = async (seq: SubscriberSequence) => {
+        if (!confirm(`Stop sequence "${seq.name}" for ${subscriber.email}?`)) return;
+        try {
+            const res = await fetchWithAdminAuth(
+                `${getApiUrl()}/api/subscribers/${subscriber.id}/sequences/${seq.sequence_id}/unsubscribe`,
+                { method: 'POST' }
+            );
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                alert(data.error || 'Failed to stop sequence');
+                return;
+            }
+            setSequences((prev) =>
+                (prev || []).map((s) => (s.sequence_id === seq.sequence_id ? { ...s, status: 'unsubscribed' } : s))
+            );
+        } catch (e) {
+            console.error('Failed to stop sequence', e);
+            alert('Failed to stop sequence');
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-surface rounded-xl border border-border p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-semibold text-lg">Sequences for {subscriber.email}</h3>
+                    <button onClick={onClose} className="text-muted hover:text-foreground text-sm">
+                        Close
+                    </button>
+                </div>
+                {loading && <p className="text-muted text-sm">Loading...</p>}
+                {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
+                {!loading && sequences && sequences.length === 0 && (
+                    <p className="text-muted text-sm">This subscriber is not in any sequences.</p>
+                )}
+                {!loading && sequences && sequences.length > 0 && (
+                    <div className="space-y-3">
+                        {sequences.map((seq) => (
+                            <div
+                                key={seq.id}
+                                className="flex items-center justify-between p-3 rounded-lg border border-border bg-surfaceElevated/40"
+                            >
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-medium">{seq.name}</span>
+                                        {seq.kind && (
+                                            <span className="px-2 py-0.5 rounded text-xs bg-white/5 text-muted uppercase tracking-widest">
+                                                {seq.kind}
+                                            </span>
+                                        )}
+                                        <span className="text-xs text-muted uppercase">
+                                            {seq.locale === 'am' ? 'AM' : 'EN'}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted flex flex-wrap gap-2">
+                                        <span>
+                                            Status:{' '}
+                                            <span
+                                                className={
+                                                    seq.status === 'active'
+                                                        ? 'text-emerald-400'
+                                                        : seq.status === 'completed'
+                                                        ? 'text-blue-400'
+                                                        : seq.status === 'unsubscribed'
+                                                        ? 'text-red-400'
+                                                        : 'text-muted'
+                                                }
+                                            >
+                                                {seq.status}
+                                            </span>
+                                        </span>
+                                        <span>Step: {seq.current_step}</span>
+                                        <span>
+                                            Started:{' '}
+                                            {seq.started_at ? new Date(seq.started_at).toLocaleDateString() : '—'}
+                                        </span>
+                                        {seq.next_email_at && (
+                                            <span>
+                                                Next:{' '}
+                                                {new Date(seq.next_email_at).toLocaleString(undefined, {
+                                                    year: 'numeric',
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {seq.status === 'active' ? (
+                                        <button
+                                            onClick={() => stopSequence(seq)}
+                                            className="px-3 py-1 rounded bg-red-500/20 text-red-400 text-xs hover:bg-red-500/30"
+                                        >
+                                            Stop sequence
+                                        </button>
+                                    ) : (
+                                        <span className="text-xs text-muted">Not active</span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
