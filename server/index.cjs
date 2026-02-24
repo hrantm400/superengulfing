@@ -4867,20 +4867,26 @@ async function sendWelcomeEmail(email, locale = 'en') {
     const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
     const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
     const isAm = locale === 'am';
-    const subject = isAm ? 'Ձեր PDF-ը պատրաստ է – SuperEngulfing' : 'Your PDF is ready - SuperEngulfing';
+    const subject = isAm ? 'Ահա քո PDF–ը 📄' : 'Your PDF is ready - SuperEngulfing';
     const htmlContent = isAm ? `
-                <h1>Ձեր PDF-ը պատրաստ է</h1>
+                <h1>Ահա քո PDF–ը 📄</h1>
                 <p>Ողջույն,</p>
-                <p>Շնորհակալություն բաժանորդագրությունը հաստատելու համար: Ինչպես և խոստացել էինք, ահա ձեր <strong>Liquidity Sweep Cheatsheet</strong>-ը:</p>
+                <p>Ահա քո <strong>SuperEngulfing PDF-ը</strong>։</p>
                 <p style="text-align: center; margin: 28px 0;">
                     <a href="${pdfLink}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Ներբեռնել PDF-ը</a>
                 </p>
-                <p><strong>Ինչ կա ներսում.</strong></p>
+                <p>Այստեղ դու կգտնես.</p>
                 <ul>
-                    <li>8 հիմնական setup-ներ՝ շրջադարձերը (reversals) հայտնաբերելու համար</li>
-                    <li>Մուտքի և ելքի կանոններ</li>
-                    <li>Օրինակներ իրական գծապատկերների վրա</li>
+                    <li>Ինչո՞ւ են քո ստոպ լոսսերն անընդհատ ակտիվանում</li>
+                    <li>Ի՞նչ է իրենից ներկայացնում SuperEngulfing-ը</li>
+                    <li>2 պայման, որոնց դեպքում ստրատեգիան աշխատում է</li>
+                    <li>Իրական գրաֆիկաների օրինակներ</li>
+                    <li>Ո՞րն է հաջորդ քայլը</li>
                 </ul>
+                <p>Կարդա՛, ուսումնասիրի՛ր, հետո կշարունակենք:</p>
+                <p>Հաջորդ մեյլում ես կխոսեմ #1 սխալի մասին, որն անում են թրեյդերները այս պատերնի (pattern) հետ աշխատելիս:</p>
+                <p>Մինչ հանդիպում,<br/>Հայկ</p>
+                <p class="muted">Այս PDF-ը դեռ սկիզբն է. քեզ է սպասում նաև ամբողջական անվճար դասընթաց։ Մանրամասները՝ ֆայլի ներսում։</p>
                 <div class="divider"></div>
                 <p class="muted"><a href="${unsubscribeUrl}">Չեղարկել բաժանորդագրությունը</a></p>
             ` : `
@@ -4899,7 +4905,9 @@ async function sendWelcomeEmail(email, locale = 'en') {
                 <div class="divider"></div>
                 <p class="muted"><a href="${unsubscribeUrl}">Unsubscribe</a> from these emails.</p>
             `;
-    const textContent = isAm ? `Ձեր PDF-ը պատրաստ է – SuperEngulfing\n\nՆերբեռնել Liquidity Sweep Cheatsheet:\n${pdfLink}\n\nՉեղարկել: ${unsubscribeUrl}` : `Your PDF is Ready!\n\nThank you for confirming your subscription to SuperEngulfing.\n\nDownload your Liquidity Sweep Cheatsheet:\n${pdfLink}\n\nThis PDF contains: 8 essential setups, entry/exit guidelines, real chart examples.\n\nUnsubscribe: ${unsubscribeUrl}`;
+    const textContent = isAm
+        ? `Ահա քո PDF–ը 📄\n\nՈղջույն,\n\nԱհա քո SuperEngulfing PDF-ը.\n\nՆերբեռնել PDF-ը:\n${pdfLink}\n\nԱյստեղ դու կգտնես.\n- Ինչո՞ւ են քո ստոպ լոսսերն անընդհատ ակտիվանում\n- Ի՞նչ է իրենից ներկայացնում SuperEngulfing-ը\n- 2 պայման, որոնց դեպքում ստրատեգիան աշխատում է\n- Իրական գրաֆիկաների օրինակներ\n- Ո՞րն է հաջորդ քայլը\n\nԿարդա՛, ուսումնասիրի՛ր, հետո կշարունակենք:\nՀաջորդ մեյլում ես կխոսեմ #1 սխալի մասին, որն անում են թրեյդերները այս պատերնի (pattern) հետ աշխատելիս:\n\nՄինչ հանդիպում,\nՀայկ\n\nԱյս PDF-ը դեռ սկիզբն է. քեզ է սպասում նաև ամբողջական անվճար դասընթաց (մանրամասները՝ ֆայլի ներսում).\n\nՉեղարկել բաժանորդագրությունը: ${unsubscribeUrl}`
+        : `Your PDF is Ready!\n\nThank you for confirming your subscription to SuperEngulfing.\n\nDownload your Liquidity Sweep Cheatsheet:\n${pdfLink}\n\nThis PDF contains: 8 essential setups, entry/exit guidelines, real chart examples.\n\nUnsubscribe: ${unsubscribeUrl}`;
 
     try {
         await transporter.sendMail({
