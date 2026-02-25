@@ -1996,15 +1996,11 @@ app.post('/api/subscribe', async (req, res) => {
             });
         }
 
-        // Check if exists
-        const existing = await pool.query('SELECT id, confirmed_at, locale AS existing_locale FROM subscribers WHERE email = $1', [emailNorm]);
+        // Check if exists. First successful signup \"locks\" locale; we never change it afterwards.
+        const existing = await pool.query('SELECT id, confirmed_at, locale FROM subscribers WHERE email = $1', [emailNorm]);
 
         if (existing.rows.length > 0) {
             const row = existing.rows[0];
-            // If the same email signs up from a different locale, keep a single subscriber and update its locale.
-            if (row.existing_locale !== locale) {
-                await pool.query('UPDATE subscribers SET locale = $1 WHERE id = $2', [locale, row.id]);
-            }
             if (row.confirmed_at) {
                 return res.json({ success: true, subscriptionStatus: 'already_subscribed', message: 'This email has already been used.' });
             } else {
