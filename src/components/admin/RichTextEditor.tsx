@@ -97,6 +97,23 @@ export function RichTextEditor({ value, onChange, placeholder, className = '', m
         editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
     };
 
+    const unsetLink = () => {
+        if (!editor) return;
+        editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    };
+
+    const handleContextMenu: React.MouseEventHandler<HTMLDivElement> = (event) => {
+        if (!editor) return;
+        // If right-click happens while selection is inside a link, offer to remove the link
+        if (editor.isActive('link')) {
+            event.preventDefault();
+            const shouldRemove = window.confirm('Remove link from selected text?');
+            if (shouldRemove) {
+                editor.chain().focus().extendMarkRange('link').unsetLink().run();
+            }
+        }
+    };
+
     if (!editor) {
         return (
             <div
@@ -126,8 +143,20 @@ export function RichTextEditor({ value, onChange, placeholder, className = '', m
                 >
                     Add link
                 </button>
+                <button
+                    type="button"
+                    onClick={unsetLink}
+                    disabled={!editor.isActive('link')}
+                    className={`px-2 py-1 rounded text-sm ${
+                        editor.isActive('link')
+                            ? 'hover:bg-surfaceElevated'
+                            : 'opacity-40 cursor-not-allowed'
+                    }`}
+                >
+                    Remove link
+                </button>
             </div>
-            <EditorContent editor={editor} />
+            <EditorContent editor={editor} onContextMenu={handleContextMenu} />
         </div>
     );
 }
