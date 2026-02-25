@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
+import Link from '@tiptap/extension-link';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface RichTextEditorProps {
@@ -27,6 +28,14 @@ export function RichTextEditor({ value, onChange, placeholder, className = '', m
             StarterKit,
             Placeholder.configure({ placeholder: placeholder || 'Enter content... Use {{first_name}}, {{email}}, {{unsubscribe_url}} for merge tags.' }),
             Image.configure({ inline: false, allowBase64: false }),
+            Link.configure({
+                autolink: true,
+                linkOnPaste: true,
+                openOnClick: false,
+                HTMLAttributes: {
+                    class: 'text-blue-500 underline',
+                },
+            }),
         ],
         content: value,
         editorProps: {
@@ -76,6 +85,18 @@ export function RichTextEditor({ value, onChange, placeholder, className = '', m
         }
     }, [value, editor]);
 
+    const setLink = () => {
+        if (!editor) return;
+        const previousUrl = editor.getAttributes('link').href as string | undefined;
+        const url = window.prompt('Enter link URL', previousUrl || 'https://');
+        if (url === null) return;
+        if (url === '') {
+            editor.chain().focus().extendMarkRange('link').unsetLink().run();
+            return;
+        }
+        editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    };
+
     if (!editor) {
         return (
             <div
@@ -98,6 +119,13 @@ export function RichTextEditor({ value, onChange, placeholder, className = '', m
                 <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={`px-2 py-1 rounded text-sm ${editor.isActive('bulletList') ? 'bg-primary/20 text-primary' : 'hover:bg-surfaceElevated'}`}>List</button>
                 <button type="button" onClick={() => editor.chain().focus().setParagraph().run()} className="px-2 py-1 rounded text-sm hover:bg-surfaceElevated">Paragraph</button>
                 <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={`px-2 py-1 rounded text-sm ${editor.isActive('heading', { level: 2 }) ? 'bg-primary/20 text-primary' : 'hover:bg-surfaceElevated'}`}>H2</button>
+                <button
+                    type="button"
+                    onClick={setLink}
+                    className={`px-2 py-1 rounded text-sm ${editor.isActive('link') ? 'bg-primary/20 text-primary' : 'hover:bg-surfaceElevated'}`}
+                >
+                    Add link
+                </button>
             </div>
             <EditorContent editor={editor} />
         </div>
