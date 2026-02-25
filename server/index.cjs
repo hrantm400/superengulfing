@@ -1997,15 +1997,37 @@ app.post('/api/subscribe', async (req, res) => {
         }
 
         // Check if exists. First successful signup \"locks\" locale; we never change it afterwards.
-        const existing = await pool.query('SELECT id, confirmed_at, locale FROM subscribers WHERE email = $1', [emailNorm]);
+        const existing = await pool.query('SELECT id, confirmed_at, locale, status FROM subscribers WHERE email = $1', [emailNorm]);
 
         if (existing.rows.length > 0) {
             const row = existing.rows[0];
-            if (row.confirmed_at) {
-                return res.json({ success: true, subscriptionStatus: 'already_subscribed', message: 'This email has already been used.' });
-            } else {
-                return res.json({ success: true, subscriptionStatus: 'pending_confirmation', message: 'Please check your email and confirm your subscription.' });
+            const existingLocale = row.locale === 'am' ? 'am' : 'en';
+
+            // If subscriber is already confirmed OR already active (e.g. came from Access flow),
+            // treat this as a request to (re)send the PDF welcome email WITHOUT changing sequences.
+            if (row.confirmed_at || row.status === 'active') {
+                try {
+                    await sendWelcomeEmail(emailNorm, existingLocale);
+                    await pool.query(
+                        'INSERT INTO email_log (subscriber_id, email_type, subject, status) VALUES ($1, $2, $3, $4)',
+                        [row.id, 'welcome', 'Welcome Email with PDF (resent)', 'sent']
+                    );
+                } catch (e) {
+                    console.error('[subscribe] Failed to resend welcome PDF for existing subscriber', emailNorm, e.message);
+                }
+                return res.json({
+                    success: true,
+                    subscriptionStatus: 'welcome_resent',
+                    message: 'Your PDF has been sent to your email address.',
+                });
             }
+
+            // Not confirmed yet: keep old behaviour (ask to check confirmation email)
+            return res.json({
+                success: true,
+                subscriptionStatus: 'pending_confirmation',
+                message: 'Please check your email and confirm your subscription.',
+            });
         }
 
         // Generate confirmation token
