@@ -4771,20 +4771,17 @@ function replaceMergeTags(text, subscriber) {
     return out;
 }
 
-// Compute next_email_at for first sequence step (in UTC so comparison with PostgreSQL NOW() works).
-// If delay is 0,0 use past so scheduler sends within ~1 min.
+// Compute next_email_at for first sequence step using absolute UTC time.
+// If delay is 0d 0h, put it 1 minute in the past so scheduler picks it up on the next run.
 function getNextEmailAtForFirstStep(delay_days, delay_hours) {
     const d = delay_days || 0;
     const h = delay_hours || 0;
+    const nowMs = Date.now();
     if (d === 0 && h === 0) {
-        const past = new Date();
-        past.setTime(past.getTime() - 60000);
-        return past;
+        return new Date(nowMs - 60 * 1000);
     }
-    const next = new Date();
-    next.setUTCDate(next.getUTCDate() + d);
-    next.setUTCHours(next.getUTCHours() + h);
-    return next;
+    const deltaMs = ((d * 24) + h) * 60 * 60 * 1000;
+    return new Date(nowMs + deltaMs);
 }
 
 // Ensure there is a subscriber row for a given email; return { id, locale }.
