@@ -9,6 +9,7 @@ const { Pool } = require('pg');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const { marked } = require('marked');
 const os = require('os');
 const multer = require('multer');
 const bcrypt = require('bcrypt');
@@ -4843,6 +4844,33 @@ function pickContentByLocale(row, locale) {
     return { subject: subject || row.subject, body: body || row.body };
 }
 
+function computeDisplayName(firstName, email) {
+    const name = (firstName || '').trim();
+    if (name) return name;
+    if (!email) return '';
+    const local = email.split('@')[0] || '';
+    if (!local) return '';
+    const token = local.split(/[\.\-_]+/)[0] || local;
+    if (!token) return '';
+    return token.charAt(0).toUpperCase() + token.slice(1);
+}
+
+function renderSequenceBodyWithNameAndMarkdown(rawBody, subscriber) {
+    let body = rawBody || '';
+    const displayName = computeDisplayName(subscriber.first_name, subscriber.email);
+    if (displayName) {
+        body = body.replace(/\{NAME\}/g, displayName);
+    } else {
+        body = body.replace(/\{NAME\}/g, '');
+    }
+    // Markdown + inline HTML → HTML
+    try {
+        return marked.parse(body);
+    } catch {
+        return body;
+    }
+}
+
 function wrapEmailTemplate(body, logId = null) {
     const apiUrl = process.env.API_URL || 'http://localhost:3001';
     let content = body;
@@ -5948,7 +5976,8 @@ async function processSequenceEmails() {
                 const content = pickContentByLocale(seqEmail, subLocale);
                 const subscriber = { email: subSeq.email, first_name: subSeq.first_name, custom_fields: subSeq.custom_fields || {}, locale: subLocale };
                 const subj = replaceMergeTags(content.subject, subscriber);
-                const bodyPersonal = replaceMergeTags(content.body, subscriber);
+                const bodyRaw = replaceMergeTags(content.body, subscriber);
+                const bodyHtml = renderSequenceBodyWithNameAndMarkdown(bodyRaw, subscriber);
                 const logResult = await pool.query(
                     'INSERT INTO email_log (subscriber_id, email_type, reference_id, subject, status) VALUES ($1, $2, $3, $4, $5) RETURNING id',
                     [subSeq.subscriber_id, 'sequence', seqEmail.id, subj, 'sending']
@@ -5956,7 +5985,7 @@ async function processSequenceEmails() {
                 const logId = logResult.rows[0].id;
 
                 // Per-sequence unsubscribe link (localized)
-                let bodyWithUnsub = bodyPersonal;
+                let bodyWithUnsub = bodyHtml;
                 try {
                     const apiUrl = process.env.API_URL || 'http://localhost:3001';
                     const seqToken = createSequenceUnsubToken(subSeq.subscriber_id, subSeq.sequence_id);

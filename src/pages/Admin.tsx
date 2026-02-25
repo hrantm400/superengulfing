@@ -2311,7 +2311,7 @@ const Admin: React.FC = () => {
                                                         <RichTextEditor
                                                             value={sequenceEmailForm.body}
                                                             onChange={(body) => setSequenceEmailForm({ ...sequenceEmailForm, body })}
-                                                            placeholder="Body (HTML). Use {{first_name}}, {{unsubscribe_url}}. Paste or drop images to upload."
+                                                            placeholder="Body (Markdown or HTML). Use {NAME}, {{unsubscribe_url}}. Paste or drop images to upload."
                                                             minHeight="140px"
                                                             className="w-full"
                                                             onUploadImage={uploadImageForEditor}
