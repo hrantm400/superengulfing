@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import PdfSuccessPopup from './PdfSuccessPopup';
 import { useTranslation } from '../locales';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLocale } from '../contexts/LocaleContext';
 import { getApiUrl } from '../lib/api';
 import AnimatedSection from './ui/AnimatedSection';
 
@@ -294,6 +295,7 @@ const PatternShowcase: React.FC = () => {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const { locale } = useLocale();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,7 +304,7 @@ const PatternShowcase: React.FC = () => {
       const res = await fetch(`${getApiUrl()}/api/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, source: 'pattern-showcase' }),
+        body: JSON.stringify({ email, source: 'pattern-showcase', locale }),
       });
       const data = await res.json();
       if (data.success) {
