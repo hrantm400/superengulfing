@@ -2297,7 +2297,7 @@ const Admin: React.FC = () => {
                                                 </button>
                                             </div>
 
-                                            {seq.status === 'draft' && (
+                                            {(seq.status === 'draft' || seq.status === 'active' || seq.status === 'paused') && (
                                                 <div className="bg-surface rounded-xl p-6 border border-border mb-6">
                                                     <h3 className="font-semibold mb-4">{editingSequenceEmailId ? 'Edit Step' : 'Add Email to Sequence'}</h3>
                                                     <div className="space-y-4">
