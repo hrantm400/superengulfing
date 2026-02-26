@@ -1759,8 +1759,17 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
                     await transporter.sendMail({
                         from: fromAddr,
                         to: userEmail,
-                        subject: `You have access to: ${courseTitle}`,
-                        text: `Your payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
+                        subject: `You have been granted access to: ${courseTitle}`,
+                        text: [
+                            `Your payment was successful. You now have access to the course "${courseTitle}".`,
+                            '',
+                            'Log in to your dashboard to start learning!!',
+                            '',
+                            'Best,',
+                            'Hayk',
+                            '',
+                            'SuperEngulfing',
+                        ].join('\n'),
                     }).catch((err) => console.warn('[nowpayments-ipn] course user email failed:', err.message));
 
                     // Auto-transition: ACCESS -> COURSES sequences
