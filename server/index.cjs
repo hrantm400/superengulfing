@@ -6053,8 +6053,8 @@ async function processSequenceEmails() {
                     const seqUnsubUrl = `${apiUrl}/api/unsubscribe-sequence?token=${encodeURIComponent(seqToken)}`;
                     const isAmSeq = (subSeq.locale === 'am');
                     const footerText = isAmSeq
-                        ? `Եթե այլևս չես ցանկանում ստանալ այս կոնկրետ շարքի (sequence) նամակները, սեղմիր այստեղ՝ <a href="${seqUnsubUrl}">Չեղարկել այս շարքը</a>.`
-                        : `If you no longer want to receive emails from this specific sequence, click here to <a href="${seqUnsubUrl}">unsubscribe from this sequence only</a>. Other emails (Access / Courses / LiquidityScan) will continue unless you unsubscribe from them separately.`;
+                        ? `Եթե այլևս չես ցանկանում ստանալ այս շարքի նամակները, սեղմիր այստեղ՝ <a href="${seqUnsubUrl}">unsubscribe</a>.`
+                        : `If you no longer want to receive this type of email, click here to <a href="${seqUnsubUrl}">unsubscribe</a>.`;
                     bodyWithUnsub += `
                         <div class="divider"></div>
                         <p class="muted" style="font-size:13px;color:#9ca3af;margin-top:16px;">
