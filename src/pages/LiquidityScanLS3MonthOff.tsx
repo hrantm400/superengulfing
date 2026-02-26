@@ -26,7 +26,8 @@ const LiquidityScanLS3MonthOff: React.FC = () => {
 
             {/* Right Column: Pricing & CTA */}
             <div className="order-1 lg:order-2 flex justify-center lg:justify-end w-full">
-              <PricingCard payUrl={localizePath('/pay/liquidityscan')} />
+              {/* Use test payment ($10) when coming from LS3MONTHOFF */}
+              <PricingCard payUrl={localizePath('/pay/liquidityscan?test=1')} />
             </div>
           </div>
         </main>
