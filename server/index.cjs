@@ -530,7 +530,7 @@ app.post('/api/payment-issue', optionalAuthForPaymentIssue, uploadMulter.single(
         const reportId = r.rows[0].id;
         const createdAt = r.rows[0].created_at;
         const fromAddr = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER;
-        const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
+        const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || (ADMIN_EMAILS[0] || process.env.SMTP_USER);
         if (transporter && notifyTo) {
             transporter.sendMail({
                 from: fromAddr,
@@ -1726,7 +1726,7 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
     const payCurrency = req.body && req.body.pay_currency;
     const customerEmail = (req.body && (req.body.customer_email || req.body.order_description)) || '';
 
-    const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
+    const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || (ADMIN_EMAILS[0] || process.env.SMTP_USER);
     const fromAddr = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER;
 
     // ——— Paid course: order_id format COURSE_<courseId>_USER_<userId> ———
@@ -1759,15 +1759,20 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
                     await transporter.sendMail({
                         from: fromAddr,
                         to: userEmail,
-                        subject: `You have been granted access to: ${courseTitle}`,
+                        subject: `Your course access is ready: ${courseTitle}`,
                         text: [
-                            `Your payment was successful. You now have access to the course "${courseTitle}".`,
+                            'Hey,',
                             '',
-                            'Log in to your dashboard to start learning!!',
+                            `Thank you for your payment — your access to "${courseTitle}" is now unlocked.`,
                             '',
-                            'Best,',
+                            'You can start right away:',
+                            '- Log in to your SuperEngulfing dashboard',
+                            '- Open the Academy and select your course',
+                            '',
+                            'If you do not see the course within a few minutes, reply to this email and we will fix it manually.',
+                            '',
+                            'See you inside,',
                             'Hayk',
-                            '',
                             'SuperEngulfing',
                         ].join('\n'),
                     }).catch((err) => console.warn('[nowpayments-ipn] course user email failed:', err.message));
@@ -1807,7 +1812,7 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
 
     // ——— LS3MONTHOFF (and other non-course orders): admin + optional user email ———
     if (!notifyTo) {
-        console.warn('[nowpayments-ipn] NOWPAY_NOTIFY_EMAIL / SMTP_USER not set, skipping email notification');
+        console.warn('[nowpayments-ipn] NOWPAY_NOTIFY_EMAIL / ADMIN_EMAILS / SMTP_USER not set, skipping email notification');
     }
 
     try {
@@ -1843,46 +1848,41 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
                 await transporter.sendMail({
                     from: fromAddr,
                     to: cleanedCustomerEmail,
-                    subject: "You're in — what’s next?",
+                    subject: 'Your LiquidityScan early access is locked in',
                     text: [
                         'Hey,',
                         '',
-                        'You just locked in early access to LiquidityScan.',
+                        'You just locked in early access to LiquidityScan Premium.',
                         '',
-                        '3 months for $49. Smart move.',
+                        'Deal: 3 months for $49.',
                         '',
-                        "Here's what happens now:",
+                        "Here's what happens next:",
                         '',
                         '1. YOUR SPOT IS RESERVED',
-                        "   You're on the early access list. No further action needed.",
+                        '   You are on the early access list. No extra steps required.',
                         '',
-                        '2. PLATFORM LAUNCH: ~25 DAYS',
-                        "   We're in final development. I'll keep you updated.",
+                        '2. PLATFORM LAUNCH',
+                        '   We are in final development. You will get a launch email with your login details.',
                         '',
-                        "3. WHEN IT'S LIVE",
-                        "   You'll get an email with your login.",
-                        '   Your 3 months starts the day you get access.',
+                        '3. YOUR 3 MONTHS START',
+                        '   Your 3‑month Premium period starts the day you receive access, not today.',
                         '',
-                        "That's it.",
-                        '',
-                        'In the meantime:',
-                        '',
+                        'While you wait:',
                         '→ Keep practicing SuperEngulfing manually',
-                        '→ Use the indicator',
-                        '→ Build the skill',
+                        '→ Use the indicator and refine your entries',
                         '',
-                        "When LiquidityScan goes live, you'll have the skill AND the tool.",
+                        "When LiquidityScan goes live, you'll have both the skill and the tool.",
                         '',
-                        '',
-                        'Your payment details',
+                        'Payment details:',
                         `Payment ID: ${paymentId}`,
                         `Order ID: ${orderId}`,
                         `Amount: ${payAmount} ${payCurrency}`,
                         '',
                         'Talk soon,',
                         'Hayk',
+                        'SuperEngulfing',
                         '',
-                        'P.S. Questions? Reply to this email. I read everything.',
+                        'P.S. Questions? Just reply to this email — I read everything.',
                     ].join('\n'),
                 });
 
@@ -3082,7 +3082,7 @@ async function processUsdtPayments() {
         if (pending.length === 0) return;
 
         const fromAddr = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER;
-        const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || process.env.SMTP_USER;
+        const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || (ADMIN_EMAILS[0] || process.env.SMTP_USER);
 
         const ordersByAddress = new Map();
         for (const row of pending) {
