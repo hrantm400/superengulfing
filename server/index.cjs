@@ -2170,8 +2170,20 @@ app.post('/api/subscribers/:id/tags', requireAdminAuth, async (req, res) => {
                 const firstEmail = await pool.query('SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 ORDER BY position LIMIT 1', [seqId]);
                 const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
                 const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
-                const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
-                await pool.query('INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at) VALUES ($1, $2, 0, $3)', [id, seqId, nextEmailAt]);
+                await pool.query(
+                    `INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at)
+                     VALUES (
+                        $1,
+                        $2,
+                        0,
+                        CASE
+                            WHEN $3 = 0 AND $4 = 0
+                                THEN NOW() - INTERVAL '1 minute'
+                            ELSE NOW() + ($3 * INTERVAL '1 day') + ($4 * INTERVAL '1 hour')
+                        END
+                     )`,
+                    [id, seqId, delay_days, delay_hours]
+                );
             }
         } catch (e) {
             // sequence_triggers table may not exist yet
@@ -3596,12 +3608,24 @@ app.post('/api/subscribers/bulk-sequence', requireAdminAuth, async (req, res) =>
         const firstEmail = await pool.query('SELECT delay_days, delay_hours FROM sequence_emails WHERE sequence_id = $1 ORDER BY position LIMIT 1', [sequence_id]);
         const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
         const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
-        const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
         let count = 0;
         for (const id of subscriber_ids) {
             const existing = await pool.query('SELECT id FROM subscriber_sequences WHERE subscriber_id = $1 AND sequence_id = $2', [id, sequence_id]);
             if (existing.rows.length === 0) {
-                await pool.query('INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at) VALUES ($1, $2, 0, $3)', [id, sequence_id, nextEmailAt]);
+                await pool.query(
+                    `INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at)
+                     VALUES (
+                        $1,
+                        $2,
+                        0,
+                        CASE
+                            WHEN $3 = 0 AND $4 = 0
+                                THEN NOW() - INTERVAL '1 minute'
+                            ELSE NOW() + ($3 * INTERVAL '1 day') + ($4 * INTERVAL '1 hour')
+                        END
+                     )`,
+                    [id, sequence_id, delay_days, delay_hours]
+                );
                 count++;
             }
         }
@@ -4612,11 +4636,20 @@ app.post('/api/subscribers/:id/sequences/:seqId', requireAdminAuth, async (req, 
 
         const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
         const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
-        const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
 
         await pool.query(
-            'INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at) VALUES ($1, $2, $3, $4)',
-            [id, seqId, 0, nextEmailAt]
+            `INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at)
+             VALUES (
+                $1,
+                $2,
+                0,
+                CASE
+                    WHEN $3 = 0 AND $4 = 0
+                        THEN NOW() - INTERVAL '1 minute'
+                    ELSE NOW() + ($3 * INTERVAL '1 day') + ($4 * INTERVAL '1 hour')
+                END
+             )`,
+            [id, seqId, delay_days, delay_hours]
         );
 
         // Trigger sequence processor soon so 0-delay first email goes out within seconds
@@ -4833,11 +4866,19 @@ async function addToSequenceByKind(subscriberId, locale, kind) {
     );
     const delay_days = firstEmail.rows[0] ? (firstEmail.rows[0].delay_days || 0) : 0;
     const delay_hours = firstEmail.rows[0] ? (firstEmail.rows[0].delay_hours || 0) : 0;
-    const nextEmailAt = getNextEmailAtForFirstStep(delay_days, delay_hours);
-
     await pool.query(
-        'INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at) VALUES ($1, $2, 0, $3)',
-        [subscriberId, seqId, nextEmailAt]
+        `INSERT INTO subscriber_sequences (subscriber_id, sequence_id, current_step, next_email_at)
+         VALUES (
+            $1,
+            $2,
+            0,
+            CASE
+                WHEN $3 = 0 AND $4 = 0
+                    THEN NOW() - INTERVAL '1 minute'
+                ELSE NOW() + ($3 * INTERVAL '1 day') + ($4 * INTERVAL '1 hour')
+            END
+         )`,
+        [subscriberId, seqId, delay_days, delay_hours]
     );
     return true;
 }
