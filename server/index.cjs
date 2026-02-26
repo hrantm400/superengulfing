@@ -5084,7 +5084,7 @@ async function sendWelcomeEmail(email, locale = 'en') {
     const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
     const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
     const isAm = locale === 'am';
-    const subject = isAm ? 'Ահա քո PDF–ը 📄' : 'Your PDF is ready - SuperEngulfing';
+    const subject = isAm ? 'Ահա քո PDF–ը 📄' : 'Your PDF is ready';
     const htmlContent = isAm ? `
                 <h1>Ահա քո PDF–ը 📄</h1>
                 <p>Ողջույն,</p>
@@ -5108,23 +5108,28 @@ async function sendWelcomeEmail(email, locale = 'en') {
                 <p class="muted"><a href="${unsubscribeUrl}">Չեղարկել բաժանորդագրությունը</a></p>
             ` : `
                 <h1>Your PDF is ready</h1>
-                <p>Hello,</p>
-                <p>Thank you for confirming your subscription. As promised, here is your <strong>Liquidity Sweep Cheatsheet</strong>.</p>
+                <p>Hey,</p>
+                <p>Here's your <strong>SuperEngulfing PDF</strong>:</p>
                 <p style="text-align: center; margin: 28px 0;">
                     <a href="${pdfLink}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Download your PDF</a>
                 </p>
-                <p><strong>What's inside:</strong></p>
+                <p><strong>Inside:</strong></p>
                 <ul>
-                    <li>8 essential setups for identifying reversals</li>
-                    <li>Entry and exit guidelines</li>
-                    <li>Real chart examples</li>
+                    <li>Why you keep getting stopped out</li>
+                    <li>What SuperEngulfing actually is</li>
+                    <li>The 2 conditions that make it work</li>
+                    <li>REV, RUN, and PLUS setups</li>
+                    <li>What to do next</li>
                 </ul>
+                <p>Takes about 10 minutes to read.</p>
+                <p>Tomorrow I'll share the #1 mistake traders make with this pattern — and how to avoid it.</p>
+                <p>Talk soon,<br/>Hayk</p>
                 <div class="divider"></div>
                 <p class="muted"><a href="${unsubscribeUrl}">Unsubscribe</a> from these emails.</p>
             `;
     const textContent = isAm
         ? `Ահա քո PDF–ը 📄\n\nՈղջույն,\n\nԱհա քո SuperEngulfing PDF-ը.\n\nՆերբեռնել PDF-ը:\n${pdfLink}\n\nԱյստեղ դու կգտնես.\n- Ինչո՞ւ են քո ստոպ լոսսերն անընդհատ ակտիվանում\n- Ի՞նչ է իրենից ներկայացնում SuperEngulfing-ը\n- 2 պայման, որոնց դեպքում ստրատեգիան աշխատում է\n- Իրական գրաֆիկաների օրինակներ\n- Ո՞րն է հաջորդ քայլը\n\nԿարդա՛, ուսումնասիրի՛ր, հետո կշարունակենք:\nՀաջորդ մեյլում ես կխոսեմ #1 սխալի մասին, որն անում են թրեյդերները այս պատերնի (pattern) հետ աշխատելիս:\n\nՄինչ հանդիպում,\nՀայկ\n\nԱյս PDF-ը դեռ սկիզբն է. քեզ է սպասում նաև ամբողջական անվճար դասընթաց (մանրամասները՝ ֆայլի ներսում).\n\nՉեղարկել բաժանորդագրությունը: ${unsubscribeUrl}`
-        : `Your PDF is Ready!\n\nThank you for confirming your subscription to SuperEngulfing.\n\nDownload your Liquidity Sweep Cheatsheet:\n${pdfLink}\n\nThis PDF contains: 8 essential setups, entry/exit guidelines, real chart examples.\n\nUnsubscribe: ${unsubscribeUrl}`;
+        : `Your PDF is ready\n\nHey,\n\nHere's your SuperEngulfing PDF:\n${pdfLink}\n\nInside:\n- Why you keep getting stopped out\n- What SuperEngulfing actually is\n- The 2 conditions that make it work\n- REV, RUN, and PLUS setups\n- What to do next\n\nTakes about 10 minutes to read.\n\nTomorrow I'll share the #1 mistake traders make with this pattern — and how to avoid it.\n\nTalk soon,\nHayk\n\nUnsubscribe: ${unsubscribeUrl}`;
 
     try {
         await transporter.sendMail({
