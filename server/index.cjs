@@ -664,6 +664,172 @@ app.get('/api/admin/course-payments', requireAdminAuth, async (req, res) => {
     }
 });
 
+// GET /api/admin/finance-analytics - Revenue summary and detailed transactions (admin)
+app.get('/api/admin/finance-analytics', requireAdminAuth, async (req, res) => {
+    try {
+        const summaryRes = await pool.query(
+            `SELECT product_type, COUNT(*) AS count, SUM(amount_usdt) AS total
+             FROM usdt_orders
+             WHERE status = 'completed'
+             GROUP BY product_type`
+        );
+
+        const rangeRes = await pool.query(
+            `SELECT
+                 SUM(CASE WHEN created_at >= date_trunc('month', NOW()) THEN amount_usdt ELSE 0 END) AS month_total,
+                 SUM(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN amount_usdt ELSE 0 END) AS week_total
+             FROM usdt_orders
+             WHERE status = 'completed'`
+        );
+
+        const ordersRes = await pool.query(
+            `SELECT
+                 o.id,
+                 o.order_id,
+                 o.product_type,
+                 o.product_id,
+                 o.user_id,
+                 o.email,
+                 o.amount_usdt,
+                 o.tx_hash,
+                 o.status,
+                 o.created_at,
+                 c.title AS course_title,
+                 du.email AS user_email
+             FROM usdt_orders o
+             LEFT JOIN courses c ON c.id = o.product_id
+             LEFT JOIN dashboard_users du ON du.id = o.user_id
+             WHERE o.status = 'completed'
+             ORDER BY o.created_at DESC
+             LIMIT 1000`
+        );
+
+        const coursePaymentsRes = await pool.query(
+            `SELECT
+                 cp.id,
+                 cp.user_id,
+                 du.email,
+                 cp.course_id,
+                 c.title AS course_title,
+                 cp.amount_cents,
+                 cp.status,
+                 cp.payment_id,
+                 cp.created_at
+             FROM course_payments cp
+             LEFT JOIN dashboard_users du ON du.id = cp.user_id
+             LEFT JOIN courses c ON c.id = cp.course_id
+             ORDER BY cp.created_at DESC
+             LIMIT 1000`
+        );
+
+        const summaryByProduct = {};
+        for (const row of summaryRes.rows) {
+            const type = row.product_type || 'unknown';
+            summaryByProduct[type] = {
+                count: Number(row.count) || 0,
+                total_usdt: row.total != null ? Number(row.total) : 0,
+            };
+        }
+
+        const monthTotal =
+            rangeRes.rows[0] && rangeRes.rows[0].month_total != null
+                ? Number(rangeRes.rows[0].month_total)
+                : 0;
+        const weekTotal =
+            rangeRes.rows[0] && rangeRes.rows[0].week_total != null
+                ? Number(rangeRes.rows[0].week_total)
+                : 0;
+
+        const orders = ordersRes.rows.map((row) => ({
+            id: row.id,
+            order_id: row.order_id,
+            product_type: row.product_type,
+            product_id: row.product_id,
+            user_id: row.user_id,
+            email: row.email || row.user_email || null,
+            amount_usdt: row.amount_usdt != null ? Number(row.amount_usdt) : null,
+            tx_hash: row.tx_hash || null,
+            status: row.status || 'completed',
+            created_at: row.created_at ? row.created_at.toISOString() : null,
+            course_title: row.course_title || null,
+        }));
+
+        const coursePayments = coursePaymentsRes.rows.map((row) => ({
+            id: row.id,
+            user_id: row.user_id,
+            email: row.email || null,
+            course_id: row.course_id,
+            course_title: row.course_title || 'Course',
+            amount_usd: row.amount_cents != null ? Number(row.amount_cents) / 100 : null,
+            status: row.status || 'completed',
+            payment_id: row.payment_id || null,
+            created_at: row.created_at ? row.created_at.toISOString() : null,
+        }));
+
+        const totalRevenueUsdt = Object.values(summaryByProduct).reduce(
+            (acc, s) => acc + (s.total_usdt || 0),
+            0
+        );
+        const totalTransactions = Object.values(summaryByProduct).reduce(
+            (acc, s) => acc + (s.count || 0),
+            0
+        );
+
+        return res.json({
+            summary: {
+                byProduct: summaryByProduct,
+                totalRevenueUsdt,
+                totalTransactions,
+                thisMonthRevenueUsdt: monthTotal,
+                thisWeekRevenueUsdt: weekTotal,
+            },
+            orders,
+            coursePayments,
+        });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// DELETE /api/admin/finance/order/:id - Delete a single USDT order (admin)
+app.delete('/api/admin/finance/order/:id', requireAdminAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const r = await pool.query('DELETE FROM usdt_orders WHERE id = $1 RETURNING id', [id]);
+        if (r.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
+        return res.json({ success: true, deleted_id: r.rows[0].id });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// DELETE /api/admin/finance/course-payment/:id - Delete a single course payment (admin)
+app.delete('/api/admin/finance/course-payment/:id', requireAdminAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const r = await pool.query('DELETE FROM course_payments WHERE id = $1 RETURNING id', [id]);
+        if (r.rows.length === 0) return res.status(404).json({ error: 'Payment not found' });
+        return res.json({ success: true, deleted_id: r.rows[0].id });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/finance/purge-test - Purge all non-completed USDT orders (test/pending/abandoned)
+app.post('/api/admin/finance/purge-test', requireAdminAuth, async (req, res) => {
+    try {
+        const ordersResult = await pool.query(
+            `DELETE FROM usdt_orders WHERE status != 'completed' RETURNING id`
+        );
+        return res.json({
+            success: true,
+            purged_orders: ordersResult.rows.length,
+        });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
 // GET /api/admin/payment-issues - List payment issue reports (admin)
 app.get('/api/admin/payment-issues', requireAdminAuth, async (req, res) => {
     try {
@@ -2987,13 +3153,12 @@ function simpleHash(s) {
 
 // POST /api/usdt/create-order - Create USDT TRC20 order (optional JWT for course)
 app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
-    const { product_type, product_id, email, test } = req.body || {};
+    const { product_type, product_id, email } = req.body || {};
     if (!product_type || !['liquidityscan_pro', 'course'].includes(product_type)) {
         return res.status(400).json({ error: 'product_type must be liquidityscan_pro or course' });
     }
     const userId = req.user ? req.user.id : null;
     const userEmail = (req.user && req.user.email) || (email && String(email).trim()) || null;
-    const isTest = test === true;
 
     if (product_type === 'course') {
         if (!req.user) return res.status(401).json({ error: 'Login required to pay for course' });
@@ -3005,7 +3170,7 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
         if (existing.rows.length > 0) return res.status(400).json({ error: 'Already purchased' });
     }
 
-    const baseAmount = isTest ? 10.0 : (product_type === 'liquidityscan_pro' ? LIQUIDITYSCAN_BASE_USD : COURSE_BASE_USD);
+    const baseAmount = product_type === 'liquidityscan_pro' ? LIQUIDITYSCAN_BASE_USD : COURSE_BASE_USD;
 
     // Reuse existing pending order for same user+product instead of creating duplicates on page refresh
     const existingPending = await pool.query(
@@ -3026,19 +3191,15 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
     if (existingPending.rows.length > 0) {
         const ep = existingPending.rows[0];
         const existingAmount = Number(ep.amount_usdt);
-        const sameRange = isTest ? (existingAmount <= 11) : (existingAmount > 11);
-        if (sameRange) {
-            const addr = ep.deposit_address || USDT_TRC20_WALLET;
-            return res.json({
-                order_id: ep.order_id,
-                address: addr,
-                amount: existingAmount,
-                amount_display: existingAmount.toFixed(2),
-                qr_address: addr,
-                qr_payment: `tron:${addr}?amount=${existingAmount}&token=USDT`,
-            });
-        }
-        await pool.query(`UPDATE usdt_orders SET status = 'cancelled' WHERE id = $1`, [ep.id]);
+        const addr = ep.deposit_address || USDT_TRC20_WALLET;
+        return res.json({
+            order_id: ep.order_id,
+            address: addr,
+            amount: existingAmount,
+            amount_display: existingAmount.toFixed(2),
+            qr_address: addr,
+            qr_payment: `tron:${addr}?amount=${existingAmount}&token=USDT`,
+        });
     }
 
     const orderId = `USDT_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;

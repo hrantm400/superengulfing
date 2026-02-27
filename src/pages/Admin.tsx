@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from '@remix-run/react';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { AdminCourses } from '../components/admin/AdminCourses';
+import { FinanceAnalytics } from '../components/admin/FinanceAnalytics';
 import { RichTextEditor } from '../components/admin/RichTextEditor';
 import { getApiUrl } from '../lib/api';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -474,7 +475,7 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
     const { fetchWithAdminAuth } = useAdminAuth();
     const urlAudienceAm = location.pathname.startsWith('/am') || new URLSearchParams(location.search).get('audience') === 'am';
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'monitoring' | 'settings' | 'courses' | 'coursePayments' | 'paymentIssues' | 'liquidityScanEarlyUsers'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'monitoring' | 'settings' | 'courses' | 'coursePayments' | 'paymentIssues' | 'liquidityScanEarlyUsers' | 'finance'>('dashboard');
     const [adminAudienceLocale, setAdminAudienceLocale] = useState<'en' | 'am'>(() => (urlAudienceAm ? 'am' : 'en'));
     const [stats, setStats] = useState<Stats>({ total: 0, today: 0, thisWeek: 0, emailsSent: 0 });
     const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -1374,6 +1375,7 @@ const Admin: React.FC = () => {
                 <TabButton tab="accessRequests" icon="person_add" label="Access Requests" />
                 <TabButton tab="indicatorRequests" icon="trending_up" label="Indicator requests" />
                 <TabButton tab="courses" icon="school" label="Courses" />
+                <TabButton tab="finance" icon="account_balance" label="Finance" />
                 <TabButton tab="coursePayments" icon="payments" label="Course payments" />
                 <TabButton tab="paymentIssues" icon="receipt_long" label="Payment issues" />
                 <TabButton tab="liquidityScanEarlyUsers" icon="groups" label="LS Early Users" />
@@ -2897,6 +2899,11 @@ const Admin: React.FC = () => {
                             )}
                         </div>
                     </div>
+                )}
+
+                {/* Finance Analytics */}
+                {activeTab === 'finance' && (
+                    <FinanceAnalytics fetchWithAdminAuth={fetchWithAdminAuth} />
                 )}
 
                 {/* Course payments */}
