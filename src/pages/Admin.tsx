@@ -134,6 +134,18 @@ interface LiquidityScanEarlyUser {
     user_id?: number | null;
 }
 
+interface CoursePaymentAdminRow {
+    id: number;
+    user_id: number | null;
+    email: string | null;
+    course_id: number | null;
+    course_title: string;
+    amount_usd: number | null;
+    status: string;
+    payment_id: string | null;
+    created_at: string | null;
+}
+
 interface IndicatorAccessRequest {
     id: number;
     email: string;
@@ -462,7 +474,7 @@ const Admin: React.FC = () => {
     const navigate = useNavigate();
     const { fetchWithAdminAuth } = useAdminAuth();
     const urlAudienceAm = location.pathname.startsWith('/am') || new URLSearchParams(location.search).get('audience') === 'am';
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'monitoring' | 'settings' | 'courses' | 'paymentIssues' | 'liquidityScanEarlyUsers'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'subscribers' | 'tags' | 'templates' | 'broadcasts' | 'sequences' | 'analytics' | 'accessRequests' | 'indicatorRequests' | 'monitoring' | 'settings' | 'courses' | 'coursePayments' | 'paymentIssues' | 'liquidityScanEarlyUsers'>('dashboard');
     const [adminAudienceLocale, setAdminAudienceLocale] = useState<'en' | 'am'>(() => (urlAudienceAm ? 'am' : 'en'));
     const [stats, setStats] = useState<Stats>({ total: 0, today: 0, thisWeek: 0, emailsSent: 0 });
     const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -482,6 +494,7 @@ const Admin: React.FC = () => {
     const [indicatorRequests, setIndicatorRequests] = useState<IndicatorAccessRequest[]>([]);
     const [paymentIssues, setPaymentIssues] = useState<PaymentIssueReport[]>([]);
     const [paymentIssueNotes, setPaymentIssueNotes] = useState<Record<number, string>>({});
+    const [coursePayments, setCoursePayments] = useState<CoursePaymentAdminRow[]>([]);
     const [liquidityScanEarlyUsers, setLiquidityScanEarlyUsers] = useState<LiquidityScanEarlyUser[]>([]);
     const [showAddEarlyUserModal, setShowAddEarlyUserModal] = useState(false);
     const [addEarlyUserEmail, setAddEarlyUserEmail] = useState('');
@@ -665,6 +678,15 @@ const Admin: React.FC = () => {
                 .then(res => res.json())
                 .then(data => setPaymentIssues(Array.isArray(data) ? data : []))
                 .catch(() => setPaymentIssues([]));
+        }
+    }, [activeTab, fetchWithAdminAuth]);
+
+    useEffect(() => {
+        if (activeTab === 'coursePayments') {
+            fetchWithAdminAuth(`${getApiUrl()}/api/admin/course-payments`)
+                .then(res => res.json())
+                .then(data => setCoursePayments(Array.isArray(data) ? data : []))
+                .catch(() => setCoursePayments([]));
         }
     }, [activeTab, fetchWithAdminAuth]);
 
@@ -1352,6 +1374,7 @@ const Admin: React.FC = () => {
                 <TabButton tab="accessRequests" icon="person_add" label="Access Requests" />
                 <TabButton tab="indicatorRequests" icon="trending_up" label="Indicator requests" />
                 <TabButton tab="courses" icon="school" label="Courses" />
+                <TabButton tab="coursePayments" icon="payments" label="Course payments" />
                 <TabButton tab="paymentIssues" icon="receipt_long" label="Payment issues" />
                 <TabButton tab="liquidityScanEarlyUsers" icon="groups" label="LS Early Users" />
                 <TabButton tab="settings" icon="settings" label="Settings" />
@@ -2865,6 +2888,54 @@ const Admin: React.FC = () => {
                                                                 </button>
                                                             </div>
                                                         )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Course payments */}
+                {activeTab === 'coursePayments' && (
+                    <div>
+                        <h1 className="text-3xl font-bold mb-6">Course payments</h1>
+                        <p className="text-muted text-sm mb-4">
+                            Users who paid for paid courses. Shows email, course, amount (if available) and payment id.
+                        </p>
+                        <div className="bg-surface rounded-xl border border-border overflow-hidden">
+                            {coursePayments.length === 0 ? (
+                                <p className="p-6 text-muted text-center">No course payments yet</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="text-muted text-xs border-b border-border">
+                                                <th className="text-left p-3">Email</th>
+                                                <th className="text-left p-3">Course</th>
+                                                <th className="text-left p-3">Amount</th>
+                                                <th className="text-left p-3">Status</th>
+                                                <th className="text-left p-3">Payment ID</th>
+                                                <th className="text-left p-3">Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border">
+                                            {coursePayments.map((p) => (
+                                                <tr key={p.id}>
+                                                    <td className="p-3">{p.email || '—'}</td>
+                                                    <td className="p-3">{p.course_title}</td>
+                                                    <td className="p-3">
+                                                        {p.amount_usd != null ? `$${p.amount_usd.toFixed(2)}` : '—'}
+                                                    </td>
+                                                    <td className="p-3 text-xs uppercase text-muted">{p.status}</td>
+                                                    <td className="p-3 font-mono text-xs truncate max-w-[180px]">
+                                                        {p.payment_id || '—'}
+                                                    </td>
+                                                    <td className="p-3 text-muted text-xs">
+                                                        {p.created_at ? new Date(p.created_at).toLocaleString() : '—'}
                                                     </td>
                                                 </tr>
                                             ))}

@@ -628,6 +628,42 @@ app.post('/api/admin/liquidityscan-early-users', requireAdminAuth, async (req, r
     }
 });
 
+// GET /api/admin/course-payments - List paid course enrollments (admin)
+app.get('/api/admin/course-payments', requireAdminAuth, async (req, res) => {
+    try {
+        const r = await pool.query(
+            `SELECT
+                 cp.id,
+                 cp.user_id,
+                 du.email,
+                 cp.course_id,
+                 c.title AS course_title,
+                 cp.amount_cents,
+                 cp.status,
+                 cp.payment_id,
+                 cp.created_at
+             FROM course_payments cp
+             LEFT JOIN dashboard_users du ON du.id = cp.user_id
+             LEFT JOIN courses c ON c.id = cp.course_id
+             ORDER BY cp.created_at DESC
+             LIMIT 200`
+        );
+        return res.json(r.rows.map(row => ({
+            id: row.id,
+            user_id: row.user_id,
+            email: row.email || null,
+            course_id: row.course_id,
+            course_title: row.course_title || 'Course',
+            amount_usd: row.amount_cents != null ? Number(row.amount_cents) / 100 : null,
+            status: row.status || 'completed',
+            payment_id: row.payment_id || null,
+            created_at: row.created_at ? row.created_at.toISOString() : null,
+        })));
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
 // GET /api/admin/payment-issues - List payment issue reports (admin)
 app.get('/api/admin/payment-issues', requireAdminAuth, async (req, res) => {
     try {
