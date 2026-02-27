@@ -2,7 +2,7 @@ import type { MetaDescriptor } from "@remix-run/node";
 
 const SITE_NAME = "SuperEngulfing.com";
 const DEFAULT_TITLE = `${SITE_NAME} - Master the Liquidity Sweep`;
-const DEFAULT_DESC = "Institutional algos hunt stops below the lows. SuperEngulfing identifies the wick grab before the reversal happens.";
+const DEFAULT_DESC = "Most traders get stopped out right before the move. SuperEngulfing detects the exact 2-candle footprint institutions leave when they grab liquidity — so you enter AFTER the trap, not inside it.";
 
 const SEO: Record<string, { title: string; description: string; noindex?: boolean }> = {
   home: { title: DEFAULT_TITLE, description: DEFAULT_DESC },
