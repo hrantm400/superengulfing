@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from '@remix-run/react';
-import { getApiUrl } from '../lib/api';
+import { authFetch, getApiUrl } from '../lib/api';
 import { useLocale } from '../contexts/LocaleContext';
 import USDTPaymentPage from '../components/payment/USDTPaymentPage';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -23,9 +23,8 @@ const PayLiquidityScanPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${getApiUrl()}/api/usdt/create-order`, {
+    authFetch('/api/usdt/create-order', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ product_type: 'liquidityscan_pro', test: isTest }),
     })
       .then((r) => r.json())
