@@ -45,11 +45,11 @@ const PayCoursePage: React.FC = () => {
   useEffect(() => {
     if (!courseId || !course?.is_paid) return;
     // Create default full-price order on first load
-    createOrder();
+    createOrder(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, course?.is_paid]);
 
-  const createOrder = () => {
+  const createOrder = (isTest: boolean) => {
     if (!courseId) return;
     setError(null);
     setOrder(null);
@@ -59,6 +59,7 @@ const PayCoursePage: React.FC = () => {
       body: JSON.stringify({
         product_type: 'course',
         product_id: parseInt(courseId, 10),
+        test: isTest,
       }),
     })
       .then((r) => r.json())
@@ -120,13 +121,20 @@ const PayCoursePage: React.FC = () => {
             <span className="font-semibold">{t('dashboard.price')}:</span> {course.price_display}
           </p>
         )}
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => createOrder()}
+            onClick={() => createOrder(false)}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-[#020617] hover:bg-primary/90 transition-colors"
           >
             Pay full price
+          </button>
+          <button
+            type="button"
+            onClick={() => createOrder(true)}
+            className="px-4 py-2 rounded-xl text-xs font-semibold border border-primary/60 text-primary hover:bg-primary/10 transition-colors"
+          >
+            Test pay $10 USDT
           </button>
         </div>
         {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
@@ -137,7 +145,7 @@ const PayCoursePage: React.FC = () => {
         address={order.address}
         amount={order.amount}
         amountDisplay={order.amount_display}
-        productName={course.title}
+        productName={order.amount <= 10.99 ? `${course.title} — Test $10` : course.title}
         productType="course"
         onSuccessRedirect={localizePath('/dashboard')}
       />
