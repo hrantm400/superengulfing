@@ -3195,7 +3195,7 @@ async function processUsdtPayments() {
                         if (processedOrderIds.has(o.order_id)) return false;
                         if (Math.abs(Number(o.amount_usdt) - amountUsdt) >= 0.02) return false;
                         const orderCreatedMs = o.created_at ? new Date(o.created_at).getTime() : 0;
-                        if (txTimestamp > 0 && orderCreatedMs > 0 && txTimestamp < orderCreatedMs - 60000) return false;
+                        if (txTimestamp > 0 && orderCreatedMs > 0 && txTimestamp < orderCreatedMs - 20 * 60 * 1000) return false;
                         return true;
                     }
                 );
