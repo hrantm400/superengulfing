@@ -3160,36 +3160,51 @@ async function processUsdtPayments() {
                 );
 
                 if (match.product_type === 'course' && match.user_id && match.product_id) {
-                    const amountCents = match.amount_usdt != null ? Math.round(Number(match.amount_usdt) * 100) : null;
-                    await pool.query(
-                        `INSERT INTO course_payments (user_id, course_id, amount_cents, payment_id, status)
-                         VALUES ($1, $2, $3, $4, 'completed')
-                         ON CONFLICT (user_id, course_id) DO UPDATE SET amount_cents = COALESCE(EXCLUDED.amount_cents, course_payments.amount_cents), payment_id = EXCLUDED.payment_id, status = 'completed'`,
-                        [match.user_id, match.product_id, amountCents, `USDT_${txHash}`]
-                    );
-                    await pool.query(
-                        'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
-                        [match.user_id, match.product_id]
-                    );
-                    const courseRes = await pool.query('SELECT title FROM courses WHERE id = $1', [match.product_id]);
-                    const courseTitle = (courseRes.rows[0] && courseRes.rows[0].title) || 'Course';
-                    const userRes = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
-                    const userEmail = userRes.rows[0] && userRes.rows[0].email;
-                    if (userEmail && transporter) {
-                        await transporter.sendMail({
-                            from: fromAddr,
-                            to: userEmail,
-                            subject: `You have access to: ${courseTitle}`,
-                            text: `Your USDT payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
-                        }).catch((err) => console.warn('[usdt] course email failed:', err.message));
-                    }
-                    if (notifyTo) {
-                        await transporter.sendMail({
-                            from: fromAddr,
-                            to: notifyTo,
-                            subject: `USDT payment: ${userEmail || match.user_id} enrolled in "${courseTitle}"`,
-                            text: `USDT TRC20 payment detected. User ${userEmail || match.user_id} enrolled in course "${courseTitle}". TX: ${txHash}`,
-                        }).catch((err) => console.warn('[usdt] admin email failed:', err.message));
+                    const amountUsdtNum = match.amount_usdt != null ? Number(match.amount_usdt) : null;
+                    const isTestCoursePayment = amountUsdtNum != null && amountUsdtNum <= 10.5;
+
+                    // For $10 test payments: mark order completed but do NOT grant course access
+                    if (isTestCoursePayment) {
+                        if (notifyTo) {
+                            await transporter.sendMail({
+                                from: fromAddr,
+                                to: notifyTo,
+                                subject: `USDT TEST payment (no access) for course_id=${match.product_id}`,
+                                text: `USDT TRC20 TEST payment (~$${amountUsdtNum}) detected for course_id=${match.product_id}, user_id=${match.user_id}. TX: ${txHash}. Access was NOT granted because this is a test payment.`,
+                            }).catch((err) => console.warn('[usdt] admin test-course email failed:', err.message));
+                        }
+                    } else {
+                        const amountCents = amountUsdtNum != null ? Math.round(amountUsdtNum * 100) : null;
+                        await pool.query(
+                            `INSERT INTO course_payments (user_id, course_id, amount_cents, payment_id, status)
+                             VALUES ($1, $2, $3, $4, 'completed')
+                             ON CONFLICT (user_id, course_id) DO UPDATE SET amount_cents = COALESCE(EXCLUDED.amount_cents, course_payments.amount_cents), payment_id = EXCLUDED.payment_id, status = 'completed'`,
+                            [match.user_id, match.product_id, amountCents, `USDT_${txHash}`]
+                        );
+                        await pool.query(
+                            'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
+                            [match.user_id, match.product_id]
+                        );
+                        const courseRes = await pool.query('SELECT title FROM courses WHERE id = $1', [match.product_id]);
+                        const courseTitle = (courseRes.rows[0] && courseRes.rows[0].title) || 'Course';
+                        const userRes = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
+                        const userEmail = userRes.rows[0] && userRes.rows[0].email;
+                        if (userEmail && transporter) {
+                            await transporter.sendMail({
+                                from: fromAddr,
+                                to: userEmail,
+                                subject: `You have access to: ${courseTitle}`,
+                                text: `Your USDT payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
+                            }).catch((err) => console.warn('[usdt] course email failed:', err.message));
+                        }
+                        if (notifyTo) {
+                            await transporter.sendMail({
+                                from: fromAddr,
+                                to: notifyTo,
+                                subject: `USDT payment: ${userEmail || match.user_id} enrolled in "${courseTitle}"`,
+                                text: `USDT TRC20 payment detected. User ${userEmail || match.user_id} enrolled in course "${courseTitle}". TX: ${txHash}`,
+                            }).catch((err) => console.warn('[usdt] admin email failed:', err.message));
+                        }
                     }
                 }
 
