@@ -3005,8 +3005,43 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
         if (existing.rows.length > 0) return res.status(400).json({ error: 'Already purchased' });
     }
 
-    const orderId = `USDT_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
     const baseAmount = isTest ? 10.0 : (product_type === 'liquidityscan_pro' ? LIQUIDITYSCAN_BASE_USD : COURSE_BASE_USD);
+
+    // Reuse existing pending order for same user+product instead of creating duplicates on page refresh
+    const existingPending = await pool.query(
+        `SELECT o.id, o.order_id, o.amount_usdt, a.address AS deposit_address
+         FROM usdt_orders o
+         LEFT JOIN usdt_deposit_addresses a ON a.id = o.deposit_address_id
+         WHERE o.status = 'pending'
+           AND o.product_type = $1
+           AND o.user_id IS NOT DISTINCT FROM $2
+           AND o.email IS NOT DISTINCT FROM $3
+           AND COALESCE(o.product_id, 0) = COALESCE($4, 0)
+           AND o.created_at > NOW() - INTERVAL '30 minutes'
+         ORDER BY o.created_at DESC
+         LIMIT 1`,
+        [product_type, userId, userEmail || null, product_id || null]
+    );
+
+    if (existingPending.rows.length > 0) {
+        const ep = existingPending.rows[0];
+        const existingAmount = Number(ep.amount_usdt);
+        const sameRange = isTest ? (existingAmount <= 11) : (existingAmount > 11);
+        if (sameRange) {
+            const addr = ep.deposit_address || USDT_TRC20_WALLET;
+            return res.json({
+                order_id: ep.order_id,
+                address: addr,
+                amount: existingAmount,
+                amount_display: existingAmount.toFixed(2),
+                qr_address: addr,
+                qr_payment: `tron:${addr}?amount=${existingAmount}&token=USDT`,
+            });
+        }
+        await pool.query(`UPDATE usdt_orders SET status = 'cancelled' WHERE id = $1`, [ep.id]);
+    }
+
+    const orderId = `USDT_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
     const centsOffset = (simpleHash(orderId) % 99) * 0.01;
     const amountUsdt = Math.round((baseAmount + centsOffset) * 100) / 100;
 
@@ -3131,6 +3166,11 @@ async function processUsdtPayments() {
 
         const processedOrderIds = new Set();
 
+        const usedHashesRes = await pool.query(
+            `SELECT tx_hash FROM usdt_orders WHERE tx_hash IS NOT NULL AND tx_hash != ''`
+        );
+        const usedTxHashes = new Set(usedHashesRes.rows.map((r) => r.tx_hash));
+
         for (const [addressKey, orders] of ordersByAddress.entries()) {
             const scanAddress = addressKey === 'LEGACY' ? USDT_TRC20_WALLET : addressKey;
             if (!scanAddress) continue;
@@ -3144,6 +3184,9 @@ async function processUsdtPayments() {
             );
 
             for (const tx of txs) {
+                const txHash = tx.transaction_id || tx.txID || '';
+                if (txHash && usedTxHashes.has(txHash)) continue;
+
                 const rawVal = parseInt(tx.value || '0', 10);
                 const amountUsdt = rawVal / Math.pow(10, USDT_DECIMALS);
                 const txTimestamp = tx.block_timestamp ? Number(tx.block_timestamp) : 0;
@@ -3158,7 +3201,7 @@ async function processUsdtPayments() {
                 );
                 if (!match) continue;
                 processedOrderIds.add(match.order_id);
-                const txHash = tx.transaction_id || tx.txID || '';
+                usedTxHashes.add(txHash);
 
                 await pool.query(
                     'UPDATE usdt_orders SET status = $1, tx_hash = $2 WHERE id = $3',
