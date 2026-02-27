@@ -1777,11 +1777,12 @@ app.post('/api/nowpayments-ipn', async (req, res) => {
             );
             if (courseResult.rows.length > 0 && courseResult.rows[0].is_paid) {
                 const course = courseResult.rows[0];
+                const amountCents = payAmount != null ? Math.round(Number(payAmount) * 100) : null;
                 await pool.query(
-                    `INSERT INTO course_payments (user_id, course_id, payment_id, status)
-                     VALUES ($1, $2, $3, 'completed')
-                     ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
-                    [userId, courseId, (paymentId && String(paymentId).trim()) || null]
+                    `INSERT INTO course_payments (user_id, course_id, amount_cents, payment_id, status)
+                     VALUES ($1, $2, $3, $4, 'completed')
+                     ON CONFLICT (user_id, course_id) DO UPDATE SET amount_cents = COALESCE(EXCLUDED.amount_cents, course_payments.amount_cents), payment_id = EXCLUDED.payment_id, status = 'completed'`,
+                    [userId, courseId, amountCents, (paymentId && String(paymentId).trim()) || null]
                 );
                 await pool.query(
                     'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
@@ -3159,11 +3160,12 @@ async function processUsdtPayments() {
                 );
 
                 if (match.product_type === 'course' && match.user_id && match.product_id) {
+                    const amountCents = match.amount_usdt != null ? Math.round(Number(match.amount_usdt) * 100) : null;
                     await pool.query(
-                        `INSERT INTO course_payments (user_id, course_id, payment_id, status)
-                         VALUES ($1, $2, $3, 'completed')
-                         ON CONFLICT (user_id, course_id) DO UPDATE SET payment_id = EXCLUDED.payment_id, status = 'completed'`,
-                        [match.user_id, match.product_id, `USDT_${txHash}`]
+                        `INSERT INTO course_payments (user_id, course_id, amount_cents, payment_id, status)
+                         VALUES ($1, $2, $3, $4, 'completed')
+                         ON CONFLICT (user_id, course_id) DO UPDATE SET amount_cents = COALESCE(EXCLUDED.amount_cents, course_payments.amount_cents), payment_id = EXCLUDED.payment_id, status = 'completed'`,
+                        [match.user_id, match.product_id, amountCents, `USDT_${txHash}`]
                     );
                     await pool.query(
                         'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
