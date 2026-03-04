@@ -5465,6 +5465,10 @@ function wrapEmailTemplate(body, logId = null) {
 <body>
   <div class="wrapper">
     <div class="card">
+      <div class="header">
+        <div class="logo">SuperEngulfing</div>
+        <div class="tagline">Trading clarity. One setup at a time.</div>
+      </div>
       <div class="content">
         ${content}
       </div>
