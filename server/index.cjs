@@ -5654,9 +5654,6 @@ async function sendCourseAccessEmail(email, locale = 'en') {
                 <p>Շնորհավորում եմ, PDF-ն արդեն ուղարկել եմ քո էլփոստին։</p>
                 <p>Եթե բաց ես թողել կամ չես հասցրել դիտել տեսանյութը <strong>Thank You</strong> էջում, ահա կարճ, թե ինչի մասին էր խոսքը.</p>
                 <p>Նկարահանել եմ <strong>10+ դասից բաղկացած մինի դասընթաց</strong> <em>Super Engulfing</em>–ի վերաբերյալ և ստեղծել եմ հատուկ ինդիկատոր, որոնք դու ևս կարող ես ստանալ <strong>անվճար</strong>։</p>
-                <div style="margin: 24px 0; text-align: center;">
-                    <img src="https://image2url.com/r2/default/images/1772618537273-09156af0-e044-4818-b66a-69a565a132eb.jpg" alt="Access steps" style="max-width:100%; border-radius:14px; box-shadow:0 18px 45px rgba(15,23,42,0.55);" />
-                </div>
                 <p><strong>Ի՞նչ է ներառված դասընթացում.</strong></p>
                 <ul>
                     <li><strong>«Փիղը սենյակում»</strong> – Կհասկանաս, թե իրականում ինչու են քո ստոպերն ակտիվանում։</li>
@@ -5671,6 +5668,9 @@ async function sendCourseAccessEmail(email, locale = 'en') {
                     <li><strong>Գործարք բացել</strong> – Բացիր ընդամենը մեկ գործարք։</li>
                     <li><strong>Հաստատել</strong> – Մուտքի էջում գրիր քո UID‑ն և էլ․ հասցեն, որպեսզի կարողանանք հաստատել, որ դու իրական թրեյդեր ես։</li>
                 </ul>
+                <div style="margin: 24px 0; text-align: center;">
+                    <img src="https://image2url.com/r2/default/images/1772618537273-09156af0-e044-4818-b66a-69a565a132eb.jpg" alt="Access steps" style="max-width:100%; border-radius:14px; box-shadow:0 18px 45px rgba(15,23,42,0.55);" />
+                </div>
                 <p style="text-align: center; margin: 28px 0;">
                     <a href="${courseAccessUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Անցնել մուտքի էջին</a>
                 </p>
@@ -5680,32 +5680,34 @@ async function sendCourseAccessEmail(email, locale = 'en') {
             ` : `
                 <h1>In case you missed the video</h1>
                 <p>Hello,</p>
-                <p>Congratulations on grabbing your PDF — it should already be in your inbox.</p>
-                <p>In case you missed or didn't get a chance to watch the video on the <strong>Thank You</strong> page, here’s the short version.</p>
-                <p>I’ve created a <strong>14‑lesson mini‑course</strong> on trading the Super Engulfer strategy and a <strong>custom indicator</strong> that you can get for free.</p>
+                <p>Congratulations on grabbing your PDF! It should be in your inbox by now. In case you have missed or didn't get a chance to watch the video on the Thank You page.</p>
+                <p>In short, here's what's inside:</p>
+                <p>I've created a <strong>14-lesson mini-course</strong> on trading the Super Engulfer strategy and a <strong>custom indicator</strong> that you can get for free!</p>
                 <p><strong>Here is what I talked about in the video:</strong></p>
+                <p>I've designed this course to take you through the exact patterns and strategies I use, including:</p>
                 <ul>
-                    <li><strong>The \"Elephant in the Room\"</strong> – why you keep getting stopped out right before the move.</li>
-                    <li><strong>Liquidity & Market Structure</strong> – seeing the market like an institutional trader and spotting structure shifts.</li>
-                    <li><strong>The Super Engulfer Logic</strong> – deep dives into Candle A & B, reversal patterns, and the high‑conviction Run / Rev / Plus patterns.</li>
-                    <li><strong>Live Strategies</strong> – two powerful strategies (Bias/Reversal and Fractal Run) and a full guide on using the indicator.</li>
+                    <li><strong>The &quot;Elephant in the Room&quot;</strong>: Understanding why you keep getting stopped out.</li>
+                    <li><strong>Liquidity &amp; Market Structure</strong>: Seeing the market like an institutional trader and mastering structure shifts.</li>
+                    <li><strong>The Super Engulfer Logic</strong>: Deep dives into Candle A &amp; B, reversal patterns, and the high-conviction &quot;Run&quot;, &quot;Rev&quot;, and &quot;Plus&quot; patterns.</li>
+                    <li><strong>Live Strategies</strong>: I reveal two powerful strategies (Bias/Reversal and Fractal Run) that will change the way you trade and a full guide on using the indicator.</li>
                 </ul>
                 <p><strong>How to get your free access:</strong></p>
+                <p>We want to work with serious traders, so we've made the access free for those ready to take action. To unlock the course:</p>
                 <ul>
-                    <li><strong>Register</strong> – use the link below to sign up at Weex via our affiliate link.</li>
-                    <li><strong>Trade</strong> – deposit $100 and make one trade. This is your own capital; we don’t take any payment from you.</li>
-                    <li><strong>Verify</strong> – submit your UID on the Access page so we can verify you’re a real trader, not just a PDF collector.</li>
+                    <li><strong>Register</strong>: Use the link below to sign up at Weex via our affiliate link.</li>
+                    <li><strong>Trade</strong>: Deposit $100 and make one trade. This is your capital; we don't take any payment from you.</li>
+                    <li><strong>Verify</strong>: Submit your UID on the Access page so we can verify you're a legit trader and not just a &quot;PDF collector.&quot;</li>
                 </ul>
+                <p>Get your registration link and full access here:</p>
                 <p style="text-align: center; margin: 28px 0;">
                     <a href="${courseAccessUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Go to Access Page</a>
                 </p>
-                <p class="muted">Access page link: <a href="${courseAccessUrl}">${courseAccessUrl}</a></p>
-                <p>Once you’ve completed these steps, we’ll verify your UID within 24 hours and get you started.</p>
+                <p>Once you've completed these steps, we will verify your UID within 24 hours and get you started.</p>
                 <p>See you on the inside!<br />Hayk<br />Super Engulfers Team</p>
             `;
     const textContent = isAm
         ? `Հիշեցում – մուտք SuperEngulfing դասընթացին\n\nՈղջույն,\n\nPDF‑ն արդեն ուղարկվել է քո էլ․ հասցեին։ Եթե բաց ես թողել տեսանյութը Thank You էջում, ահա ամփոփ տարբերակը.\n\nՆկարահանված է 10+ դասից բաղկացած մինի դասընթաց Super Engulfing ռազմավարության մասին և հատուկ ինդիկատոր, որը կարող ես ստանալ անվճար.\n\nԻնչ է ներառված.\n• «Փիղը սենյակում» – ինչու են քո ստոպերն ակտիվանում\n• Լիկվիդայնություն և շուկայի կառուցվածք\n• Super Engulfing տրամաբանությունը (Reversal, Run, Plus)\n• 2 աշխատող ստրատեգիա Super Engulfing հիման վրա\n\nԻնչպես ստանալ անվճար մուտք.\n1) Գրանցվիր Weex բորսայում իմ հղումով\n2) Լիցքավորիր հաշիվդ $100‑ով և բացիր մեկ գործարք\n3) Մուտքի էջում գրիր UID‑դ և էլ․ հասցեն\n\nՄուտքի էջի հղումը՝ ${courseAccessUrl}\n\nԱյս քայլերը կատարելուց հետո 24 ժամվա ընթացքում կստուգեմ UID‑դ և կուղարկեմ մուտքերը.\n\nՀայկ`
-        : `In case you missed the video – SuperEngulfing access\n\nHello,\n\nThanks for grabbing the PDF — it should be in your inbox.\n\nIn case you didn’t watch the video on the Thank You page, here’s what it covers:\n\n• 14‑lesson mini‑course on the Super Engulfer strategy\n• Why most traders get stopped out right before the move\n• Liquidity & market structure, Super Engulfer candle logic, and the Run / Rev / Plus patterns\n• Two live strategies plus a full guide on using the indicator\n\nHow to get free access:\n1) Register at Weex via our affiliate link\n2) Deposit $100 and place one trade (your own capital)\n3) Submit your UID on the Access page so we can verify you\n\nAccess page: ${courseAccessUrl}\n\nOnce you complete these steps, we’ll verify your UID within 24 hours and give you full access.\n\nSee you on the inside!\nHayk\nSuper Engulfers Team`;
+        : `In case you missed the video \u2013 SuperEngulfing access\n\nHello,\n\nCongratulations on grabbing your PDF! It should be in your inbox by now. In case you have missed or didn't get a chance to watch the video on the Thank You page.\n\nIn short, here's what's inside:\n\nI've created a 14-lesson mini-course on trading the Super Engulfer strategy and a custom indicator that you can get for free!\n\nHere is what I talked about in the video:\nI've designed this course to take you through the exact patterns and strategies I use, including:\n\n• The "Elephant in the Room": Understanding why you keep getting stopped out.\n• Liquidity & Market Structure: Seeing the market like an institutional trader and mastering structure shifts.\n• The Super Engulfer Logic: Deep dives into Candle A & B, reversal patterns, and the high-conviction "Run", "Rev", and "Plus" patterns.\n• Live Strategies: I reveal two powerful strategies (Bias/Reversal and Fractal Run) that will change the way you trade and a full guide on using the indicator.\n\nHow to get your free access:\nWe want to work with serious traders, so we've made the access free for those ready to take action. To unlock the course:\n\n1) Register: Use the link below to sign up at Weex via our affiliate link.\n2) Trade: Deposit $100 and make one trade. This is your capital; we don't take any payment from you.\n3) Verify: Submit your UID on the Access page so we can verify you're a legit trader and not just a "PDF collector."\n\nGet your registration link and full access here: ${courseAccessUrl}\n\nOnce you've completed these steps, we will verify your UID within 24 hours and get you started.\n\nSee you on the inside!\nHayk\nSuper Engulfers Team`;
 
     try {
         await transporter.sendMail({
