@@ -5668,9 +5668,11 @@ async function sendCourseAccessEmail(email, locale = 'en') {
                     <li><strong>Գործարք բացել</strong> – Բացիր ընդամենը մեկ գործարք։</li>
                     <li><strong>Հաստատել</strong> – Մուտքի էջում գրիր քո UID‑ն և էլ․ հասցեն, որպեսզի կարողանանք հաստատել, որ դու իրական թրեյդեր ես։</li>
                 </ul>
+
                 <div style="margin: 24px 0; text-align: center;">
                     <img src="https://image2url.com/r2/default/images/1772618537273-09156af0-e044-4818-b66a-69a565a132eb.jpg" alt="Access steps" style="max-width:100%; border-radius:14px; box-shadow:0 18px 45px rgba(15,23,42,0.55);" />
                 </div>
+                <p>Ստացիր գրանցման հղումը և ամբողջական մուտքը այստեղ՝ 👉</p>
                 <p style="text-align: center; margin: 28px 0;">
                     <a href="${courseAccessUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Անցնել մուտքի էջին</a>
                 </p>
