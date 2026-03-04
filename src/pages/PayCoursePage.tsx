@@ -26,6 +26,7 @@ const PayCoursePage: React.FC = () => {
     qr_address: string;
     qr_payment: string;
   } | null>(null);
+  const [network, setNetwork] = useState<'trc20' | 'bep20'>('trc20');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,12 +45,12 @@ const PayCoursePage: React.FC = () => {
 
   useEffect(() => {
     if (!courseId || !course?.is_paid) return;
-    // Create default full-price order on first load
-    createOrder();
+    // Create default full-price order on first load for selected network
+    createOrder(network);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId, course?.is_paid]);
+  }, [courseId, course?.is_paid, network]);
 
-  const createOrder = () => {
+  const createOrder = (net: 'trc20' | 'bep20') => {
     if (!courseId) return;
     setError(null);
     setOrder(null);
@@ -59,6 +60,7 @@ const PayCoursePage: React.FC = () => {
       body: JSON.stringify({
         product_type: 'course',
         product_id: parseInt(courseId, 10),
+        network: net,
       }),
     })
       .then((r) => r.json())
@@ -123,6 +125,30 @@ const PayCoursePage: React.FC = () => {
         {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
       </div>
 
+      <div className="mb-4">
+        <div className="inline-flex items-center gap-2 rounded-full bg-zinc-900/80 border border-zinc-700 px-2 py-1 text-xs text-zinc-300">
+          <span className="font-semibold uppercase tracking-wide text-zinc-500">Network</span>
+          <button
+            type="button"
+            onClick={() => setNetwork('trc20')}
+            className={`px-3 py-1 rounded-full font-semibold ${
+              network === 'trc20' ? 'bg-emerald-500 text-black' : 'text-zinc-300 hover:text-white'
+            }`}
+          >
+            TRC20 (Tron)
+          </button>
+          <button
+            type="button"
+            onClick={() => setNetwork('bep20')}
+            className={`px-3 py-1 rounded-full font-semibold ${
+              network === 'bep20' ? 'bg-emerald-500 text-black' : 'text-zinc-300 hover:text-white'
+            }`}
+          >
+            BEP20 (BSC)
+          </button>
+        </div>
+      </div>
+
       <USDTPaymentPage
         orderId={order.order_id}
         address={order.address}
@@ -130,6 +156,7 @@ const PayCoursePage: React.FC = () => {
         amountDisplay={order.amount_display}
         productName={course.title}
         productType="course"
+        network={network}
         onSuccessRedirect={localizePath('/dashboard')}
       />
     </div>

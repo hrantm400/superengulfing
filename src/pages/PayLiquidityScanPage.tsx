@@ -8,6 +8,7 @@ import { useTranslation } from '../locales';
 const PayLiquidityScanPage: React.FC = () => {
   const { t } = useTranslation();
   const { localizePath } = useLocale();
+  const [network, setNetwork] = useState<'trc20' | 'bep20'>('trc20');
   const [order, setOrder] = useState<{
     order_id: string;
     address: string;
@@ -20,9 +21,12 @@ const PayLiquidityScanPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
+    setOrder(null);
     authFetch('/api/usdt/create-order', {
       method: 'POST',
-      body: JSON.stringify({ product_type: 'liquidityscan_pro' }),
+      body: JSON.stringify({ product_type: 'liquidityscan_pro', network }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -34,7 +38,7 @@ const PayLiquidityScanPage: React.FC = () => {
       })
       .catch((e) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [network]);
 
   if (loading) {
     return (
@@ -57,6 +61,30 @@ const PayLiquidityScanPage: React.FC = () => {
 
   return (
     <div className="pt-20 pb-8">
+      <div className="max-w-4xl mx-auto px-4 mb-6">
+        <div className="inline-flex items-center gap-2 rounded-full bg-zinc-900/80 border border-zinc-700 px-2 py-1 text-xs text-zinc-300">
+          <span className="font-semibold uppercase tracking-wide text-zinc-500">Network</span>
+          <button
+            type="button"
+            onClick={() => setNetwork('trc20')}
+            className={`px-3 py-1 rounded-full font-semibold ${
+              network === 'trc20' ? 'bg-emerald-500 text-black' : 'text-zinc-300 hover:text-white'
+            }`}
+          >
+            TRC20 (Tron)
+          </button>
+          <button
+            type="button"
+            onClick={() => setNetwork('bep20')}
+            className={`px-3 py-1 rounded-full font-semibold ${
+              network === 'bep20' ? 'bg-emerald-500 text-black' : 'text-zinc-300 hover:text-white'
+            }`}
+          >
+            BEP20 (BSC)
+          </button>
+        </div>
+      </div>
+
       <USDTPaymentPage
         orderId={order.order_id}
         address={order.address}
@@ -64,6 +92,7 @@ const PayLiquidityScanPage: React.FC = () => {
         amountDisplay={order.amount_display}
         productName="LiquidityScan PRO"
         productType="liquidityscan_pro"
+        network={network}
       />
     </div>
   );

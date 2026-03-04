@@ -15,6 +15,7 @@ export interface USDTPaymentPageProps {
   amountDisplay: string;
   productName: string;
   productType: 'liquidityscan_pro' | 'course';
+  network?: 'trc20' | 'bep20';
   onSuccessRedirect?: string;
 }
 
@@ -27,6 +28,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
   amountDisplay,
   productName,
   productType,
+  network = 'trc20',
   onSuccessRedirect,
 }) => {
   const { localizePath } = useLocale();
@@ -79,7 +81,10 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
   };
 
   const qrAddress = address;
-  const qrPayment = `tron:${address}?amount=${amount}&token=USDT`;
+  const qrPayment =
+    network === 'bep20'
+      ? `bep20:${address}?amount=${amount}&token=USDT`
+      : `tron:${address}?amount=${amount}&token=USDT`;
   const qrValue = tab === 'addr' ? qrAddress : qrPayment;
 
   useEffect(() => {
@@ -174,7 +179,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
 
             <div className="space-y-1">
               <p className="text-xs text-zinc-500 font-bold uppercase tracking-[0.2em] pl-1">
-                USDT TRC20 Checkout
+                {network === 'bep20' ? 'USDT BEP20 Checkout' : 'USDT TRC20 Checkout'}
               </p>
               <h2 className="text-2xl md:text-3xl font-bold text-white leading-tight">{productName}</h2>
             </div>
@@ -198,13 +203,15 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
                   <p className="text-lg font-bold font-mono text-emerald-400 mt-0.5">
                     {amountDisplay} USDT
                   </p>
-                  <p className="text-xs text-zinc-500 mt-1">TRC20 on Tron</p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    {network === 'bep20' ? 'BEP20 on BNB Smart Chain' : 'TRC20 on Tron'}
+                  </p>
                 </div>
                 <div className="mt-5 pt-5 border-t border-white/10 flex justify-between items-center text-sm">
                   <span className="text-zinc-500">Network</span>
                   <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full text-xs">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    TRC20
+                    {network === 'bep20' ? 'BEP20' : 'TRC20'}
                   </span>
                 </div>
               </div>
@@ -344,7 +351,7 @@ const USDTPaymentPage: React.FC<USDTPaymentPageProps> = ({
               <div className="w-full max-w-md space-y-2">
                 <div className="flex justify-between px-1">
                   <span className="text-xs font-semibold text-zinc-500 uppercase">
-                    USDT TRC20 address
+                    {network === 'bep20' ? 'USDT BEP20 address' : 'USDT TRC20 address'}
                   </span>
                 </div>
                 <div className="bg-black/40 border border-white/10 rounded-xl flex items-center p-1 pr-2">

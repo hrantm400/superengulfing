@@ -3049,11 +3049,19 @@ app.get('/api/course-payment-widget-url', requireAuth, async (req, res) => {
     }
 });
 
-// ==================== USDT TRC20 PAYMENT (self-hosted) ====================
+// ==================== USDT TRC20/BEP20 PAYMENT (self-hosted) ====================
 const USDT_TRC20_WALLET = process.env.USDT_TRC20_WALLET_ADDRESS || 'TRXj2ShUse4vpYxQhqaJz8dM7WscUzhARB';
 const USDT_MAIN_WALLET = USDT_TRC20_WALLET;
 const USDT_TRC20_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 const USDT_DECIMALS = 6;
+// BEP20 (Binance Smart Chain) USDT support
+const USDT_BEP20_WALLET = process.env.USDT_BEP20_WALLET_ADDRESS || '0x904b7B159a3226b392b78C623222615C1dE4F7D5';
+// Default to the canonical USDT contract on BSC; can be overridden via env
+const USDT_BEP20_CONTRACT =
+    process.env.USDT_BEP20_CONTRACT ||
+    '0x55d398326f99059ff775485246999027b3197955';
+const USDT_BEP20_DECIMALS = 18;
+const BSCSCAN_API_KEY = process.env.BSCSCAN_API_KEY || '';
 const LIQUIDITYSCAN_BASE_USD = 49.01;
 const COURSE_BASE_USD = 59.01;
 const TRON_FULLNODE_URL = process.env.TRON_FULLNODE_URL || 'https://api.trongrid.io';
@@ -3151,14 +3159,15 @@ function simpleHash(s) {
     return Math.abs(h);
 }
 
-// POST /api/usdt/create-order - Create USDT TRC20 order (optional JWT for course)
+// POST /api/usdt/create-order - Create USDT order (TRC20 or BEP20, optional JWT for course)
 app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
-    const { product_type, product_id, email } = req.body || {};
+    const { product_type, product_id, email, network } = req.body || {};
     if (!product_type || !['liquidityscan_pro', 'course'].includes(product_type)) {
         return res.status(400).json({ error: 'product_type must be liquidityscan_pro or course' });
     }
     const userId = req.user ? req.user.id : null;
     const userEmail = (req.user && req.user.email) || (email && String(email).trim()) || null;
+    const orderNetwork = (network || 'trc20').toString().toLowerCase() === 'bep20' ? 'bep20' : 'trc20';
 
     if (product_type === 'course') {
         if (!req.user) return res.status(401).json({ error: 'Login required to pay for course' });
@@ -3174,7 +3183,7 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
 
     // Reuse existing pending order for same user+product instead of creating duplicates on page refresh
     const existingPending = await pool.query(
-        `SELECT o.id, o.order_id, o.amount_usdt, a.address AS deposit_address
+        `SELECT o.id, o.order_id, o.amount_usdt, o.network, a.address AS deposit_address
          FROM usdt_orders o
          LEFT JOIN usdt_deposit_addresses a ON a.id = o.deposit_address_id
          WHERE o.status = 'pending'
@@ -3182,23 +3191,27 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
            AND o.user_id IS NOT DISTINCT FROM $2
            AND o.email IS NOT DISTINCT FROM $3
            AND COALESCE(o.product_id, 0) = COALESCE($4, 0)
+           AND o.network = $5
            AND o.created_at > NOW() - INTERVAL '30 minutes'
          ORDER BY o.created_at DESC
          LIMIT 1`,
-        [product_type, userId, userEmail || null, product_id || null]
+        [product_type, userId, userEmail || null, product_id || null, orderNetwork]
     );
 
     if (existingPending.rows.length > 0) {
         const ep = existingPending.rows[0];
         const existingAmount = Number(ep.amount_usdt);
-        const addr = ep.deposit_address || USDT_TRC20_WALLET;
+        const isBep20 = (ep.network || '') === 'bep20';
+        const addr = ep.deposit_address || (isBep20 ? USDT_BEP20_WALLET : USDT_TRC20_WALLET);
         return res.json({
             order_id: ep.order_id,
             address: addr,
             amount: existingAmount,
             amount_display: existingAmount.toFixed(2),
             qr_address: addr,
-            qr_payment: `tron:${addr}?amount=${existingAmount}&token=USDT`,
+            qr_payment: isBep20
+                ? `bep20:${addr}?amount=${existingAmount}&token=USDT`
+                : `tron:${addr}?amount=${existingAmount}&token=USDT`,
         });
     }
 
@@ -3209,10 +3222,10 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
     let orderDbId = null;
     try {
         const insert = await pool.query(
-            `INSERT INTO usdt_orders (order_id, product_type, product_id, user_id, email, amount_usdt, status)
-             VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+            `INSERT INTO usdt_orders (order_id, product_type, product_id, user_id, email, amount_usdt, status, network)
+             VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
              RETURNING id`,
-            [orderId, product_type, product_id || null, userId, userEmail || null, amountUsdt]
+            [orderId, product_type, product_id || null, userId, userEmail || null, amountUsdt, orderNetwork]
         );
         orderDbId = insert.rows[0] && insert.rows[0].id;
     } catch (e) {
@@ -3224,16 +3237,20 @@ app.post('/api/usdt/create-order', optionalAuth, async (req, res) => {
 
     let depositAddress = null;
     try {
-        if (orderDbId != null) {
+        if (orderDbId != null && orderNetwork === 'trc20') {
             depositAddress = await allocateDepositAddressForOrder(orderDbId);
         }
     } catch (e) {
         console.warn('[usdt] failed to allocate deposit address, falling back to main wallet:', e.message);
     }
 
-    const addressForPayment = depositAddress || USDT_TRC20_WALLET;
+    const addressForPayment =
+        orderNetwork === 'bep20' ? USDT_BEP20_WALLET : (depositAddress || USDT_TRC20_WALLET);
     const qrAddress = addressForPayment;
-    const qrPayment = `tron:${addressForPayment}?amount=${amountUsdt}&token=USDT`;
+    const qrPayment =
+        orderNetwork === 'bep20'
+            ? `bep20:${addressForPayment}?amount=${amountUsdt}&token=USDT`
+            : `tron:${addressForPayment}?amount=${amountUsdt}&token=USDT`;
 
     return res.json({
         order_id: orderId,
@@ -3251,12 +3268,17 @@ app.get('/api/usdt/orders/:orderId/status', async (req, res) => {
     if (!orderId) return res.status(400).json({ error: 'order_id required' });
     try {
         const r = await pool.query(
-            'SELECT status FROM usdt_orders WHERE order_id = $1',
+            'SELECT status, network FROM usdt_orders WHERE order_id = $1',
             [orderId]
         );
         if (r.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
         if (r.rows[0].status === 'pending') {
-            processUsdtPayments().catch((e) => console.warn('[usdt] lazy check error:', e.message));
+            const net = (r.rows[0].network || 'trc20').toLowerCase();
+            if (net === 'bep20') {
+                processUsdtBep20Payments().catch((e) => console.warn('[usdt] lazy BEP20 check error:', e.message));
+            } else {
+                processUsdtPayments().catch((e) => console.warn('[usdt] lazy TRC20 check error:', e.message));
+            }
         }
         return res.json({ status: r.rows[0].status });
     } catch (e) {
@@ -3309,7 +3331,8 @@ async function processUsdtPayments() {
                 a.address AS deposit_address
              FROM usdt_orders o
              LEFT JOIN usdt_deposit_addresses a ON a.id = o.deposit_address_id
-             WHERE o.status = $1`,
+             WHERE o.status = $1
+               AND (o.network IS NULL OR o.network = 'trc20')`,
             ['pending']
         );
         const pending = pendingRes.rows;
@@ -3328,7 +3351,11 @@ async function processUsdtPayments() {
         const processedOrderIds = new Set();
 
         const usedHashesRes = await pool.query(
-            `SELECT tx_hash FROM usdt_orders WHERE tx_hash IS NOT NULL AND tx_hash != ''`
+            `SELECT tx_hash
+             FROM usdt_orders
+             WHERE tx_hash IS NOT NULL
+               AND tx_hash != ''
+               AND (network IS NULL OR network = 'trc20')`
         );
         const usedTxHashes = new Set(usedHashesRes.rows.map((r) => r.tx_hash));
 
@@ -3356,7 +3383,11 @@ async function processUsdtPayments() {
                         if (processedOrderIds.has(o.order_id)) return false;
                         if (Math.abs(Number(o.amount_usdt) - amountUsdt) >= 0.02) return false;
                         const orderCreatedMs = o.created_at ? new Date(o.created_at).getTime() : 0;
-                        if (txTimestamp > 0 && orderCreatedMs > 0 && txTimestamp < orderCreatedMs - 20 * 60 * 1000) return false;
+                        if (txTimestamp > 0 && orderCreatedMs > 0) {
+                            const minTs = orderCreatedMs - 60 * 1000; // allow tx up to 60s before order
+                            const maxTs = orderCreatedMs + 20 * 60 * 1000; // and up to 20 minutes after
+                            if (txTimestamp < minTs || txTimestamp > maxTs) return false;
+                        }
                         return true;
                     }
                 );
@@ -3450,12 +3481,181 @@ async function processUsdtPayments() {
     }
 }
 
+// BSCScan polling: fetch USDT BEP20 incoming txs to main wallet, match to pending orders, grant access
+async function processUsdtBep20Payments() {
+    try {
+        if (!USDT_BEP20_WALLET || !USDT_BEP20_CONTRACT || !BSCSCAN_API_KEY) return;
+
+        const pendingRes = await pool.query(
+            `SELECT
+                o.id,
+                o.order_id,
+                o.product_type,
+                o.product_id,
+                o.user_id,
+                o.email,
+                o.amount_usdt,
+                o.created_at
+             FROM usdt_orders o
+             WHERE o.status = $1
+               AND o.network = 'bep20'`,
+            ['pending']
+        );
+        const pending = pendingRes.rows;
+        if (pending.length === 0) return;
+
+        const fromAddr = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER;
+        const notifyTo = process.env.NOWPAY_NOTIFY_EMAIL || (ADMIN_EMAILS[0] || process.env.SMTP_USER);
+
+        const processedOrderIds = new Set();
+
+        const usedHashesRes = await pool.query(
+            `SELECT tx_hash
+             FROM usdt_orders
+             WHERE tx_hash IS NOT NULL
+               AND tx_hash != ''
+               AND network = 'bep20'`
+        );
+        const usedTxHashes = new Set(usedHashesRes.rows.map((r) => r.tx_hash));
+
+        const addr = USDT_BEP20_WALLET;
+        const url = `https://api.bscscan.com/api?module=account&action=tokentx&address=${encodeURIComponent(
+            addr
+        )}&contractaddress=${USDT_BEP20_CONTRACT}&page=1&offset=50&sort=desc&apikey=${BSCSCAN_API_KEY}`;
+        const resp = await fetch(url);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const txs = (data.result || []).filter(
+            (t) =>
+                (t.contractAddress || '').toLowerCase() === USDT_BEP20_CONTRACT.toLowerCase() &&
+                (t.to || '').toLowerCase() === addr.toLowerCase()
+        );
+
+        for (const tx of txs) {
+            const txHash = tx.hash || '';
+            if (txHash && usedTxHashes.has(txHash)) continue;
+
+            const rawVal = tx.value ? BigInt(tx.value) : 0n;
+            const amountUsdt = Number(rawVal) / Math.pow(10, USDT_BEP20_DECIMALS);
+            const txTimestamp = tx.timeStamp ? Number(tx.timeStamp) * 1000 : 0;
+
+            const match = pending.find((o) => {
+                if (processedOrderIds.has(o.order_id)) return false;
+                if (Math.abs(Number(o.amount_usdt) - amountUsdt) >= 0.02) return false;
+                const orderCreatedMs = o.created_at ? new Date(o.created_at).getTime() : 0;
+                if (txTimestamp > 0 && orderCreatedMs > 0) {
+                    const minTs = orderCreatedMs - 60 * 1000;
+                    const maxTs = orderCreatedMs + 20 * 60 * 1000;
+                    if (txTimestamp < minTs || txTimestamp > maxTs) return false;
+                }
+                return true;
+            });
+            if (!match) continue;
+
+            processedOrderIds.add(match.order_id);
+            usedTxHashes.add(txHash);
+
+            await pool.query(
+                'UPDATE usdt_orders SET status = $1, tx_hash = $2 WHERE id = $3',
+                ['completed', txHash || null, match.id]
+            );
+
+            if (match.product_type === 'course' && match.user_id && match.product_id) {
+                const amountUsdtNum = match.amount_usdt != null ? Number(match.amount_usdt) : null;
+                const amountCents = amountUsdtNum != null ? Math.round(amountUsdtNum * 100) : null;
+                await pool.query(
+                    `INSERT INTO course_payments (user_id, course_id, amount_cents, payment_id, status)
+                     VALUES ($1, $2, $3, $4, 'completed')
+                     ON CONFLICT (user_id, course_id) DO UPDATE SET amount_cents = COALESCE(EXCLUDED.amount_cents, course_payments.amount_cents), payment_id = EXCLUDED.payment_id, status = 'completed'`,
+                    [match.user_id, match.product_id, amountCents, `USDT_BEP20_${txHash}`]
+                );
+                await pool.query(
+                    'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT (user_id, course_id) DO NOTHING',
+                    [match.user_id, match.product_id]
+                );
+                const courseRes = await pool.query('SELECT title FROM courses WHERE id = $1', [match.product_id]);
+                const courseTitle = (courseRes.rows[0] && courseRes.rows[0].title) || 'Course';
+                const userRes = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
+                const userEmail = userRes.rows[0] && userRes.rows[0].email;
+                if (userEmail && transporter) {
+                    await transporter
+                        .sendMail({
+                            from: fromAddr,
+                            to: userEmail,
+                            subject: `You have access to: ${courseTitle}`,
+                            text: `Your USDT (BEP20) payment was successful. You now have access to the course "${courseTitle}". Log in to your dashboard to start learning.\n\nSuperEngulfing`,
+                        })
+                        .catch((err) => console.warn('[usdt-bep20] course email failed:', err.message));
+                }
+                if (notifyTo) {
+                    await transporter
+                        .sendMail({
+                            from: fromAddr,
+                            to: notifyTo,
+                            subject: `USDT BEP20 payment: ${userEmail || match.user_id} enrolled in "${courseTitle}"`,
+                            text: `USDT BEP20 payment detected. User ${userEmail || match.user_id} enrolled in course "${courseTitle}". TX: ${txHash}`,
+                        })
+                        .catch((err) => console.warn('[usdt-bep20] admin email failed:', err.message));
+                }
+            }
+
+            if (match.product_type === 'liquidityscan_pro') {
+                let recipientEmail = match.email;
+                if (!recipientEmail && match.user_id) {
+                    const u = await pool.query('SELECT email FROM dashboard_users WHERE id = $1', [match.user_id]);
+                    recipientEmail = u.rows[0] && u.rows[0].email;
+                }
+                if (recipientEmail && recipientEmail.includes('@')) {
+                    await transporter
+                        .sendMail({
+                            from: fromAddr,
+                            to: recipientEmail,
+                            subject: 'Your LiquidityScan PRO payment was received',
+                            text: [
+                                'Hi,',
+                                '',
+                                'Your USDT (BEP20) payment for LiquidityScan PRO was received successfully.',
+                                '',
+                                `Transaction: ${txHash}`,
+                                '',
+                                'Access LiquidityScan PRO at: https://liquidityscan.io',
+                                '',
+                                '– SuperEngulfing',
+                            ].join('\n'),
+                        })
+                        .catch((err) => console.warn('[usdt-bep20] LS PRO email failed:', err.message));
+                }
+                if (notifyTo) {
+                    await transporter
+                        .sendMail({
+                            from: fromAddr,
+                            to: notifyTo,
+                            subject: 'USDT BEP20 LiquidityScan PRO payment received',
+                            text: `USDT BEP20 payment for LiquidityScan PRO. Email: ${match.email || 'N/A'}. TX: ${txHash}`,
+                        })
+                        .catch((err) => console.warn('[usdt-bep20] admin LS email failed:', err.message));
+                }
+            }
+        }
+    } catch (e) {
+        if (!e.message || !/usdt_orders/i.test(e.message)) {
+            console.warn('[usdt-bep20] processUsdtBep20Payments error:', e.message);
+        }
+    }
+}
+
 // Start USDT payment polling (every 45 seconds)
 let usdtPollInterval = null;
+let usdtBep20PollInterval = null;
 function startUsdtPolling() {
-    if (usdtPollInterval) return;
-    usdtPollInterval = setInterval(processUsdtPayments, 45000);
-    console.log('   USDT TRC20 payment polling started (every 45s)');
+    if (!usdtPollInterval) {
+        usdtPollInterval = setInterval(processUsdtPayments, 45000);
+        console.log('   USDT TRC20 payment polling started (every 45s)');
+    }
+    if (!usdtBep20PollInterval) {
+        usdtBep20PollInterval = setInterval(processUsdtBep20Payments, 45000);
+        console.log('   USDT BEP20 payment polling started (every 45s)');
+    }
 }
 
 // POST /api/course-payment-complete - For PAID courses: access is granted ONLY by NOWPayments webhook (IPN).
@@ -5445,39 +5645,67 @@ async function sendCourseAccessEmail(email, locale = 'en') {
     const fromAddr = process.env.SMTP_FROM || '"SuperEngulfing" <info@superengulfing.com>';
     const replyTo = process.env.SMTP_REPLY_TO || process.env.SMTP_FROM || 'info@superengulfing.com';
     const isAm = locale === 'am';
-    const subject = isAm ? 'Ցանկանու՞մ եք մուտքի մասին նամակ – SuperEngulfing' : 'Do you want the course access email? - SuperEngulfing';
+    const subject = isAm
+        ? 'Հիշեցում – մուտք SuperEngulfing դասընթացին'
+        : 'In case you missed the video – SuperEngulfing access';
     const htmlContent = isAm ? `
-                <h1>Մուտք դասընթացին</h1>
+                <h1>Հիշեցում</h1>
                 <p>Ողջույն,</p>
-                <p>Տեսանյութում մանրամասն բացատրվում է, <strong>ինչպես ստանալ մուտք</strong> դասընթացին և ինդիկատորին։</p>
-                <p style="text-align: center; margin: 28px 0;">
-                    <a href="${courseAccessUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Բացել մուտքի էջը</a>
-                </p>
-                <p><strong>Ինչպես ստանալ մուտք.</strong></p>
+                <p>Շնորհավորում եմ, PDF-ն արդեն ուղարկել եմ քո էլփոստին։</p>
+                <p>Եթե բաց ես թողել կամ չես հասցրել դիտել տեսանյութը <strong>Thank You</strong> էջում, ահա կարճ, թե ինչի մասին էր խոսքը.</p>
+                <p>Նկարահանել եմ <strong>10+ դասից բաղկացած մինի դասընթաց</strong> <em>Super Engulfing</em>–ի վերաբերյալ և ստեղծել եմ հատուկ ինդիկատոր, որոնք դու ևս կարող ես ստանալ <strong>անվճար</strong>։</p>
+                <div style="margin: 24px 0; text-align: center;">
+                    <img src="https://image2url.com/r2/default/images/1772618537273-09156af0-e044-4818-b66a-69a565a132eb.jpg" alt="Access steps" style="max-width:100%; border-radius:14px; box-shadow:0 18px 45px rgba(15,23,42,0.55);" />
+                </div>
+                <p><strong>Ի՞նչ է ներառված դասընթացում.</strong></p>
                 <ul>
-                    <li>Գրանցվեք գործընկերոջ հղումով (անվճար)</li>
-                    <li>Ավելացրեք հաշվին $100 և կատարեք գործարք</li>
-                    <li>Ներկայացրեք ձեր UID-ն մուտքի էջում — մենք կհաստատենք 24 ժամի ընթացքում</li>
+                    <li><strong>«Փիղը սենյակում»</strong> – Կհասկանաս, թե իրականում ինչու են քո ստոպերն ակտիվանում։</li>
+                    <li><strong>Լիկվիդայնություն և շուկայի կառուցվածք</strong> – Կսովորես տեսնել շուկան խոշոր խաղացողների աչքերով։</li>
+                    <li><strong>Super Engulfing–ի տրամաբանությունը</strong> – Մանրամասն կուսումնասիրենք Reversal, Run և Plus մոդելները։</li>
+                    <li><strong>2 աշխատող ստրատեգիա</strong> – Կներկայացնեմ Super Engulfing–ի հիման վրա ստեղծված 2 ստրատեգիա, որպեսզի կարողանաս ավելի լավ կարդալ շուկան և ընտրել մուտքերը։</li>
                 </ul>
-                <p class="muted">Հղումը դեպի մուտքի էջ. <a href="${courseAccessUrl}">${courseAccessUrl}</a></p>
+                <p><strong>Ինչպե՞ս ստանալ անվճար մուտք.</strong></p>
+                <ul>
+                    <li><strong>Հաշիվ բացել</strong> – Օգտագործիր ներքևի հղումը և գրանցվիր Weex բորսայում իմ հղումով։</li>
+                    <li><strong>Լիցքավորել հաշիվը</strong> – Լիցքավորիր հաշիվդ $100-ով (սա քո կապիտալն է, մենք ոչինչ չենք վերցնում)։</li>
+                    <li><strong>Գործարք բացել</strong> – Բացիր ընդամենը մեկ գործարք։</li>
+                    <li><strong>Հաստատել</strong> – Մուտքի էջում գրիր քո UID‑ն և էլ․ հասցեն, որպեսզի կարողանանք հաստատել, որ դու իրական թրեյդեր ես։</li>
+                </ul>
+                <p style="text-align: center; margin: 28px 0;">
+                    <a href="${courseAccessUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Անցնել մուտքի էջին</a>
+                </p>
+                <p class="muted">Մուտքի էջի հղումը՝ <a href="${courseAccessUrl}">${courseAccessUrl}</a></p>
+                <p>Այս քայլերը կատարելուց հետո 24 ժամվա ընթացքում կստուգեմ քո UID‑ն և կտրամադրեմ մուտքերը։</p>
+                <p>Մինչ հանդիպում,<br />Հայկ</p>
             ` : `
-                <h1>Course access</h1>
+                <h1>In case you missed the video</h1>
                 <p>Hello,</p>
-                <p>In the video you'll see <strong>exactly how to get access</strong> to the course and indicator.</p>
-                <p style="text-align: center; margin: 28px 0;">
-                    <a href="${courseAccessUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Go to Access page</a>
-                </p>
-                <p><strong>How it works:</strong></p>
+                <p>Congratulations on grabbing your PDF — it should already be in your inbox.</p>
+                <p>In case you missed or didn't get a chance to watch the video on the <strong>Thank You</strong> page, here’s the short version.</p>
+                <p>I’ve created a <strong>14‑lesson mini‑course</strong> on trading the Super Engulfer strategy and a <strong>custom indicator</strong> that you can get for free.</p>
+                <p><strong>Here is what I talked about in the video:</strong></p>
                 <ul>
-                    <li>Register using our partner link (free)</li>
-                    <li>Deposit $100 and make a trade</li>
-                    <li>Submit your UID on the Access page — we'll verify within 24 hours</li>
+                    <li><strong>The \"Elephant in the Room\"</strong> – why you keep getting stopped out right before the move.</li>
+                    <li><strong>Liquidity & Market Structure</strong> – seeing the market like an institutional trader and spotting structure shifts.</li>
+                    <li><strong>The Super Engulfer Logic</strong> – deep dives into Candle A & B, reversal patterns, and the high‑conviction Run / Rev / Plus patterns.</li>
+                    <li><strong>Live Strategies</strong> – two powerful strategies (Bias/Reversal and Fractal Run) and a full guide on using the indicator.</li>
                 </ul>
+                <p><strong>How to get your free access:</strong></p>
+                <ul>
+                    <li><strong>Register</strong> – use the link below to sign up at Weex via our affiliate link.</li>
+                    <li><strong>Trade</strong> – deposit $100 and make one trade. This is your own capital; we don’t take any payment from you.</li>
+                    <li><strong>Verify</strong> – submit your UID on the Access page so we can verify you’re a real trader, not just a PDF collector.</li>
+                </ul>
+                <p style="text-align: center; margin: 28px 0;">
+                    <a href="${courseAccessUrl}" class="btn" style="display:inline-block;background:#059669;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;margin:8px 0;">Go to Access Page</a>
+                </p>
                 <p class="muted">Access page link: <a href="${courseAccessUrl}">${courseAccessUrl}</a></p>
+                <p>Once you’ve completed these steps, we’ll verify your UID within 24 hours and get you started.</p>
+                <p>See you on the inside!<br />Hayk<br />Super Engulfers Team</p>
             `;
     const textContent = isAm
-        ? `Մուտք դասընթացին – SuperEngulfing\n\nՏեսանյութում մանրամասն բացատրվում է, ինչպես ստանալ մուտք:\n\nԲացել մուտքի էջը: ${courseAccessUrl}\n\nԻնչպես ստանալ մուտք: Գրանցվել, ավելացնել $100 և գործարք կատարել, ներկայացնել UID մուտքի էջում։`
-        : `Do you want the course access email? – SuperEngulfing\n\nIn the video you'll see exactly how to get access.\n\nGo to Access page: ${courseAccessUrl}\n\nHow it works: Register, deposit $100 and trade, submit your UID on the Access page. We'll verify within 24 hours.`;
+        ? `Հիշեցում – մուտք SuperEngulfing դասընթացին\n\nՈղջույն,\n\nPDF‑ն արդեն ուղարկվել է քո էլ․ հասցեին։ Եթե բաց ես թողել տեսանյութը Thank You էջում, ահա ամփոփ տարբերակը.\n\nՆկարահանված է 10+ դասից բաղկացած մինի դասընթաց Super Engulfing ռազմավարության մասին և հատուկ ինդիկատոր, որը կարող ես ստանալ անվճար.\n\nԻնչ է ներառված.\n• «Փիղը սենյակում» – ինչու են քո ստոպերն ակտիվանում\n• Լիկվիդայնություն և շուկայի կառուցվածք\n• Super Engulfing տրամաբանությունը (Reversal, Run, Plus)\n• 2 աշխատող ստրատեգիա Super Engulfing հիման վրա\n\nԻնչպես ստանալ անվճար մուտք.\n1) Գրանցվիր Weex բորսայում իմ հղումով\n2) Լիցքավորիր հաշիվդ $100‑ով և բացիր մեկ գործարք\n3) Մուտքի էջում գրիր UID‑դ և էլ․ հասցեն\n\nՄուտքի էջի հղումը՝ ${courseAccessUrl}\n\nԱյս քայլերը կատարելուց հետո 24 ժամվա ընթացքում կստուգեմ UID‑դ և կուղարկեմ մուտքերը.\n\nՀայկ`
+        : `In case you missed the video – SuperEngulfing access\n\nHello,\n\nThanks for grabbing the PDF — it should be in your inbox.\n\nIn case you didn’t watch the video on the Thank You page, here’s what it covers:\n\n• 14‑lesson mini‑course on the Super Engulfer strategy\n• Why most traders get stopped out right before the move\n• Liquidity & market structure, Super Engulfer candle logic, and the Run / Rev / Plus patterns\n• Two live strategies plus a full guide on using the indicator\n\nHow to get free access:\n1) Register at Weex via our affiliate link\n2) Deposit $100 and place one trade (your own capital)\n3) Submit your UID on the Access page so we can verify you\n\nAccess page: ${courseAccessUrl}\n\nOnce you complete these steps, we’ll verify your UID within 24 hours and give you full access.\n\nSee you on the inside!\nHayk\nSuper Engulfers Team`;
 
     try {
         await transporter.sendMail({
